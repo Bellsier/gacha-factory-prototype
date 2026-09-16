@@ -142,6 +142,11 @@
   }
   #log div{padding:2px 0; border-bottom:1px dashed #22282d;}
   #log div:last-child{border-bottom:none;}
+  .next-hint{
+    background:var(--panel); border:1px solid var(--amber-dim);
+    color:var(--text); font-size:0.78rem; line-height:1.55;
+    padding:10px 14px; border-radius:6px; margin-bottom:14px;
+  }
 </style>
 </head>
 <body>
@@ -157,9 +162,11 @@
 
   <div class="currencies">
     <div class="cur"><div class="label">골드</div><div class="value" id="goldVal">0</div></div>
-    <div class="cur ticket"><div class="label">가챠권</div><div class="value" id="ticketVal">1</div></div>
+    <div class="cur ticket"><div class="label">가챠권</div><div class="value" id="ticketVal">0</div></div>
     <div class="cur prestige"><div class="label">명성 포인트</div><div class="value" id="prestigeVal">0</div></div>
   </div>
+
+  <div class="next-hint" id="nextHint">채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다.</div>
 
   <div class="tabbar">
     <button class="tab-btn active" data-tab="mining">채굴</button>
@@ -170,6 +177,7 @@
   <div id="tab-mining" class="tab-panel active">
     <section>
       <h2>채굴장</h2>
+      <p class="rate" style="margin:0 0 10px;">캔 광석은 골드가 아닙니다. 위쪽 <b>개발</b> 탭에서 제작·판매해야 골드가 됩니다.</p>
       <div id="lines"></div>
     </section>
   </div>
@@ -214,9 +222,9 @@
       <div>현재 영구 배율 <span class="mult" id="multVal">×1.00</span></div>
       <p>이번 회차 골드 <span id="runGoldVal">0</span>G — 초기화하면 모든 자원·제품·일꾼이 사라지고, 일정 골드당 명성 포인트 1점을 얻어 다음 회차부터 영구히 더 빨라집니다. <button id="prestigeInfoBtn" class="ghost" style="width:auto; padding:2px 8px; font-size:0.7rem; margin:0; border-radius:50%;">?</button></p>
       <div id="prestigeInfoBox" style="display:none; font-size:0.7rem; color:var(--dim); background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin:0 0 10px; line-height:1.6;">
-        정확한 공식: 명성 포인트 = ⌊√(골드 ÷ 50)⌋<br>
-        50G→1점 · 200G→2점 · 450G→3점 · 800G→4점 · 1,250G→5점 · 1,800G→6점 · 2,450G→7점<br>
-        갈수록 다음 1점을 얻는 데 필요한 골드가 훨씬 많이 늘어나는 방식입니다.
+        정확한 공식: 명성 포인트 = ⌊√(골드 ÷ 200)⌋ (일꾼 1명 이상일 때만)<br>
+        200G→1점 · 800G→2점 · 1,800G→3점 · 3,200G→4점 · 5,000G→5점<br>
+        첫 가챠권(50G)과 겹치지 않게, 일꾼을 뽑고 공방을 굴린 뒤에 초기화하세요.
       </div>
       <div style="margin-bottom:10px; font-size:0.8rem;">지금 초기화하면 <span id="prestigeGainPreview" style="color:var(--legend); font-family:'Space Grotesk'; font-weight:700;">+0</span> 획득</div>
       <button id="prestigeBtn">초기화하고 명성 얻기</button>
@@ -268,10 +276,9 @@ const STAT_BASE_COST = {mining:40, carry:60, move:50};
 const STAT_GROWTH = 1.35;
 // First mining, then earn your way into your first worker: crossing this much
 // gold (before spending any of it) grants exactly one free gacha ticket, once,
-// ever — even across prestige. 50G was chosen because it's already the game's
-// natural "first milestone" (it's also the exact threshold for the first
-// prestige point), and it's reachable in a handful of mine→craft→sell cycles
-// without needing a facility/workforce upgrade first.
+// ever — even across prestige. 50G is a handful of mine→craft→sell cycles and
+// is no longer the prestige threshold (that starts at 200G, and only after a
+// worker has been pulled).
 const FIRST_GACHA_GOLD_THRESHOLD = 50;
 
 let state = freshRunState();
@@ -343,13 +350,36 @@ function log(msg){
   while(el.children.length > 40) el.removeChild(el.lastChild);
 }
 
-function fmt(n){ return Math.floor(n).toLocaleString(); }
+function fmt(n){
+  if(n <= 0) return '0';
+  if(n < 10 && n % 1 !== 0) return n.toFixed(1);
+  return Math.floor(n).toLocaleString();
+}
 
 // Shared helpers to avoid repeating the same formula/lookup everywhere.
 function resName(key){ return RESOURCES.find(r=>r.key===key).name; }
 function expCost(base, growth, level){ return Math.round(base * Math.pow(growth, level)); }
 function dis(condition){ return condition ? 'disabled' : ''; }
-function prestigeGain(){ return Math.floor(Math.sqrt(state.runGold/50)); }
+function prestigeGain(){
+  if(state.characters.length < 1) return 0;
+  return Math.floor(Math.sqrt(state.runGold/200));
+}
+
+function updateNextHint(){
+  const el = document.getElementById('nextHint');
+  if(!el) return;
+  if(!window.firstGachaGranted){
+    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${FIRST_GACHA_GOLD_THRESHOLD}G)`;
+  } else if(state.characters.length === 0){
+    el.textContent = window.tickets >= 1
+      ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
+      : '인부 탭에서 일꾼을 뽑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
+  } else if(prestigeGain() <= 0){
+    el.textContent = '일꾼을 채굴장에 배치하고 공방을 굴리세요. 이번 회차 200G부터 명성 1점을 얻습니다.';
+  } else {
+    el.textContent = `이번 회차를 초기화하면 명성 +${prestigeGain()}점을 얻습니다. 일꾼·자원은 사라지고 영구 배율이 남습니다.`;
+  }
+}
 
 function renderCurrencies(){
   document.getElementById('goldVal').textContent = fmt(state.gold);
@@ -528,7 +558,7 @@ function buildRecipes(){
       <div class="stock" data-stock="${r.key}">${fmt(state.products[r.key])}개 보유</div>
       <div class="row">
         <button data-craft="${r.key}" ${dis(!canCraft(r))}>제작</button>
-        <button data-sell="${r.key}" class="ghost" ${dis(state.products[r.key]<=0)}>전량 판매 (${r.sell}G/개)</button>
+        <button data-sell="${r.key}" class="ghost" ${dis(state.products[r.key]<=0)}>전량 판매 (${fmt(r.sell * mult())}G/개)</button>
       </div>
       <label class="toggle-auto">
         <input type="checkbox" data-autocraft="${r.key}" ${state.autoCraft[r.key]?'checked':''} ${dis(!autoUnlocked)}>
@@ -670,11 +700,13 @@ function pullGacha(){
   renderLastPull();
   renderCurrencies();
   if(wasEmpty) buildRecipes(); // auto-craft just unlocked, checkbox needs enabling
+  updateNumbers();
 }
 
 document.getElementById('gachaTicketBtn').onclick = ()=>{
   if(window.tickets < 1) return;
   window.tickets -= 1;
+  document.getElementById('gachaTicketBtn').disabled = window.tickets < 1;
   pullGacha();
 };
 document.getElementById('gachaGoldBtn').onclick = ()=>{
@@ -699,6 +731,10 @@ document.getElementById('prestigeInfoBtn').onclick = ()=>{
 };
 
 document.getElementById('prestigeBtn').onclick = ()=>{
+  if(state.characters.length < 1){
+    log('일꾼을 한 명 이상 뽑은 뒤에 초기화할 수 있습니다.');
+    return;
+  }
   const gain = prestigeGain();
   if(gain <= 0){
     log('명성 포인트를 얻으려면 이번 회차에서 더 골드를 벌어야 합니다.');
@@ -706,9 +742,9 @@ document.getElementById('prestigeBtn').onclick = ()=>{
   }
   if(!confirm(`초기화하면 모든 자원/제품/일꾼이 사라집니다. 명성 포인트 +${gain}을 얻고 다음 회차를 시작할까요?`)) return;
   totalPrestige += gain;
+  state = freshRunState();
   log(`── 회차 ${runCount} 종료. 명성 포인트 +${gain} (누적 ${totalPrestige}, 배율 ×${mult().toFixed(2)}) ──`);
   runCount++;
-  state = freshRunState();
   renderAll();
 };
 
@@ -716,6 +752,7 @@ document.getElementById('prestigeBtn').onclick = ()=>{
 // elements — never rebuilds the DOM, so nothing flickers and clicks never
 // get dropped mid-render.
 function updateNumbers(){
+  updateNextHint();
   const hint = document.getElementById('firstGachaHint');
   hint.textContent = window.firstGachaGranted
     ? '일반 60% · 희귀 25% · 영웅 12% · 전설 3%'
@@ -747,7 +784,10 @@ function updateNumbers(){
       }
     }
     const sellBtn = document.querySelector(`[data-sell="${r.key}"]`);
-    if(sellBtn) sellBtn.disabled = state.products[r.key] <= 0 || (state.autoSell[r.key] && state.autoSellOn[r.key]);
+    if(sellBtn){
+      sellBtn.disabled = state.products[r.key] <= 0 || (state.autoSell[r.key] && state.autoSellOn[r.key]);
+      sellBtn.textContent = `전량 판매 (${fmt(r.sell * mult())}G/개)`;
+    }
     const buyAutoSellBtn = document.querySelector(`[data-buyautosell="${r.key}"]`);
     if(buyAutoSellBtn) buyAutoSellBtn.disabled = state.gold < autoSellCost(r);
   });
