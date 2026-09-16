@@ -157,7 +157,7 @@
       <h1>채굴 공방</h1>
       <div class="sub">뽑기 × 공장형 프로토타입</div>
     </div>
-    <div class="sub">회차 <span id="runNum">1</span></div>
+    <div class="sub">회차 <span id="runNum">1</span> · <span id="saveStatus"></span></div>
   </header>
 
   <div class="currencies">
@@ -363,6 +363,188 @@ function dis(condition){ return condition ? 'disabled' : ''; }
 function prestigeGain(){
   if(state.characters.length < 1) return 0;
   return Math.floor(Math.sqrt(state.runGold/200));
+}
+
+// ---------------------------------------------------------------------------
+// Save / load (localStorage). Task 1. Single storage key, versioned payload,
+// per-field defensive validation. Never touches game balance/rules — only
+// persists and restores the state that already exists above.
+// ---------------------------------------------------------------------------
+const SAVE_KEY = 'gachaFactorySave';
+const CURRENT_SAVE_VERSION = 1;
+let saveBlocked = false;    // true once a future-version save is detected, so we never overwrite it
+let saveFailLogged = false; // avoid spamming the log every 10s while storage stays unavailable
+
+function isFiniteNumber(v){ return typeof v === 'number' && Number.isFinite(v); }
+function isPlainObject(v){ return v !== null && typeof v === 'object' && !Array.isArray(v); }
+
+function storageAvailable(){
+  try{
+    const k = '__save_test__';
+    localStorage.setItem(k, '1');
+    localStorage.removeItem(k);
+    return true;
+  }catch(e){ return false; }
+}
+
+function sanitizeNumberMap(raw, keys, fallback){
+  const out = {};
+  keys.forEach(k=>{ out[k] = isFiniteNumber(raw && raw[k]) ? raw[k] : fallback; });
+  return out;
+}
+function sanitizeBoolMap(raw, keys, fallback){
+  const out = {};
+  keys.forEach(k=>{ out[k] = typeof (raw && raw[k]) === 'boolean' ? raw[k] : fallback; });
+  return out;
+}
+function sanitizeCraftQueueMap(raw, keys){
+  const out = {};
+  keys.forEach(k=>{
+    const v = raw && raw[k];
+    out[k] = (v === null || isFiniteNumber(v)) ? v : null;
+  });
+  return out;
+}
+function sanitizeUnlockedSites(raw){
+  const out = {};
+  SITES.forEach(s=>{
+    const v = raw && raw[s.key];
+    out[s.key] = typeof v === 'boolean' ? v : (s.unlockCost === 0);
+  });
+  return out;
+}
+function sanitizeCharacter(c){
+  if(!isPlainObject(c)) return null;
+  if(!RARITY.some(r=>r.key===c.rarity)) return null;
+  if(!RESOURCES.some(r=>r.key===c.resource)) return null;
+  const nums = ['mining','carry','move','miningLvl','carryLvl','moveLvl'];
+  if(!nums.every(k=>isFiniteNumber(c[k]))) return null;
+  return {
+    rarity:c.rarity, resource:c.resource,
+    mining:c.mining, carry:c.carry, move:c.move,
+    miningLvl:c.miningLvl, carryLvl:c.carryLvl, moveLvl:c.moveLvl,
+  };
+}
+function sanitizeCharacters(raw){
+  if(!Array.isArray(raw)) return [];
+  return raw.map(sanitizeCharacter).filter(c=>c!==null);
+}
+
+// Rebuilds a fully-valid run state from (possibly malformed) saved data.
+// Any single bad field falls back to its default; every other, valid field
+// is kept — a corrupted `characters` array doesn't wipe out `resources`, etc.
+function sanitizeRunState(raw){
+  const fresh = freshRunState();
+  if(!isPlainObject(raw)) return fresh;
+  const resKeys = RESOURCES.map(r=>r.key);
+  const recipeKeys = RECIPES.map(r=>r.key);
+  return {
+    resources: sanitizeNumberMap(raw.resources, resKeys, 0),
+    products: sanitizeNumberMap(raw.products, recipeKeys, 0),
+    gold: isFiniteNumber(raw.gold) ? raw.gold : 0,
+    runGold: isFiniteNumber(raw.runGold) ? raw.runGold : 0,
+    characters: sanitizeCharacters(raw.characters),
+    lastPull: sanitizeCharacter(raw.lastPull), // cosmetic only; null is a safe fallback
+    facility: sanitizeNumberMap(raw.facility, resKeys, 0),
+    workforce: sanitizeNumberMap(raw.workforce, resKeys, 0),
+    unlockedSites: sanitizeUnlockedSites(raw.unlockedSites),
+    autoCraft: sanitizeBoolMap(raw.autoCraft, recipeKeys, false),
+    autoSell: sanitizeBoolMap(raw.autoSell, recipeKeys, false),
+    autoSellOn: sanitizeBoolMap(raw.autoSellOn, recipeKeys, true),
+    craftQueue: sanitizeCraftQueueMap(raw.craftQueue, recipeKeys), // paused countdowns restored as-is
+    hqLevel: isFiniteNumber(raw.hqLevel) ? raw.hqLevel : 0,
+  };
+}
+function sanitizePermanent(raw){
+  const fresh = { totalPrestige:0, runCount:1, tickets:0, firstGachaGranted:false };
+  if(!isPlainObject(raw)) return fresh;
+  return {
+    totalPrestige: isFiniteNumber(raw.totalPrestige) ? raw.totalPrestige : 0,
+    runCount: isFiniteNumber(raw.runCount) ? raw.runCount : 1,
+    tickets: isFiniteNumber(raw.tickets) ? raw.tickets : 0,
+    firstGachaGranted: typeof raw.firstGachaGranted === 'boolean' ? raw.firstGachaGranted : false,
+  };
+}
+
+// Structure for future migrations: each entry converts a payload FROM that
+// saveVersion TO the next one. Empty for now since CURRENT_SAVE_VERSION is
+// still 1 — add entries here (keyed by the version being upgraded FROM) when
+// the save shape needs to change later.
+const SAVE_MIGRATIONS = {
+  // 1: function(payload){ ...convert payload.run/permanent...; payload.saveVersion = 2; return payload; }
+};
+function migrateSave(payload){
+  let v = payload.saveVersion;
+  while(v < CURRENT_SAVE_VERSION && SAVE_MIGRATIONS[v]){
+    payload = SAVE_MIGRATIONS[v](payload);
+    v = payload.saveVersion;
+  }
+  return payload;
+}
+
+function setSaveStatus(text){
+  const el = document.getElementById('saveStatus');
+  if(el) el.textContent = text;
+}
+
+function saveGame(){
+  if(saveBlocked) return false; // a future-version save exists on disk — never overwrite it
+  try{
+    if(!storageAvailable()){
+      if(!saveFailLogged){ log('저장할 수 없음'); saveFailLogged = true; }
+      setSaveStatus('저장 안 됨');
+      return false;
+    }
+    const payload = {
+      saveVersion: CURRENT_SAVE_VERSION,
+      savedAt: Date.now(),
+      permanent: { totalPrestige, runCount, tickets: window.tickets, firstGachaGranted: window.firstGachaGranted },
+      run: state,
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    saveFailLogged = false;
+    setSaveStatus('저장됨');
+    return true;
+  }catch(e){
+    if(!saveFailLogged){ log('저장할 수 없음'); saveFailLogged = true; }
+    setSaveStatus('저장 안 됨');
+    return false;
+  }
+}
+
+// Returns one of:
+//   {ok:true, permanent, run}
+//   {ok:false, reason:'none'}        — nothing saved yet (not an error)
+//   {ok:false, reason:'unavailable'} — localStorage can't be used here
+//   {ok:false, reason:'corrupted'}   — save exists but isn't valid JSON/shape
+//   {ok:false, reason:'future'}      — save is from a newer saveVersion than this build understands
+function loadGame(){
+  let raw;
+  try{
+    if(!storageAvailable()) return { ok:false, reason:'unavailable' };
+    raw = localStorage.getItem(SAVE_KEY);
+  }catch(e){
+    return { ok:false, reason:'unavailable' };
+  }
+  if(!raw) return { ok:false, reason:'none' };
+  let payload;
+  try{
+    payload = JSON.parse(raw);
+  }catch(e){
+    return { ok:false, reason:'corrupted' };
+  }
+  if(!isPlainObject(payload) || !isFiniteNumber(payload.saveVersion)){
+    return { ok:false, reason:'corrupted' };
+  }
+  if(payload.saveVersion > CURRENT_SAVE_VERSION){
+    return { ok:false, reason:'future' }; // never touch the raw storage in this case
+  }
+  payload = migrateSave(payload);
+  return {
+    ok:true,
+    permanent: sanitizePermanent(payload.permanent),
+    run: sanitizeRunState(payload.run),
+  };
 }
 
 function updateNextHint(){
@@ -746,6 +928,7 @@ document.getElementById('prestigeBtn').onclick = ()=>{
   log(`── 회차 ${runCount} 종료. 명성 포인트 +${gain} (누적 ${totalPrestige}, 배율 ×${mult().toFixed(2)}) ──`);
   runCount++;
   renderAll();
+  saveGame();
 };
 
 // Runs 10x/second: only touches numbers and disabled flags on EXISTING
@@ -805,7 +988,7 @@ function updateNumbers(){
   renderCurrencies();
 }
 
-let tickTimer = setInterval(()=>{
+function tickLoop(){
   RESOURCES.forEach(r=>{
     const rate = autoRate(r.key);
     if(rate>0) state.resources[r.key] += rate/10;
@@ -823,16 +1006,16 @@ let tickTimer = setInterval(()=>{
     if(state.autoSell[r.key] && state.autoSellOn[r.key]) sellAll(r, true);
   });
   updateNumbers();
-}, 100);
+}
 
 // passive ticket trickle — only once the first (50G-earned) ticket has been
 // granted, so this can't bypass the early progression gate by just idling
-let ticketTimer = setInterval(()=>{
+function ticketTrickle(){
   if(!window.firstGachaGranted) return;
   window.tickets += 1;
   log('가챠권 +1 (자동 지급)');
   renderCurrencies();
-}, 45000);
+}
 
 function renderAll(){
   renderCurrencies();
@@ -842,8 +1025,43 @@ function renderAll(){
   renderLastPull();
   updateNumbers();
 }
-renderAll();
-log('공방 가동을 시작합니다. 채굴장을 눌러 자원을 모으세요.');
+
+// ---------------------------------------------------------------------------
+// Startup sequence: the save (if any) is loaded and applied to `state` BEFORE
+// renderAll() and BEFORE the tick/ticket/autosave loops are created. This
+// guarantees the very first tick ever operates on the restored state, never
+// on freshRunState() defaults.
+// ---------------------------------------------------------------------------
+let tickTimer, ticketTimer, autoSaveTimer;
+(function boot(){
+  const loaded = loadGame();
+  if(loaded.ok){
+    state = loaded.run;
+    totalPrestige = loaded.permanent.totalPrestige;
+    runCount = loaded.permanent.runCount;
+    window.tickets = loaded.permanent.tickets;
+    window.firstGachaGranted = loaded.permanent.firstGachaGranted;
+  } else if(loaded.reason === 'corrupted'){
+    log('저장 데이터를 불러오지 못해 새로 시작합니다');
+  } else if(loaded.reason === 'future'){
+    saveBlocked = true;
+    log('더 최신 버전의 저장 데이터가 있어 이 게임에서는 불러올 수 없습니다. 이번 세션은 저장 없이 진행됩니다.');
+  }
+  // 'none' (no save yet) and 'unavailable' (storage inaccessible) are not
+  // announced here — they aren't errors, and 'unavailable' will surface
+  // naturally as '저장 안 됨' the moment an actual save attempt is made.
+
+  renderAll();
+  log(loaded.ok ? '이전 진행 상황을 불러왔습니다.' : '공방 가동을 시작합니다. 채굴장을 눌러 자원을 모으세요.');
+
+  tickTimer = setInterval(tickLoop, 100);
+  ticketTimer = setInterval(ticketTrickle, 45000);
+  autoSaveTimer = setInterval(saveGame, 10000);
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'hidden') saveGame();
+  });
+  window.addEventListener('beforeunload', ()=>{ saveGame(); });
+})();
 </script>
 </body>
 </html>
