@@ -376,6 +376,8 @@ let saveBlocked = false;    // true once a future-version save is detected, so w
 let saveFailLogged = false; // avoid spamming the log every 10s while storage stays unavailable
 
 function isFiniteNumber(v){ return typeof v === 'number' && Number.isFinite(v); }
+function isNonNegativeFinite(v){ return isFiniteNumber(v) && v >= 0; }
+function isNonNegativeInt(v){ return isNonNegativeFinite(v) && Number.isInteger(v); }
 function isPlainObject(v){ return v !== null && typeof v === 'object' && !Array.isArray(v); }
 
 function storageAvailable(){
@@ -387,9 +389,10 @@ function storageAvailable(){
   }catch(e){ return false; }
 }
 
-function sanitizeNumberMap(raw, keys, fallback){
+function sanitizeNumberMap(raw, keys, fallback, validator){
+  const check = validator || isFiniteNumber;
   const out = {};
-  keys.forEach(k=>{ out[k] = isFiniteNumber(raw && raw[k]) ? raw[k] : fallback; });
+  keys.forEach(k=>{ out[k] = check(raw && raw[k]) ? raw[k] : fallback; });
   return out;
 }
 function sanitizeBoolMap(raw, keys, fallback){
@@ -401,7 +404,7 @@ function sanitizeCraftQueueMap(raw, keys){
   const out = {};
   keys.forEach(k=>{
     const v = raw && raw[k];
-    out[k] = (v === null || isFiniteNumber(v)) ? v : null;
+    out[k] = (v === null || isNonNegativeFinite(v)) ? v : null;
   });
   return out;
 }
@@ -418,7 +421,7 @@ function sanitizeCharacter(c){
   if(!RARITY.some(r=>r.key===c.rarity)) return null;
   if(!RESOURCES.some(r=>r.key===c.resource)) return null;
   const nums = ['mining','carry','move','miningLvl','carryLvl','moveLvl'];
-  if(!nums.every(k=>isFiniteNumber(c[k]))) return null;
+  if(!nums.every(k=>isNonNegativeFinite(c[k]))) return null;
   return {
     rarity:c.rarity, resource:c.resource,
     mining:c.mining, carry:c.carry, move:c.move,
@@ -439,29 +442,29 @@ function sanitizeRunState(raw){
   const resKeys = RESOURCES.map(r=>r.key);
   const recipeKeys = RECIPES.map(r=>r.key);
   return {
-    resources: sanitizeNumberMap(raw.resources, resKeys, 0),
-    products: sanitizeNumberMap(raw.products, recipeKeys, 0),
-    gold: isFiniteNumber(raw.gold) ? raw.gold : 0,
-    runGold: isFiniteNumber(raw.runGold) ? raw.runGold : 0,
+    resources: sanitizeNumberMap(raw.resources, resKeys, 0, isNonNegativeFinite),
+    products: sanitizeNumberMap(raw.products, recipeKeys, 0, isNonNegativeFinite),
+    gold: isNonNegativeFinite(raw.gold) ? raw.gold : 0,
+    runGold: isNonNegativeFinite(raw.runGold) ? raw.runGold : 0,
     characters: sanitizeCharacters(raw.characters),
     lastPull: sanitizeCharacter(raw.lastPull), // cosmetic only; null is a safe fallback
-    facility: sanitizeNumberMap(raw.facility, resKeys, 0),
-    workforce: sanitizeNumberMap(raw.workforce, resKeys, 0),
+    facility: sanitizeNumberMap(raw.facility, resKeys, 0, isNonNegativeFinite),
+    workforce: sanitizeNumberMap(raw.workforce, resKeys, 0, isNonNegativeFinite),
     unlockedSites: sanitizeUnlockedSites(raw.unlockedSites),
     autoCraft: sanitizeBoolMap(raw.autoCraft, recipeKeys, false),
     autoSell: sanitizeBoolMap(raw.autoSell, recipeKeys, false),
     autoSellOn: sanitizeBoolMap(raw.autoSellOn, recipeKeys, true),
     craftQueue: sanitizeCraftQueueMap(raw.craftQueue, recipeKeys), // paused countdowns restored as-is
-    hqLevel: isFiniteNumber(raw.hqLevel) ? raw.hqLevel : 0,
+    hqLevel: isNonNegativeInt(raw.hqLevel) ? raw.hqLevel : 0, // hqLevel is always a whole level in normal play
   };
 }
 function sanitizePermanent(raw){
   const fresh = { totalPrestige:0, runCount:1, tickets:0, firstGachaGranted:false };
   if(!isPlainObject(raw)) return fresh;
   return {
-    totalPrestige: isFiniteNumber(raw.totalPrestige) ? raw.totalPrestige : 0,
-    runCount: isFiniteNumber(raw.runCount) ? raw.runCount : 1,
-    tickets: isFiniteNumber(raw.tickets) ? raw.tickets : 0,
+    totalPrestige: isNonNegativeFinite(raw.totalPrestige) ? raw.totalPrestige : 0,
+    runCount: (Number.isInteger(raw.runCount) && raw.runCount >= 1) ? raw.runCount : 1, // runCount starts at 1 and only ever increments
+    tickets: isNonNegativeFinite(raw.tickets) ? raw.tickets : 0,
     firstGachaGranted: typeof raw.firstGachaGranted === 'boolean' ? raw.firstGachaGranted : false,
   };
 }
