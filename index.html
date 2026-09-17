@@ -272,14 +272,54 @@ const RARITY = [
   {key:'legend', label:'전설', chance:3,  mining:5, carry:8, move:5, cls:'legend'},
 ];
 const STAT_LABEL = {mining:'채굴속도', carry:'물자 이동량', move:'이동속도'};
-const STAT_BASE_COST = {mining:40, carry:60, move:50};
-const STAT_GROWTH = 1.35;
-// First mining, then earn your way into your first worker: crossing this much
-// gold (before spending any of it) grants exactly one free gacha ticket, once,
-// ever — even across prestige. 50G is a handful of mine→craft→sell cycles and
-// is no longer the prestige threshold (that starts at 200G, and only after a
-// worker has been pulled).
-const FIRST_GACHA_GOLD_THRESHOLD = 50;
+
+// ---------------------------------------------------------------------------
+// BALANCE — every gameplay-tunable number that lives in a function body
+// (rather than in RESOURCES/RECIPES/RARITY/SITES, which are already
+// content-data and stay untouched). Values are copied verbatim from the
+// prior hardcoded literals; nothing here changes game balance.
+// TICK_MS is kept separate: it's an engine timing constant, not a balance
+// knob (see tickLoop's use of TICKS_PER_SECOND below, which preserves the
+// existing rate/10 and -0.1 relationships bit-for-bit).
+// ---------------------------------------------------------------------------
+const TICK_MS = 100;
+const TICKS_PER_SECOND = 1000/TICK_MS; // exactly 10 — used to derive per-tick fractions bit-identically to the prior /10 and -0.1 literals
+const BALANCE = {
+  prestige: {
+    MULTIPLIER_PER_POINT: 0.15, // mult(): permanent multiplier gained per prestige point
+    GOLD_DIVISOR: 200,          // prestigeGain(): floor(sqrt(runGold / GOLD_DIVISOR))
+  },
+  hq: {
+    MULTIPLIER_PER_LEVEL: 0.08, // hqMult(): run-scoped multiplier gained per HQ level
+    COST_BASE: 150,             // hqCost(): base cost of HQ level 0
+    COST_GROWTH: 1.6,           // hqCost(): cost growth factor per level
+  },
+  mining: {
+    WORKFORCE_BONUS_MULTIPLIER: 1.5, // autoRate(): auto-mining bonus per workforce level
+    FACILITY_COST_BASE: 20,          // facilityCost(): base cost of facility level 0
+    FACILITY_COST_GROWTH: 1.4,       // facilityCost(): cost growth factor per level
+    FACILITY_BONUS_PER_LEVEL: 1,     // manual-yield bonus added per facility level purchased
+    WORKFORCE_COST_BASE: 15,         // workforceCost(): base cost of workforce level 0
+    WORKFORCE_COST_GROWTH: 1.35,     // workforceCost(): cost growth factor per level
+    WORKFORCE_BONUS_PER_LEVEL: 1,    // auto-mining bonus added per workforce level purchased
+  },
+  worker: {
+    EFFECTIVE_DIVISOR: 16,       // workerEffective(): (mining*carry*move) / EFFECTIVE_DIVISOR
+    STAT_COST_BASE: {mining:40, carry:60, move:50}, // workerUpgradeCost(): base cost per stat
+    STAT_COST_GROWTH: 1.35,      // workerUpgradeCost(): cost growth factor per stat level
+    STAT_INCREMENT_PER_UPGRADE: 1, // stat gain per upgrade purchase
+    MIN_REQUIRED: 1,             // minimum workers needed for prestige / auto-craft unlock
+  },
+  selling: {
+    AUTO_SELL_COST_MULTIPLIER: 20, // autoSellCost(): recipe.sell * AUTO_SELL_COST_MULTIPLIER
+  },
+  gacha: {
+    FIRST_TICKET_GOLD_THRESHOLD: 50, // one-time gold milestone that grants the first ticket
+    PULL_COST_GOLD: 50,              // gold cost of a direct gold-funded gacha pull
+    PULL_COST_TICKET: 1,             // tickets consumed per ticket-funded gacha pull
+    TICKET_TRICKLE_MS: 45000,        // passive automatic ticket grant interval
+  },
+};
 
 let state = freshRunState();
 let totalPrestige = 0;
@@ -307,9 +347,9 @@ function freshRunState(){
   };
 }
 
-function mult(){ return (1 + totalPrestige * 0.15) * hqMult(); }
-function hqMult(){ return 1 + state.hqLevel * 0.08; }
-function hqCost(){ return expCost(150, 1.6, state.hqLevel); }
+function mult(){ return (1 + totalPrestige * BALANCE.prestige.MULTIPLIER_PER_POINT) * hqMult(); }
+function hqMult(){ return 1 + state.hqLevel * BALANCE.hq.MULTIPLIER_PER_LEVEL; }
+function hqCost(){ return expCost(BALANCE.hq.COST_BASE, BALANCE.hq.COST_GROWTH, state.hqLevel); }
 
 function isUnlocked(resKey){
   const r = RESOURCES.find(x=>x.key===resKey);
@@ -317,15 +357,15 @@ function isUnlocked(resKey){
 }
 
 function workerEffective(worker){
-  return worker.mining * worker.carry * worker.move / 16;
+  return worker.mining * worker.carry * worker.move / BALANCE.worker.EFFECTIVE_DIVISOR;
 }
 function workerUpgradeCost(worker, stat){
-  return expCost(STAT_BASE_COST[stat], STAT_GROWTH, worker[stat+'Lvl']);
+  return expCost(BALANCE.worker.STAT_COST_BASE[stat], BALANCE.worker.STAT_COST_GROWTH, worker[stat+'Lvl']);
 }
 
 function autoRate(resKey){
   const charBonus = state.characters.filter(c=>c.resource===resKey).reduce((s,c)=>s+workerEffective(c),0);
-  const workforceBonus = state.workforce[resKey] * 1.5;
+  const workforceBonus = state.workforce[resKey] * BALANCE.mining.WORKFORCE_BONUS_MULTIPLIER;
   return (charBonus + workforceBonus) * mult();
 }
 
@@ -335,11 +375,11 @@ function manualAmount(resKey){
 }
 
 function facilityCost(resKey){
-  return expCost(20, 1.4, state.facility[resKey]);
+  return expCost(BALANCE.mining.FACILITY_COST_BASE, BALANCE.mining.FACILITY_COST_GROWTH, state.facility[resKey]);
 }
 
 function workforceCost(resKey){
-  return expCost(15, 1.35, state.workforce[resKey]);
+  return expCost(BALANCE.mining.WORKFORCE_COST_BASE, BALANCE.mining.WORKFORCE_COST_GROWTH, state.workforce[resKey]);
 }
 
 function log(msg){
@@ -361,8 +401,8 @@ function resName(key){ return RESOURCES.find(r=>r.key===key).name; }
 function expCost(base, growth, level){ return Math.round(base * Math.pow(growth, level)); }
 function dis(condition){ return condition ? 'disabled' : ''; }
 function prestigeGain(){
-  if(state.characters.length < 1) return 0;
-  return Math.floor(Math.sqrt(state.runGold/200));
+  if(state.characters.length < BALANCE.worker.MIN_REQUIRED) return 0;
+  return Math.floor(Math.sqrt(state.runGold/BALANCE.prestige.GOLD_DIVISOR));
 }
 
 // ---------------------------------------------------------------------------
@@ -554,8 +594,8 @@ function updateNextHint(){
   const el = document.getElementById('nextHint');
   if(!el) return;
   if(!window.firstGachaGranted){
-    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${FIRST_GACHA_GOLD_THRESHOLD}G)`;
-  } else if(state.characters.length === 0){
+    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+  } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     el.textContent = window.tickets >= 1
       ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
       : '인부 탭에서 일꾼을 뽑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
@@ -664,7 +704,7 @@ function buildLines(){
       const cost = facilityCost(key);
       if(state.resources[key] < cost) return;
       state.resources[key] -= cost;
-      state.facility[key]++;
+      state.facility[key] += BALANCE.mining.FACILITY_BONUS_PER_LEVEL;
       log(`채굴 도구 강화: ${resName(key)} 라인 Lv.${state.facility[key]} (${resName(key)} ${cost}개 소모)`);
       buildLines(); // rate/cost/level text changed → structural rebuild is fine here (rare event)
     };
@@ -675,7 +715,7 @@ function buildLines(){
       const cost = workforceCost(key);
       if(state.resources[key] < cost) return;
       state.resources[key] -= cost;
-      state.workforce[key]++;
+      state.workforce[key] += BALANCE.mining.WORKFORCE_BONUS_PER_LEVEL;
       log(`인력 강화: ${resName(key)} 라인 Lv.${state.workforce[key]} (${resName(key)} ${cost}개 소모)`);
       buildLines(); // rate/cost/level text changed → structural rebuild is fine here (rare event)
     };
@@ -702,7 +742,7 @@ function startCraft(recipe){
   }
   return true;
 }
-function autoSellCost(recipe){ return recipe.sell * 20; }
+function autoSellCost(recipe){ return recipe.sell * BALANCE.selling.AUTO_SELL_COST_MULTIPLIER; }
 function sellAll(recipe, silent){
   const qty = state.products[recipe.key];
   if(qty<=0) return;
@@ -711,7 +751,7 @@ function sellAll(recipe, silent){
   state.runGold += earned;
   state.products[recipe.key] = 0;
   if(!silent) log(`${recipe.name} ${fmt(qty)}개 판매 → +${fmt(earned)}G`);
-  if(!window.firstGachaGranted && state.gold >= FIRST_GACHA_GOLD_THRESHOLD){
+  if(!window.firstGachaGranted && state.gold >= BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD){
     window.firstGachaGranted = true;
     window.tickets += 1;
     log('🎟️ 첫 가챠권 획득! 이제 인부를 뽑을 수 있습니다.');
@@ -723,7 +763,7 @@ function sellAll(recipe, silent){
 function buildRecipes(){
   const wrap = document.getElementById('recipes');
   wrap.innerHTML = '';
-  const autoUnlocked = state.characters.length > 0;
+  const autoUnlocked = state.characters.length >= BALANCE.worker.MIN_REQUIRED;
   RECIPES.forEach(r=>{
     // Hide recipes whose raw resource inputs aren't unlocked yet, to avoid clutter.
     const needsLockedResource = Object.keys(r.need).some(k=>{
@@ -856,7 +896,7 @@ function buildWorkers(){
       const cost = workerUpgradeCost(worker, stat);
       if(state.gold < cost) return;
       state.gold -= cost;
-      worker[stat] += 1;
+      worker[stat] += BALANCE.worker.STAT_INCREMENT_PER_UPGRADE;
       worker[stat+'Lvl']++;
       log(`일꾼 강화: #${idx+1} ${STAT_LABEL[stat]} 상승 (Lv.${worker[stat+'Lvl']})`);
       buildWorkers();
@@ -889,14 +929,14 @@ function pullGacha(){
 }
 
 document.getElementById('gachaTicketBtn').onclick = ()=>{
-  if(window.tickets < 1) return;
-  window.tickets -= 1;
-  document.getElementById('gachaTicketBtn').disabled = window.tickets < 1;
+  if(window.tickets < BALANCE.gacha.PULL_COST_TICKET) return;
+  window.tickets -= BALANCE.gacha.PULL_COST_TICKET;
+  document.getElementById('gachaTicketBtn').disabled = window.tickets < BALANCE.gacha.PULL_COST_TICKET;
   pullGacha();
 };
 document.getElementById('gachaGoldBtn').onclick = ()=>{
-  if(state.gold < 50) return;
-  state.gold -= 50;
+  if(state.gold < BALANCE.gacha.PULL_COST_GOLD) return;
+  state.gold -= BALANCE.gacha.PULL_COST_GOLD;
   pullGacha();
 };
 
@@ -916,7 +956,7 @@ document.getElementById('prestigeInfoBtn').onclick = ()=>{
 };
 
 document.getElementById('prestigeBtn').onclick = ()=>{
-  if(state.characters.length < 1){
+  if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     log('일꾼을 한 명 이상 뽑은 뒤에 초기화할 수 있습니다.');
     return;
   }
@@ -942,8 +982,8 @@ function updateNumbers(){
   const hint = document.getElementById('firstGachaHint');
   hint.textContent = window.firstGachaGranted
     ? '일반 60% · 희귀 25% · 영웅 12% · 전설 3%'
-    : `첫 골드 ${FIRST_GACHA_GOLD_THRESHOLD}G를 모으면 첫 가챠권을 드려요 (현재 ${fmt(state.gold)}/${FIRST_GACHA_GOLD_THRESHOLD}G)`;
-  document.getElementById('gachaTicketBtn').disabled = window.tickets < 1;
+    : `첫 골드 ${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G를 모으면 첫 가챠권을 드려요 (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+  document.getElementById('gachaTicketBtn').disabled = window.tickets < BALANCE.gacha.PULL_COST_TICKET;
   RESOURCES.forEach(r=>{
     const el = document.querySelector(`[data-amt="${r.key}"]`);
     if(el) el.textContent = fmt(state.resources[r.key]);
@@ -994,11 +1034,11 @@ function updateNumbers(){
 function tickLoop(){
   RESOURCES.forEach(r=>{
     const rate = autoRate(r.key);
-    if(rate>0) state.resources[r.key] += rate/10;
+    if(rate>0) state.resources[r.key] += rate / TICKS_PER_SECOND;
   });
   RECIPES.forEach(r=>{
     if(state.craftQueue[r.key] !== null){
-      state.craftQueue[r.key] -= 0.1;
+      state.craftQueue[r.key] -= 1/TICKS_PER_SECOND;
       if(state.craftQueue[r.key] <= 0){
         state.craftQueue[r.key] = null;
         state.products[r.key] += r.out;
@@ -1057,8 +1097,8 @@ let tickTimer, ticketTimer, autoSaveTimer;
   renderAll();
   log(loaded.ok ? '이전 진행 상황을 불러왔습니다.' : '공방 가동을 시작합니다. 채굴장을 눌러 자원을 모으세요.');
 
-  tickTimer = setInterval(tickLoop, 100);
-  ticketTimer = setInterval(ticketTrickle, 45000);
+  tickTimer = setInterval(tickLoop, TICK_MS);
+  ticketTimer = setInterval(ticketTrickle, BALANCE.gacha.TICKET_TRICKLE_MS);
   autoSaveTimer = setInterval(saveGame, 10000);
   document.addEventListener('visibilitychange', ()=>{
     if(document.visibilityState === 'hidden') saveGame();
