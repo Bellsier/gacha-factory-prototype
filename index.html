@@ -334,7 +334,7 @@ function freshRunState(){
   RECIPES.forEach(r=>{ products[r.key]=0; autoCraft[r.key]=false; autoSell[r.key]=false; autoSellOn[r.key]=true; craftQueue[r.key]=null; });
   return {
     resources, products, gold:0, runGold:0,
-    characters:[], // {rarity, resource, mining, carry, move, miningLvl, carryLvl, moveLvl}
+    characters:[], // {id, rarity, resource, mining, carry, move, miningLvl, carryLvl, moveLvl}
     lastPull:null,
     facility,   // resource-funded manual-yield upgrade levels (per line)
     workforce,  // resource-funded auto-rate upgrade levels (per line)
@@ -400,6 +400,18 @@ function fmt(n){
 function resName(key){ return RESOURCES.find(r=>r.key===key).name; }
 function expCost(base, growth, level){ return Math.round(base * Math.pow(growth, level)); }
 function dis(condition){ return condition ? 'disabled' : ''; }
+// Stable worker identifier — timestamp+random string, no counter to persist,
+// no crypto.randomUUID() dependency (this file may be opened directly as a
+// local file, where secure-context APIs aren't guaranteed). `existingIds`
+// (a Set) is checked and regenerated on collision, so callers are always
+// guaranteed a fresh, unique id.
+function makeWorkerId(existingIds){
+  let id;
+  do{
+    id = 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  } while(existingIds instanceof Set && existingIds.has(id));
+  return id;
+}
 function prestigeGain(){
   if(state.characters.length < BALANCE.worker.MIN_REQUIRED) return 0;
   return Math.floor(Math.sqrt(state.runGold/BALANCE.prestige.GOLD_DIVISOR));
@@ -462,15 +474,31 @@ function sanitizeCharacter(c){
   if(!RESOURCES.some(r=>r.key===c.resource)) return null;
   const nums = ['mining','carry','move','miningLvl','carryLvl','moveLvl'];
   if(!nums.every(k=>isNonNegativeFinite(c[k]))) return null;
-  return {
+  const result = {
     rarity:c.rarity, resource:c.resource,
     mining:c.mining, carry:c.carry, move:c.move,
     miningLvl:c.miningLvl, carryLvl:c.carryLvl, moveLvl:c.moveLvl,
   };
+  // Preserve an existing valid id as-is; leave it unset otherwise so
+  // sanitizeCharacters (which sees the whole array at once) can backfill it.
+  if(typeof c.id === 'string' && c.id.length > 0) result.id = c.id;
+  return result;
 }
 function sanitizeCharacters(raw){
   if(!Array.isArray(raw)) return [];
-  return raw.map(sanitizeCharacter).filter(c=>c!==null);
+  const chars = raw.map(sanitizeCharacter).filter(c=>c!==null);
+  // Backfill missing ids and resolve duplicates (old saves predate ids
+  // entirely, so this also covers the "no worker has an id yet" case).
+  // Order and all other fields are untouched; the first occurrence of any
+  // duplicate id keeps it, later duplicates get a fresh one.
+  const seenIds = new Set();
+  chars.forEach(c=>{
+    if(typeof c.id !== 'string' || c.id.length === 0 || seenIds.has(c.id)){
+      c.id = makeWorkerId(seenIds);
+    }
+    seenIds.add(c.id);
+  });
+  return chars;
 }
 
 // Rebuilds a fully-valid run state from (possibly malformed) saved data.
@@ -862,7 +890,7 @@ function buildWorkers(){
     div.innerHTML = `
       <div class="wtitle">
         <span class="chip ${rarity.cls}">${rarity.label} #${idx+1}</span>
-        <select data-reassign="${idx}">${options}</select>
+        <select data-reassign data-worker-id="${c.id}">${options}</select>
       </div>
       <div class="worker-stats">
         <span>채굴속도 ${c.mining.toFixed(1)}</span>
@@ -871,17 +899,19 @@ function buildWorkers(){
         <span class="sum">종합 +${workerEffective(c).toFixed(2)}/초</span>
       </div>
       <div class="worker-upgrades">
-        <button class="ghost" data-upstat="mining" data-widx="${idx}" ${dis(state.gold<workerUpgradeCost(c,'mining'))}>채굴속도 강화 (${workerUpgradeCost(c,'mining')}G)</button>
-        <button class="ghost" data-upstat="carry" data-widx="${idx}" ${dis(state.gold<workerUpgradeCost(c,'carry'))}>이동량 강화 (${workerUpgradeCost(c,'carry')}G)</button>
-        <button class="ghost" data-upstat="move" data-widx="${idx}" ${dis(state.gold<workerUpgradeCost(c,'move'))}>이동속도 강화 (${workerUpgradeCost(c,'move')}G)</button>
+        <button class="ghost" data-upstat="mining" data-worker-id="${c.id}" ${dis(state.gold<workerUpgradeCost(c,'mining'))}>채굴속도 강화 (${workerUpgradeCost(c,'mining')}G)</button>
+        <button class="ghost" data-upstat="carry" data-worker-id="${c.id}" ${dis(state.gold<workerUpgradeCost(c,'carry'))}>이동량 강화 (${workerUpgradeCost(c,'carry')}G)</button>
+        <button class="ghost" data-upstat="move" data-worker-id="${c.id}" ${dis(state.gold<workerUpgradeCost(c,'move'))}>이동속도 강화 (${workerUpgradeCost(c,'move')}G)</button>
       </div>
     `;
     wrap.appendChild(div);
   });
   wrap.querySelectorAll('[data-reassign]').forEach(sel=>{
     sel.onchange = ()=>{
-      const idx = +sel.dataset.reassign;
-      const worker = state.characters[idx];
+      const workerId = sel.dataset.workerId;
+      const worker = state.characters.find(w=>w.id===workerId);
+      if(!worker) return;
+      const idx = state.characters.indexOf(worker);
       const oldRes = worker.resource;
       worker.resource = sel.value;
       log(`일꾼 이동: #${idx+1} ${resName(oldRes)} → ${resName(sel.value)}`);
@@ -890,9 +920,11 @@ function buildWorkers(){
   });
   wrap.querySelectorAll('[data-upstat]').forEach(btn=>{
     btn.onclick = ()=>{
-      const idx = +btn.dataset.widx;
+      const workerId = btn.dataset.workerId;
       const stat = btn.dataset.upstat;
-      const worker = state.characters[idx];
+      const worker = state.characters.find(w=>w.id===workerId);
+      if(!worker) return;
+      const idx = state.characters.indexOf(worker);
       const cost = workerUpgradeCost(worker, stat);
       if(state.gold < cost) return;
       state.gold -= cost;
@@ -914,6 +946,7 @@ function pullGacha(){
   const unlockedResources = RESOURCES.filter(r=>isUnlocked(r.key));
   const resource = unlockedResources[Math.floor(Math.random()*unlockedResources.length)];
   const char = {
+    id: makeWorkerId(new Set(state.characters.map(c=>c.id))),
     rarity:picked.key, resource:resource.key,
     mining:picked.mining, carry:picked.carry, move:picked.move,
     miningLvl:0, carryLvl:0, moveLvl:0,
@@ -1018,9 +1051,9 @@ function updateNumbers(){
     if(buyAutoSellBtn) buyAutoSellBtn.disabled = state.gold < autoSellCost(r);
   });
   document.querySelectorAll('[data-upstat]').forEach(btn=>{
-    const idx = +btn.dataset.widx;
+    const workerId = btn.dataset.workerId;
     const stat = btn.dataset.upstat;
-    const worker = state.characters[idx];
+    const worker = state.characters.find(w=>w.id===workerId);
     if(worker) btn.disabled = state.gold < workerUpgradeCost(worker, stat);
   });
   const hqBtn = document.getElementById('hqBtn');
