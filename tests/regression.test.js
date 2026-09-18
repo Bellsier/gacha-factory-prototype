@@ -635,6 +635,155 @@ function advanceTicks(win, n) {
 })();
 
 // =============================================================================
+// TASK 6 — early automation guidance (Next Hint branches + one-time log +
+// locked-site recipe preview)
+// =============================================================================
+
+function makeTestWorker(id, resource) {
+  return { id, rarity: 'common', resource, mining: 1, carry: 2, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 };
+}
+
+(function test_A_noWorkersHintUnchanged() {
+  const win = newDom(makeMemoryStorage()).window;
+  // Grant the first ticket (crosses 50G) but pull no worker yet.
+  win.state.gold = 50;
+  win.window.firstGachaGranted = true;
+  win.window.tickets = 1;
+  win.updateNextHint();
+  const text = win.document.getElementById('nextHint').textContent;
+  check('Task6-A: no-worker hint text is the original "뽑으세요" guidance', text.includes('일꾼') && text.includes('뽑'));
+})();
+
+(function test_B_ironOnlyShowsPartialAutomationHint() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.window.firstGachaGranted = true;
+  win.state.characters.push(makeTestWorker('t1', 'iron'));
+  win.updateNextHint();
+  const text = win.document.getElementById('nextHint').textContent;
+  check('Task6-B: iron-only worker mentions coal as the missing side', text.includes('석탄'));
+  check('Task6-B: iron-only worker does not claim full automation', !text.includes('자동화 완료'));
+})();
+
+(function test_C_coalOnlyShowsPartialAutomationHint() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.window.firstGachaGranted = true;
+  win.state.characters.push(makeTestWorker('t1', 'coal'));
+  win.updateNextHint();
+  const text = win.document.getElementById('nextHint').textContent;
+  check('Task6-C: coal-only worker mentions iron as the missing side', text.includes('철광석'));
+  check('Task6-C: coal-only worker does not claim full automation', !text.includes('자동화 완료'));
+})();
+
+(function test_D_bothSidesShowsFullAutomationHint() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.window.firstGachaGranted = true;
+  win.state.characters.push(makeTestWorker('t1', 'iron'));
+  win.state.characters.push(makeTestWorker('t2', 'coal'));
+  win.updateNextHint();
+  const text = win.document.getElementById('nextHint').textContent;
+  check('Task6-D: both sides covered shows the full-automation hint', text.includes('자동화 완료'));
+
+  // Once autoCraft is turned on, the hint must fall through to the existing
+  // prestige-related branches instead of hiding them forever (section E).
+  win.state.autoCraft.steel = true;
+  win.updateNextHint();
+  const textAfter = win.document.getElementById('nextHint').textContent;
+  check('Task6-E: after autoCraft is on, the automation-complete hint no longer shows', !textAfter.includes('자동화 완료'));
+  check('Task6-E: prestige-related guidance is shown instead', textAfter.includes('명성') || textAfter.includes('200G'));
+})();
+
+(function test_E_logFiresOnceNotEveryTick() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.window.firstGachaGranted = true;
+  win.state.characters.push(makeTestWorker('t1', 'iron'));
+  win.checkDualAutomation();
+  win.state.characters.push(makeTestWorker('t2', 'coal'));
+  win.checkDualAutomation();
+  const countLogLines = () => win.document.querySelectorAll('#log div').length;
+  const countAfterFirst = Array.from(win.document.querySelectorAll('#log div')).filter((d) => d.textContent.includes('자동화 완료')).length;
+  check('Task6-E: milestone log appears exactly once after reaching the condition', countAfterFirst === 1, `count=${countAfterFirst}`);
+
+  // Advance many ticks; the guard (state.autoLineLogged) must prevent repeats.
+  advanceTicks(win, 30);
+  win.checkDualAutomation();
+  win.checkDualAutomation();
+  const countAfterMore = Array.from(win.document.querySelectorAll('#log div')).filter((d) => d.textContent.includes('자동화 완료')).length;
+  check('Task6-E: milestone log does NOT repeat across ticks / repeated calls', countAfterMore === 1, `count=${countAfterMore}`);
+})();
+
+(function test_F_reassignmentUpdatesAutomationStatus() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.window.firstGachaGranted = true;
+  win.window.tickets = 2;
+  win.pullGacha();
+  win.pullGacha();
+  // Force both existing (randomly-assigned) workers onto iron directly, then
+  // reassign one via the real UI control — exactly like a player would.
+  win.state.characters[0].resource = 'iron';
+  win.state.characters[1].resource = 'iron';
+  win.buildWorkers();
+  win.updateNextHint();
+  check('Task6-F: both workers on iron shows the partial-automation hint', win.document.getElementById('nextHint').textContent.includes('석탄'));
+
+  const sel = win.document.querySelectorAll('[data-reassign]')[1];
+  sel.value = 'coal';
+  sel.dispatchEvent(new win.window.Event('change'));
+  win.updateNextHint();
+  const text = win.document.getElementById('nextHint').textContent;
+  check('Task6-F: reassigning the 2nd worker to coal completes automation', text.includes('자동화 완료'));
+  const logHits = Array.from(win.document.querySelectorAll('#log div')).filter((d) => d.textContent.includes('자동화 완료')).length;
+  check('Task6-F: reassignment-triggered milestone logs exactly once', logHits === 1, `count=${logHits}`);
+})();
+
+(function test_G_flagSurvivesSaveLoad() {
+  const storage = makeMemoryStorage();
+  let win = newDom(storage).window;
+  win.window.firstGachaGranted = true;
+  win.state.characters.push(makeTestWorker('t1', 'iron'));
+  win.state.characters.push(makeTestWorker('t2', 'coal'));
+  win.checkDualAutomation();
+  check('Task6-G: autoLineLogged is true before save', win.state.autoLineLogged === true);
+  win.saveGame();
+
+  win = newDom(storage).window;
+  check('Task6-G: autoLineLogged persists as true after reload', win.state.autoLineLogged === true);
+
+  // Re-checking after reload must NOT re-log, since the flag survived.
+  win.checkDualAutomation();
+  const logHits = Array.from(win.document.querySelectorAll('#log div')).filter((d) => d.textContent.includes('자동화 완료')).length;
+  check('Task6-G: no duplicate milestone log after reload', logHits === 0, `count=${logHits}`); // the reload itself logs "이전 진행 상황을 불러왔습니다", not this milestone
+})();
+
+(function test_G2_flagResetsOnPrestige() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.window.tickets = 1;
+  win.pullGacha();
+  win.state.characters.push(makeTestWorker('t2', win.state.characters[0].resource === 'iron' ? 'coal' : 'iron'));
+  win.checkDualAutomation();
+  check('Task6-G2: flag set before prestige', win.state.autoLineLogged === true);
+
+  win.state.runGold = 5000;
+  win.document.getElementById('prestigeBtn').onclick();
+  check('Task6-G2: flag resets to false on the new run after prestige', win.state.autoLineLogged === false);
+})();
+
+(function test_H_lockedSiteShowsExistingRecipesOnly() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.buildLines();
+  const lockedCards = win.document.querySelectorAll('.line.locked');
+  check('Task6-H: locked site cards still render (existing UI preserved)', lockedCards.length >= 3);
+
+  const manaVeinText = Array.from(win.document.querySelectorAll('.site-group')).find((g) => g.textContent.includes('마정석 광맥'));
+  check('Task6-H: manaVein card mentions its minerals', manaVeinText && manaVeinText.textContent.includes('마정석') && manaVeinText.textContent.includes('결정'));
+  check(
+    'Task6-H: manaVein card mentions only recipes that actually use its resources (from real RECIPES data)',
+    manaVeinText && manaVeinText.textContent.includes('마법 합금') && manaVeinText.textContent.includes('결정 합금')
+  );
+  // Must NOT mention recipes belonging to other, unrelated sites.
+  check('Task6-H: manaVein card does not falsely mention ruins/spaceStation recipes', manaVeinText && !manaVeinText.textContent.includes('퀀텀 코어') && !manaVeinText.textContent.includes('정밀 부품'));
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
