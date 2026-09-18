@@ -1,0 +1,12 @@
+{
+  "name": "gacha-factory-prototype",
+  "version": "1.0.0",
+  "private": true,
+  "description": "채굴 공방 — 뽑기 × 공장형 프로토타입. index.html이 전체 게임이며, tests/는 회귀 테스트 하네스입니다.",
+  "scripts": {
+    "test": "node tests/regression.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
+  }
+}
