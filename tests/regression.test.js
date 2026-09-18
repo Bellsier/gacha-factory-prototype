@@ -784,6 +784,157 @@ function makeTestWorker(id, resource) {
 })();
 
 // =============================================================================
+// TASK 9 — coalBrick recipe (candidate A from Task 8): coal-only, independent
+// of steel's iron/coal, reuses all existing RECIPES/canCraft/startCraft/
+// autoSell machinery with no new functions.
+// =============================================================================
+
+(function test_T9A_recipeData() {
+  const win = newDom(makeMemoryStorage()).window;
+  const r = win.RECIPES.find((x) => x.key === 'coalBrick');
+  check('Task9-A: coalBrick exists in RECIPES', !!r);
+  check('Task9-A: coalBrick.need = {coal:3}', r && Object.keys(r.need).length === 1 && r.need.coal === 3);
+  check('Task9-A: coalBrick.out = 1', r && r.out === 1);
+  check('Task9-A: coalBrick.sell = 4', r && r.sell === 4);
+  check('Task9-A: coalBrick.craftTime = 0', r && r.craftTime === 0);
+})();
+
+(function test_T9B_manualCraftConsumesExactly() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.resources.coal = 3;
+  const ok = win.startCraft(win.RECIPES.find((r) => r.key === 'coalBrick'));
+  check('Task9-B: startCraft succeeds with exactly 3 coal', ok === true);
+  check('Task9-B: coal reduced to 0', win.state.resources.coal === 0);
+  check('Task9-B: coalBrick product +1', win.state.products.coalBrick === 1);
+})();
+
+(function test_T9C_insufficientMaterialBlocks() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.resources.coal = 2;
+  const recipe = win.RECIPES.find((r) => r.key === 'coalBrick');
+  check('Task9-C: canCraft() is false with only 2 coal', win.canCraft(recipe) === false);
+  const ok = win.startCraft(recipe);
+  check('Task9-C: startCraft() refuses with only 2 coal', ok === false);
+  check('Task9-C: coal untouched on failed craft', win.state.resources.coal === 2);
+  check('Task9-C: no product created on failed craft', win.state.products.coalBrick === 0);
+})();
+
+(function test_T9D_sellUsesRecipeSellAndMult() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.products.coalBrick = 1;
+  const goldBefore = win.state.gold;
+  win.sellAll(win.RECIPES.find((r) => r.key === 'coalBrick'));
+  check('Task9-D: product cleared after sell', win.state.products.coalBrick === 0);
+  check('Task9-D: gold increased by 4 * mult()', Math.abs(win.state.gold - (goldBefore + 4 * win.mult())) < 1e-9);
+})();
+
+(function test_T9E_autoCraftAndCraftQueueStaysNull() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.resources.coal = 30;
+  win.state.autoCraft.coalBrick = true;
+  win.tickLoop();
+  check('Task9-E: auto-craft produced coalBrick on a tick with enough coal', win.state.products.coalBrick >= 1);
+  check('Task9-E: craftQueue.coalBrick stays null (craftTime=0 never queues)', win.state.craftQueue.coalBrick === null);
+  advanceTicks(win, 5);
+  check('Task9-E: craftQueue.coalBrick still null after more ticks', win.state.craftQueue.coalBrick === null);
+})();
+
+(function test_T9F_autoSellCostAndFlow() {
+  const win = newDom(makeMemoryStorage()).window;
+  const recipe = win.RECIPES.find((r) => r.key === 'coalBrick');
+  check('Task9-F: autoSellCost is computed (not hardcoded) as sell*20 = 80', win.autoSellCost(recipe) === 80);
+
+  win.state.gold = 1000;
+  win.buildRecipes();
+  const buyBtn = win.document.querySelector('[data-buyautosell="coalBrick"]');
+  check('Task9-F: buy-auto-sell button exists for coalBrick', !!buyBtn);
+  buyBtn.click();
+  check('Task9-F: autoSell.coalBrick true after purchase', win.state.autoSell.coalBrick === true);
+  check('Task9-F: autoSellOn.coalBrick true after purchase', win.state.autoSellOn.coalBrick === true);
+
+  win.state.products.coalBrick = 5;
+  const goldBefore = win.state.gold;
+  win.tickLoop();
+  check('Task9-F: auto-sell cleared the product on tick', win.state.products.coalBrick === 0);
+  check('Task9-F: auto-sell added gold on tick', win.state.gold > goldBefore);
+})();
+
+(function test_T9G_steelUnaffected() {
+  const win = newDom(makeMemoryStorage()).window;
+  const steel = win.RECIPES.find((r) => r.key === 'steel');
+  check('Task9-G: steel.need unchanged (iron:2, coal:1)', steel.need.iron === 2 && steel.need.coal === 1 && Object.keys(steel.need).length === 2);
+  check('Task9-G: steel.sell unchanged (5)', steel.sell === 5);
+  check('Task9-G: steel.craftTime unchanged (0)', steel.craftTime === 0);
+
+  // Steel auto-crafts identically whether or not coalBrick exists/auto-crafts,
+  // since they share no materials.
+  win.state.resources.iron = 100;
+  win.state.resources.coal = 100;
+  win.state.autoCraft.steel = true;
+  win.state.autoCraft.coalBrick = true; // both on at once — must not interfere
+  advanceTicks(win, 10);
+  const steelProducedWithBoth = win.state.products.steel;
+  const coalUsedByBoth = 100 - win.state.resources.coal;
+
+  const win2 = newDom(makeMemoryStorage()).window;
+  win2.state.resources.iron = 100;
+  win2.state.resources.coal = 100;
+  win2.state.autoCraft.steel = true; // coalBrick auto-craft left off
+  advanceTicks(win2, 10);
+  const steelProducedAlone = win2.state.products.steel;
+
+  check('Task9-G: steel production identical whether coalBrick auto-craft is on or off', steelProducedWithBoth === steelProducedAlone, `${steelProducedWithBoth} vs ${steelProducedAlone}`);
+})();
+
+(function test_T9H_saveLoadCompatibility() {
+  // A save written BEFORE this recipe existed (no coalBrick key anywhere)
+  // must still load safely — freshRunState()/sanitizeRunState() already
+  // derive their key sets from the live RECIPES array, so no explicit
+  // migration should be needed.
+  const storage = makeMemoryStorage();
+  const legacyPayload = {
+    saveVersion: 1,
+    permanent: { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: true },
+    run: {
+      resources: { iron: 5, coal: 5 },
+      products: { steel: 2 }, // no coalBrick key at all — simulates a pre-Task-9 save
+      gold: 10, runGold: 10,
+      characters: [], lastPull: null,
+      facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
+      autoCraft: { steel: true }, autoSell: {}, autoSellOn: {},
+      craftQueue: { steel: null }, hqLevel: 0, autoLineLogged: false,
+    },
+  };
+  storage._setRaw('gachaFactorySave', JSON.stringify(legacyPayload));
+  const win = newDom(storage).window;
+  check('Task9-H: legacy save (no coalBrick key) loads without error', win.state.gold === 10);
+  check('Task9-H: coalBrick product defaults to 0', win.state.products.coalBrick === 0);
+  check('Task9-H: coalBrick autoCraft defaults to false', win.state.autoCraft.coalBrick === false);
+  check('Task9-H: coalBrick autoSell defaults to false', win.state.autoSell.coalBrick === false);
+  check('Task9-H: coalBrick autoSellOn defaults to true', win.state.autoSellOn.coalBrick === true);
+  check('Task9-H: coalBrick craftQueue defaults to null', win.state.craftQueue.coalBrick === null);
+  check('Task9-H: pre-existing steel data untouched', win.state.products.steel === 2 && win.state.autoCraft.steel === true);
+
+  // Round trip a save made WITH coalBrick data.
+  win.state.products.coalBrick = 7;
+  win.state.autoCraft.coalBrick = true;
+  win.saveGame();
+  const win2 = newDom(storage).window;
+  check('Task9-H: coalBrick data round-trips through save/load', win2.state.products.coalBrick === 7 && win2.state.autoCraft.coalBrick === true);
+})();
+
+(function test_T9_recipeCardRendersViaExistingBuildRecipes() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.buildRecipes();
+  const card = Array.from(win.document.querySelectorAll('.recipe')).find((el) => el.textContent.includes('석탄 벽돌'));
+  check('Task9-UI: coalBrick recipe card renders via existing buildRecipes()', !!card);
+  check('Task9-UI: card shows the need text (석탄 3)', card && card.textContent.includes('석탄') && card.textContent.includes('3'));
+  check('Task9-UI: card has a craft button', card && !!card.querySelector('[data-craft="coalBrick"]'));
+  check('Task9-UI: card has a sell button', card && !!card.querySelector('[data-sell="coalBrick"]'));
+  check('Task9-UI: card has an auto-craft checkbox', card && !!card.querySelector('[data-autocraft="coalBrick"]'));
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
