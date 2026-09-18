@@ -344,6 +344,7 @@ function freshRunState(){
     autoSellOn, // recipe key -> bool, toggle while owned
     craftQueue, // recipe key -> seconds remaining while processing, else null
     hqLevel:0,  // gold-funded run-scoped multiplier
+    autoLineLogged:false, // Task 6: has the one-time "both iron+coal automated" log fired this run?
   };
 }
 
@@ -400,6 +401,12 @@ function fmt(n){
 function resName(key){ return RESOURCES.find(r=>r.key===key).name; }
 function expCost(base, growth, level){ return Math.round(base * Math.pow(growth, level)); }
 function dis(condition){ return condition ? 'disabled' : ''; }
+// Task 6: which existing recipes become reachable because of a site's
+// resources — derived entirely from RECIPES/RESOURCES, no new data.
+function siteRelatedRecipeNames(site){
+  const siteResourceKeys = RESOURCES.filter(r=>r.site===site.key).map(r=>r.key);
+  return RECIPES.filter(r=>Object.keys(r.need).some(k=>siteResourceKeys.includes(k))).map(r=>r.name);
+}
 // Stable worker identifier — timestamp+random string, no counter to persist,
 // no crypto.randomUUID() dependency (this file may be opened directly as a
 // local file, where secure-context APIs aren't guaranteed). `existingIds`
@@ -415,6 +422,22 @@ function makeWorkerId(existingIds){
 function prestigeGain(){
   if(state.characters.length < BALANCE.worker.MIN_REQUIRED) return 0;
   return Math.floor(Math.sqrt(state.runGold/BALANCE.prestige.GOLD_DIVISOR));
+}
+
+// Task 6: the very first moment both iron AND coal have at least one worker
+// assigned (the point at which steel can be produced with zero manual
+// clicking) is a real, code-verifiable milestone worth calling out once.
+// Not tied to characters.length alone — two workers on the SAME resource
+// don't count, only one on each side does.
+function hasWorkerOn(resKey){
+  return state.characters.some(c=>c.resource===resKey);
+}
+function checkDualAutomation(){
+  if(state.autoLineLogged) return;
+  if(hasWorkerOn('iron') && hasWorkerOn('coal')){
+    state.autoLineLogged = true;
+    log('🏭 철광석/석탄 자동화 완료! 이제 강철 생산을 자동화할 수 있습니다.');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -524,6 +547,7 @@ function sanitizeRunState(raw){
     autoSellOn: sanitizeBoolMap(raw.autoSellOn, recipeKeys, true),
     craftQueue: sanitizeCraftQueueMap(raw.craftQueue, recipeKeys), // paused countdowns restored as-is
     hqLevel: isNonNegativeInt(raw.hqLevel) ? raw.hqLevel : 0, // hqLevel is always a whole level in normal play
+    autoLineLogged: typeof raw.autoLineLogged === 'boolean' ? raw.autoLineLogged : false, // Task 6: additive field, no saveVersion bump needed
   };
 }
 function sanitizePermanent(raw){
@@ -621,12 +645,19 @@ function loadGame(){
 function updateNextHint(){
   const el = document.getElementById('nextHint');
   if(!el) return;
+  const ironHas = hasWorkerOn('iron');
+  const coalHas = hasWorkerOn('coal');
   if(!window.firstGachaGranted){
     el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     el.textContent = window.tickets >= 1
       ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
       : '인부 탭에서 일꾼을 뽑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
+  } else if(ironHas !== coalHas){
+    const missing = ironHas ? 'coal' : 'iron';
+    el.textContent = `${resName(missing)}은 아직 수동입니다. 일꾼을 한 명 더 뽑으면 강철도 완전 자동화할 수 있어요.`;
+  } else if(ironHas && coalHas && !state.autoCraft.steel){
+    el.textContent = '철광석/석탄 자동화 완료! 자동 제작을 켜면 강철도 자동으로 만들어져요.';
   } else if(prestigeGain() <= 0){
     el.textContent = '일꾼을 채굴장에 배치하고 공방을 굴리세요. 이번 회차 200G부터 명성 1점을 얻습니다.';
   } else {
@@ -670,11 +701,12 @@ function buildLines(){
     group.className = 'site-group';
     const siteResources = RESOURCES.filter(r=>r.site===site.key);
     if(!state.unlockedSites[site.key]){
+      const relatedRecipes = siteRelatedRecipeNames(site);
       group.innerHTML = `
         <h3><span class="site-name">🔒 ${site.name}</span></h3>
         <div class="lines">
           <div class="line locked">
-            <div class="rate">이 채굴장은 아직 탐사하지 않았습니다.<br>탐사하면 이곳만의 고유 광물(${siteResources.map(r=>r.name).join(', ')})을 캘 수 있어요.</div>
+            <div class="rate">이 채굴장은 아직 탐사하지 않았습니다.<br>탐사하면 이곳만의 고유 광물(${siteResources.map(r=>r.name).join(', ')})을 캘 수 있어요.${relatedRecipes.length ? '<br>관련 제작품: ' + relatedRecipes.join(', ') : ''}</div>
             <button data-unlocksite="${site.key}" ${dis(state.gold < site.unlockCost)}>채굴장 탐사 (${site.unlockCost}G)</button>
           </div>
         </div>
@@ -914,6 +946,7 @@ function buildWorkers(){
       const idx = state.characters.indexOf(worker);
       const oldRes = worker.resource;
       worker.resource = sel.value;
+      checkDualAutomation();
       log(`일꾼 이동: #${idx+1} ${resName(oldRes)} → ${resName(sel.value)}`);
       buildLines(); // both lines' rates changed
     };
@@ -953,6 +986,7 @@ function pullGacha(){
   };
   state.characters.push(char);
   state.lastPull = char;
+  checkDualAutomation();
   buildLines(); // rate text changed
   buildWorkers();
   renderLastPull();
