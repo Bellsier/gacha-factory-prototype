@@ -162,11 +162,11 @@
 
   <div class="currencies">
     <div class="cur"><div class="label">골드</div><div class="value" id="goldVal">0</div></div>
-    <div class="cur ticket"><div class="label">가챠권</div><div class="value" id="ticketVal">0</div></div>
+    <div class="cur ticket"><div class="label">가차권</div><div class="value" id="ticketVal">0</div></div>
     <div class="cur prestige"><div class="label">명성 포인트</div><div class="value" id="prestigeVal">0</div></div>
   </div>
 
-  <div class="next-hint" id="nextHint">채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다.</div>
+  <div class="next-hint" id="nextHint">채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가차권을 받습니다.</div>
 
   <div class="tabbar">
     <button class="tab-btn active" data-tab="mining">채굴</button>
@@ -185,6 +185,12 @@
   <div id="tab-dev" class="tab-panel">
     <section>
       <h2>제작</h2>
+      <div class="line" style="margin-bottom:10px;">
+        <div class="facility">
+          <span>제작 시설 Lv.<span id="craftFacilityVal">1</span></span>
+          <button id="craftFacilityBtn" class="ghost"></button>
+        </div>
+      </div>
       <div class="recipes" id="recipes"></div>
     </section>
     <section>
@@ -204,7 +210,7 @@
         <div>일꾼을 뽑아 채굴장에 배치하세요</div>
         <div class="rates" id="firstGachaHint"></div>
         <div class="gacha-actions">
-          <button id="gachaTicketBtn">가챠권으로 뽑기 (1장)</button>
+          <button id="gachaTicketBtn">가차권으로 뽑기 (1장)</button>
           <button id="gachaGoldBtn" class="ghost">골드로 뽑기 (50G)</button>
         </div>
         <div class="roster" id="lastPull"></div>
@@ -220,11 +226,11 @@
     <h2>프레스티지</h2>
     <div class="prestige-box">
       <div>현재 영구 배율 <span class="mult" id="multVal">×1.00</span></div>
-      <p>이번 회차 골드 <span id="runGoldVal">0</span>G — 초기화하면 모든 자원·제품·일꾼이 사라지고, 일정 골드당 명성 포인트 1점을 얻어 다음 회차부터 영구히 더 빨라집니다. <button id="prestigeInfoBtn" class="ghost" style="width:auto; padding:2px 8px; font-size:0.7rem; margin:0; border-radius:50%;">?</button></p>
+      <p>이번 회차 골드 <span id="runGoldVal">0</span>G — 초기화하면 모든 자원·제품·일꾼이 사라지고, 일정 골드당 명성 포인트 1점을 얻어 다음 회차부터 영구히 더 빠라집니다. <button id="prestigeInfoBtn" class="ghost" style="width:auto; padding:2px 8px; font-size:0.7rem; margin:0; border-radius:50%;">?</button></p>
       <div id="prestigeInfoBox" style="display:none; font-size:0.7rem; color:var(--dim); background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin:0 0 10px; line-height:1.6;">
         정확한 공식: 명성 포인트 = ⌊√(골드 ÷ 200)⌋ (일꾼 1명 이상일 때만)<br>
         200G→1점 · 800G→2점 · 1,800G→3점 · 3,200G→4점 · 5,000G→5점<br>
-        첫 가챠권(50G)과 겹치지 않게, 일꾼을 뽑고 공방을 굴린 뒤에 초기화하세요.
+        첫 가차권(50G)과 겹치지 않게, 일꾼을 뽑고 공방을 굴린 뒤에 초기화하세요.
       </div>
       <div style="margin-bottom:10px; font-size:0.8rem;">지금 초기화하면 <span id="prestigeGainPreview" style="color:var(--legend); font-family:'Space Grotesk'; font-weight:700;">+0</span> 획득</div>
       <button id="prestigeBtn">초기화하고 명성 얻기</button>
@@ -263,7 +269,7 @@ const RECIPES = [
   {key:'specialAlloy', name:'특수 합금', need:{alloy:3, coal:3}, out:1, sell:45, craftTime:4},
   {key:'precisionPart', name:'정밀 부품', need:{alloy:2, rareMetal:1}, out:1, sell:80, craftTime:6},
   {key:'relicPart', name:'유물 부품', need:{alloy:2, relic:1}, out:1, sell:85, craftTime:6},
-  {key:'quantumCore', name:'퀀텀 코어', need:{precisionPart:2, cosmicShard:1}, out:1, sell:400, craftTime:15},
+  {key:'quantumCore', name:'�텀 코어', need:{precisionPart:2, cosmicShard:1}, out:1, sell:400, craftTime:15},
   {key:'plasmaCore', name:'플라즈마 코어', need:{precisionPart:2, plasma:1}, out:1, sell:420, craftTime:15},
 ];
 const RARITY = [
@@ -308,11 +314,16 @@ const BALANCE = {
     EFFECTIVE_DIVISOR: 16,       // workerEffective(): (mining*carry*move) / EFFECTIVE_DIVISOR
     STAT_COST_BASE: {mining:40, carry:60, move:50}, // workerUpgradeCost(): base cost per stat
     STAT_COST_GROWTH: 1.35,      // workerUpgradeCost(): cost growth factor per stat level
-    STAT_INCREMENT_PER_UPGRADE: 1, // stat gain per upgrade purchase
+    STAT_INCREMENT_PER_UPGRADE: 1, // stat gain per purchase
     MIN_REQUIRED: 1,             // minimum workers needed for prestige / auto-craft unlock
   },
   selling: {
     AUTO_SELL_COST_MULTIPLIER: 20, // autoSellCost(): recipe.sell * AUTO_SELL_COST_MULTIPLIER
+  },
+  crafting: {
+    FACILITY_COST_BASE: 100,          // craftFacilityCost(): base gold cost of the first upgrade (level 1 → 2)
+    FACILITY_COST_GROWTH: 1.5,        // craftFacilityCost(): cost growth factor per facility level
+    FACILITY_SPEED_PER_LEVEL: 0.1,    // craftSpeed(): +10% timed-craft speed per level above 1
   },
   gacha: {
     FIRST_TICKET_GOLD_THRESHOLD: 50, // one-time gold milestone that grants the first ticket
@@ -350,6 +361,7 @@ function freshRunState(){
     autoSellOn, // recipe key -> bool, toggle while owned
     craftQueue, // recipe key -> seconds remaining while processing, else null
     hqLevel:0,  // gold-funded run-scoped multiplier
+    craftFacility:1, // gold-funded run-scoped timed-craft speed level (1 = current craft times)
     autoLineLogged:false, // Task 6: has the one-time "both iron+coal automated" log fired this run?
   };
 }
@@ -357,6 +369,13 @@ function freshRunState(){
 function mult(){ return (1 + permanent.totalPrestige * BALANCE.prestige.MULTIPLIER_PER_POINT) * hqMult(); }
 function hqMult(){ return 1 + state.hqLevel * BALANCE.hq.MULTIPLIER_PER_LEVEL; }
 function hqCost(){ return expCost(BALANCE.hq.COST_BASE, BALANCE.hq.COST_GROWTH, state.hqLevel); }
+
+function craftSpeed(){
+  return 1 + Math.max(0, state.craftFacility - 1) * BALANCE.crafting.FACILITY_SPEED_PER_LEVEL;
+}
+function craftFacilityCost(){
+  return expCost(BALANCE.crafting.FACILITY_COST_BASE, BALANCE.crafting.FACILITY_COST_GROWTH, Math.max(0, state.craftFacility - 1));
+}
 
 function isUnlocked(resKey){
   const r = RESOURCES.find(x=>x.key===resKey);
@@ -442,7 +461,7 @@ function checkDualAutomation(){
   if(state.autoLineLogged) return;
   if(hasWorkerOn('iron') && hasWorkerOn('coal')){
     state.autoLineLogged = true;
-    log('🏭 철광석/석탄 자동화 완료! 이제 강철 생산을 자동화할 수 있습니다.');
+    log('폰 철광석/석탄 자동화 완료! 이제 강철 생산을 자동화할 수 있습니다.');
   }
 }
 
@@ -553,6 +572,7 @@ function sanitizeRunState(raw){
     autoSellOn: sanitizeBoolMap(raw.autoSellOn, recipeKeys, true),
     craftQueue: sanitizeCraftQueueMap(raw.craftQueue, recipeKeys), // paused countdowns restored as-is
     hqLevel: isNonNegativeInt(raw.hqLevel) ? raw.hqLevel : 0, // hqLevel is always a whole level in normal play
+    craftFacility: (isNonNegativeInt(raw.craftFacility) && raw.craftFacility >= 1) ? raw.craftFacility : 1, // Task 16: additive field, missing/invalid → default 1 (preserves current craft times)
     autoLineLogged: typeof raw.autoLineLogged === 'boolean' ? raw.autoLineLogged : false, // Task 6: additive field, no saveVersion bump needed
   };
 }
@@ -654,10 +674,10 @@ function updateNextHint(){
   const ironHas = hasWorkerOn('iron');
   const coalHas = hasWorkerOn('coal');
   if(!permanent.firstGachaGranted){
-    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가차권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     el.textContent = permanent.tickets >= 1
-      ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
+      ? '인부 탭에서 가차권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
       : '인부 탭에서 일꾼을 뽑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
   } else if(ironHas !== coalHas){
     const missing = ironHas ? 'coal' : 'iron';
@@ -727,6 +747,15 @@ function upgradeWorkforce(key){
   state.resources[key] -= cost;
   state.workforce[key] += BALANCE.mining.WORKFORCE_BONUS_PER_LEVEL;
   log(`인력 강화: ${resName(key)} 라인 Lv.${state.workforce[key]} (${resName(key)} ${cost}개 소모)`);
+  return true;
+}
+
+function upgradeCraftFacility(){
+  const cost = craftFacilityCost();
+  if(state.gold < cost) return false;
+  state.gold -= cost;
+  state.craftFacility += 1;
+  log(`제작 시설 강화: Lv.${state.craftFacility}`);
   return true;
 }
 
@@ -839,7 +868,7 @@ function checkFirstGachaMilestone(){
   if(state.gold < BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD) return;
   permanent.firstGachaGranted = true;
   permanent.tickets += 1;
-  log('🎟️ 첫 가챠권 획득! 이제 인부를 뽑을 수 있습니다.');
+  log('🎫 첫 가차권 획득! 이제 인부를 뽑을 수 있습니다.');
 }
 
 function sellAll(recipe, silent){
@@ -901,7 +930,7 @@ function buildRecipes(){
       ${state.autoSell[r.key] ? `
       <label class="toggle-auto">
         <input type="checkbox" data-autoselltoggle="${r.key}" ${state.autoSellOn[r.key]?'checked':''}>
-        자동 판매 (켜짐/꺼짐)
+        자동 판매 (켜짐/글거짐)
       </label>
       ` : `
       <div class="facility">
@@ -1069,6 +1098,11 @@ document.getElementById('hqBtn').onclick = ()=>{
   updateNumbers();
 };
 
+document.getElementById('craftFacilityBtn').onclick = ()=>{
+  if(!upgradeCraftFacility()) return;
+  updateNumbers();
+};
+
 document.getElementById('prestigeInfoBtn').onclick = ()=>{
   const box = document.getElementById('prestigeInfoBox');
   box.style.display = box.style.display === 'none' ? 'block' : 'none';
@@ -1084,7 +1118,7 @@ document.getElementById('prestigeBtn').onclick = ()=>{
     log('명성 포인트를 얻으려면 이번 회차에서 더 골드를 벌어야 합니다.');
     return;
   }
-  if(!confirm(`초기화하면 모든 자원/제품/일꾼이 사라집니다. 명성 포인트 +${gain}을 얻고 다음 회차를 시작할까요?`)) return;
+  if(!confirm(`초기화하면 모든 자원/제품/일꾼이 사라직니다. 명성 포인트 +${gain}을 얻고 다음 회차를 시작할까요?`)) return;
   permanent.totalPrestige += gain;
   state = freshRunState();
   log(`── 회차 ${permanent.runCount} 종료. 명성 포인트 +${gain} (누적 ${permanent.totalPrestige}, 배율 ×${mult().toFixed(2)}) ──`);
@@ -1101,7 +1135,7 @@ function updateNumbers(){
   const hint = document.getElementById('firstGachaHint');
   hint.textContent = permanent.firstGachaGranted
     ? '일반 60% · 희귀 25% · 영웅 12% · 전설 3%'
-    : `첫 골드 ${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G를 모으면 첫 가챠권을 드려요 (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+    : `첫 골드 ${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G를 모으면 첫 가차권을 드려요 (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   document.getElementById('gachaTicketBtn').disabled = permanent.tickets < BALANCE.gacha.PULL_COST_TICKET;
   RESOURCES.forEach(r=>{
     const el = document.querySelector(`[data-amt="${r.key}"]`);
@@ -1146,6 +1180,10 @@ function updateNumbers(){
   hqBtn.textContent = `투자하기 (${hqCost()}G)`;
   hqBtn.disabled = state.gold < hqCost();
   document.getElementById('hqMultVal').textContent = '×' + hqMult().toFixed(2);
+  document.getElementById('craftFacilityVal').textContent = String(state.craftFacility);
+  const craftFacilityBtn = document.getElementById('craftFacilityBtn');
+  craftFacilityBtn.textContent = `제작 시설 강화 — ${craftFacilityCost()}G`;
+  craftFacilityBtn.disabled = state.gold < craftFacilityCost();
   document.getElementById('prestigeGainPreview').textContent = '+' + prestigeGain();
   renderCurrencies();
 }
@@ -1157,7 +1195,7 @@ function tickLoop(){
   });
   RECIPES.forEach(r=>{
     if(state.craftQueue[r.key] !== null){
-      state.craftQueue[r.key] -= 1/TICKS_PER_SECOND;
+      state.craftQueue[r.key] -= craftSpeed() / TICKS_PER_SECOND;
       if(state.craftQueue[r.key] <= 0){
         state.craftQueue[r.key] = null;
         state.products[r.key] += r.out;
@@ -1175,7 +1213,7 @@ function tickLoop(){
 function ticketTrickle(){
   if(!permanent.firstGachaGranted) return;
   permanent.tickets += 1;
-  log('가챠권 +1 (자동 지급)');
+  log('가차권 +1 (자동 지급)');
   renderCurrencies();
 }
 
