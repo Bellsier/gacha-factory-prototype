@@ -323,8 +323,13 @@ const BALANCE = {
 };
 
 let state = freshRunState();
-let totalPrestige = 0;
-let runCount = 1;
+// Permanent (cross-prestige) state — totalPrestige/runCount/tickets/
+// firstGachaGranted all live here in one container instead of being split
+// across module-scope lets and window.* globals. Same four values, same
+// meaning, same save/load JSON shape as before (Task 1/6); sanitizePermanent()
+// already returns exactly this shape, so loading a save assigns into this
+// variable directly.
+let permanent = { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: false };
 
 function freshRunState(){
   const resources = {}, facility = {}, workforce = {};
@@ -349,7 +354,7 @@ function freshRunState(){
   };
 }
 
-function mult(){ return (1 + totalPrestige * BALANCE.prestige.MULTIPLIER_PER_POINT) * hqMult(); }
+function mult(){ return (1 + permanent.totalPrestige * BALANCE.prestige.MULTIPLIER_PER_POINT) * hqMult(); }
 function hqMult(){ return 1 + state.hqLevel * BALANCE.hq.MULTIPLIER_PER_LEVEL; }
 function hqCost(){ return expCost(BALANCE.hq.COST_BASE, BALANCE.hq.COST_GROWTH, state.hqLevel); }
 
@@ -594,7 +599,7 @@ function saveGame(){
     const payload = {
       saveVersion: CURRENT_SAVE_VERSION,
       savedAt: Date.now(),
-      permanent: { totalPrestige, runCount, tickets: window.tickets, firstGachaGranted: window.firstGachaGranted },
+      permanent: { totalPrestige: permanent.totalPrestige, runCount: permanent.runCount, tickets: permanent.tickets, firstGachaGranted: permanent.firstGachaGranted },
       run: state,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -648,10 +653,10 @@ function updateNextHint(){
   if(!el) return;
   const ironHas = hasWorkerOn('iron');
   const coalHas = hasWorkerOn('coal');
-  if(!window.firstGachaGranted){
+  if(!permanent.firstGachaGranted){
     el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
-    el.textContent = window.tickets >= 1
+    el.textContent = permanent.tickets >= 1
       ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
       : '인부 탭에서 일꾼을 뽑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
   } else if(ironHas !== coalHas){
@@ -668,18 +673,12 @@ function updateNextHint(){
 
 function renderCurrencies(){
   document.getElementById('goldVal').textContent = fmt(state.gold);
-  document.getElementById('ticketVal').textContent = fmt(window.tickets);
-  document.getElementById('prestigeVal').textContent = fmt(totalPrestige);
+  document.getElementById('ticketVal').textContent = fmt(permanent.tickets);
+  document.getElementById('prestigeVal').textContent = fmt(permanent.totalPrestige);
   document.getElementById('multVal').textContent = '×' + mult().toFixed(2);
   document.getElementById('runGoldVal').textContent = fmt(state.runGold);
-  document.getElementById('runNum').textContent = runCount;
+  document.getElementById('runNum').textContent = permanent.runCount;
 }
-
-// tickets persist across prestige, kept outside freshRunState
-window.tickets = 0;
-// whether the one-time first-gacha reward has ever been granted — permanent,
-// never reset by prestige, so it can only ever fire once per browser session
-window.firstGachaGranted = false;
 
 // tab switching
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -690,6 +689,46 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
   };
 });
+
+// ---------------------------------------------------------------------------
+// Mining-tab player actions. Each does exactly one state change (plus its
+// log line, where the original click handler had one) and returns whether
+// it succeeded, so its caller (the click handler) can decide whether a UI
+// rebuild is needed. Extracted out of buildLines()'s inline onclick
+// callbacks so the state-change logic itself can be read/tested apart from
+// the DOM-building code around it. Behavior and log text are unchanged.
+// ---------------------------------------------------------------------------
+function unlockSite(key){
+  const site = SITES.find(s=>s.key===key);
+  if(state.gold < site.unlockCost) return false;
+  state.gold -= site.unlockCost;
+  state.unlockedSites[key] = true;
+  log(`채굴장 탐사: ${site.name}`);
+  return true;
+}
+
+function mineResource(key){
+  state.resources[key] += manualAmount(key);
+  return true;
+}
+
+function upgradeFacility(key){
+  const cost = facilityCost(key);
+  if(state.resources[key] < cost) return false;
+  state.resources[key] -= cost;
+  state.facility[key] += BALANCE.mining.FACILITY_BONUS_PER_LEVEL;
+  log(`채굴 도구 강화: ${resName(key)} 라인 Lv.${state.facility[key]} (${resName(key)} ${cost}개 소모)`);
+  return true;
+}
+
+function upgradeWorkforce(key){
+  const cost = workforceCost(key);
+  if(state.resources[key] < cost) return false;
+  state.resources[key] -= cost;
+  state.workforce[key] += BALANCE.mining.WORKFORCE_BONUS_PER_LEVEL;
+  log(`인력 강화: ${resName(key)} 라인 Lv.${state.workforce[key]} (${resName(key)} ${cost}개 소모)`);
+  return true;
+}
 
 // Full rebuild: only called after structural changes (new character, facility
 // level up, site unlock, prestige). Never called from the fast tick loop, so
@@ -740,12 +779,7 @@ function buildLines(){
   });
   wrap.querySelectorAll('[data-unlocksite]').forEach(btn=>{
     btn.onclick = ()=>{
-      const key = btn.dataset.unlocksite;
-      const site = SITES.find(s=>s.key===key);
-      if(state.gold < site.unlockCost) return;
-      state.gold -= site.unlockCost;
-      state.unlockedSites[key] = true;
-      log(`채굴장 탐사: ${site.name}`);
+      if(!unlockSite(btn.dataset.unlocksite)) return;
       buildLines();
       buildRecipes();
       buildWorkers();
@@ -754,30 +788,19 @@ function buildLines(){
   });
   wrap.querySelectorAll('[data-mine]').forEach(btn=>{
     btn.onclick = ()=>{
-      const key = btn.dataset.mine;
-      state.resources[key] += manualAmount(key);
+      mineResource(btn.dataset.mine);
       updateNumbers();
     };
   });
   wrap.querySelectorAll('[data-fac]').forEach(btn=>{
     btn.onclick = ()=>{
-      const key = btn.dataset.fac;
-      const cost = facilityCost(key);
-      if(state.resources[key] < cost) return;
-      state.resources[key] -= cost;
-      state.facility[key] += BALANCE.mining.FACILITY_BONUS_PER_LEVEL;
-      log(`채굴 도구 강화: ${resName(key)} 라인 Lv.${state.facility[key]} (${resName(key)} ${cost}개 소모)`);
+      if(!upgradeFacility(btn.dataset.fac)) return;
       buildLines(); // rate/cost/level text changed → structural rebuild is fine here (rare event)
     };
   });
   wrap.querySelectorAll('[data-train]').forEach(btn=>{
     btn.onclick = ()=>{
-      const key = btn.dataset.train;
-      const cost = workforceCost(key);
-      if(state.resources[key] < cost) return;
-      state.resources[key] -= cost;
-      state.workforce[key] += BALANCE.mining.WORKFORCE_BONUS_PER_LEVEL;
-      log(`인력 강화: ${resName(key)} 라인 Lv.${state.workforce[key]} (${resName(key)} ${cost}개 소모)`);
+      if(!upgradeWorkforce(btn.dataset.train)) return;
       buildLines(); // rate/cost/level text changed → structural rebuild is fine here (rare event)
     };
   });
@@ -804,6 +827,21 @@ function startCraft(recipe){
   return true;
 }
 function autoSellCost(recipe){ return recipe.sell * BALANCE.selling.AUTO_SELL_COST_MULTIPLIER; }
+
+// The first-gacha-ticket milestone (Task "early gacha ticket" redesign) is
+// its own concern, separate from selling itself — it just happens to be
+// checked right after a sale, since selling is currently the only way gold
+// increases. Kept as its own function (mirrors checkDualAutomation()'s
+// pattern) so a future gold-earning path doesn't have to duplicate this
+// check inside sellAll(). Condition and behavior are unchanged from before.
+function checkFirstGachaMilestone(){
+  if(permanent.firstGachaGranted) return;
+  if(state.gold < BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD) return;
+  permanent.firstGachaGranted = true;
+  permanent.tickets += 1;
+  log('🎟️ 첫 가챠권 획득! 이제 인부를 뽑을 수 있습니다.');
+}
+
 function sellAll(recipe, silent){
   const qty = state.products[recipe.key];
   if(qty<=0) return;
@@ -812,11 +850,21 @@ function sellAll(recipe, silent){
   state.runGold += earned;
   state.products[recipe.key] = 0;
   if(!silent) log(`${recipe.name} ${fmt(qty)}개 판매 → +${fmt(earned)}G`);
-  if(!window.firstGachaGranted && state.gold >= BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD){
-    window.firstGachaGranted = true;
-    window.tickets += 1;
-    log('🎟️ 첫 가챠권 획득! 이제 인부를 뽑을 수 있습니다.');
-  }
+  checkFirstGachaMilestone();
+}
+
+// Recipe-tab player action, extracted for the same reason as the mining
+// actions above — its state change (purchase + flags) can be read apart
+// from the DOM-building/rebuild code in buildRecipes(). Unchanged behavior.
+function buyAutoSell(key){
+  const recipe = RECIPES.find(r=>r.key===key);
+  const cost = autoSellCost(recipe);
+  if(state.gold < cost) return false;
+  state.gold -= cost;
+  state.autoSell[key] = true;
+  state.autoSellOn[key] = true;
+  log(`자동 판매 구매: ${recipe.name}`);
+  return true;
 }
 
 // Full rebuild: only called after structural changes (auto-craft unlock
@@ -878,14 +926,7 @@ function buildRecipes(){
   });
   wrap.querySelectorAll('[data-buyautosell]').forEach(btn=>{
     btn.onclick=()=>{
-      const key = btn.dataset.buyautosell;
-      const recipe = RECIPES.find(r=>r.key===key);
-      const cost = autoSellCost(recipe);
-      if(state.gold < cost) return;
-      state.gold -= cost;
-      state.autoSell[key] = true;
-      state.autoSellOn[key] = true;
-      log(`자동 판매 구매: ${recipe.name}`);
+      if(!buyAutoSell(btn.dataset.buyautosell)) return;
       buildRecipes(); // row layout changed (button → toggle) → rare event, fine to rebuild
       renderCurrencies();
     };
@@ -903,6 +944,33 @@ function renderLastPull(){
   chip.className = 'chip ' + rarity.cls;
   chip.textContent = `방금 뽑음: [${rarity.label}] ${resName} 담당 (종합 +${workerEffective(c).toFixed(2)}/초)`;
   wrap.appendChild(chip);
+}
+
+// Worker-tab player actions, extracted for the same reason as the mining/
+// recipe actions above. Unchanged behavior — same lookups, same log text,
+// same checkDualAutomation() call at the same point.
+function reassignWorker(workerId, newResource){
+  const worker = state.characters.find(w=>w.id===workerId);
+  if(!worker) return false;
+  const idx = state.characters.indexOf(worker);
+  const oldRes = worker.resource;
+  worker.resource = newResource;
+  checkDualAutomation();
+  log(`일꾼 이동: #${idx+1} ${resName(oldRes)} → ${resName(newResource)}`);
+  return true;
+}
+
+function upgradeWorkerStat(workerId, stat){
+  const worker = state.characters.find(w=>w.id===workerId);
+  if(!worker) return false;
+  const idx = state.characters.indexOf(worker);
+  const cost = workerUpgradeCost(worker, stat);
+  if(state.gold < cost) return false;
+  state.gold -= cost;
+  worker[stat] += BALANCE.worker.STAT_INCREMENT_PER_UPGRADE;
+  worker[stat+'Lvl']++;
+  log(`일꾼 강화: #${idx+1} ${STAT_LABEL[stat]} 상승 (Lv.${worker[stat+'Lvl']})`);
+  return true;
 }
 
 // Full rebuild: only called after structural changes (gacha pull, reassignment,
@@ -941,30 +1009,13 @@ function buildWorkers(){
   });
   wrap.querySelectorAll('[data-reassign]').forEach(sel=>{
     sel.onchange = ()=>{
-      const workerId = sel.dataset.workerId;
-      const worker = state.characters.find(w=>w.id===workerId);
-      if(!worker) return;
-      const idx = state.characters.indexOf(worker);
-      const oldRes = worker.resource;
-      worker.resource = sel.value;
-      checkDualAutomation();
-      log(`일꾼 이동: #${idx+1} ${resName(oldRes)} → ${resName(sel.value)}`);
+      if(!reassignWorker(sel.dataset.workerId, sel.value)) return;
       buildLines(); // both lines' rates changed
     };
   });
   wrap.querySelectorAll('[data-upstat]').forEach(btn=>{
     btn.onclick = ()=>{
-      const workerId = btn.dataset.workerId;
-      const stat = btn.dataset.upstat;
-      const worker = state.characters.find(w=>w.id===workerId);
-      if(!worker) return;
-      const idx = state.characters.indexOf(worker);
-      const cost = workerUpgradeCost(worker, stat);
-      if(state.gold < cost) return;
-      state.gold -= cost;
-      worker[stat] += BALANCE.worker.STAT_INCREMENT_PER_UPGRADE;
-      worker[stat+'Lvl']++;
-      log(`일꾼 강화: #${idx+1} ${STAT_LABEL[stat]} 상승 (Lv.${worker[stat+'Lvl']})`);
+      if(!upgradeWorkerStat(btn.dataset.workerId, btn.dataset.upstat)) return;
       buildWorkers();
       buildLines(); // this worker's line rate changed
       renderCurrencies();
@@ -997,9 +1048,9 @@ function pullGacha(){
 }
 
 document.getElementById('gachaTicketBtn').onclick = ()=>{
-  if(window.tickets < BALANCE.gacha.PULL_COST_TICKET) return;
-  window.tickets -= BALANCE.gacha.PULL_COST_TICKET;
-  document.getElementById('gachaTicketBtn').disabled = window.tickets < BALANCE.gacha.PULL_COST_TICKET;
+  if(permanent.tickets < BALANCE.gacha.PULL_COST_TICKET) return;
+  permanent.tickets -= BALANCE.gacha.PULL_COST_TICKET;
+  document.getElementById('gachaTicketBtn').disabled = permanent.tickets < BALANCE.gacha.PULL_COST_TICKET;
   pullGacha();
 };
 document.getElementById('gachaGoldBtn').onclick = ()=>{
@@ -1034,10 +1085,10 @@ document.getElementById('prestigeBtn').onclick = ()=>{
     return;
   }
   if(!confirm(`초기화하면 모든 자원/제품/일꾼이 사라집니다. 명성 포인트 +${gain}을 얻고 다음 회차를 시작할까요?`)) return;
-  totalPrestige += gain;
+  permanent.totalPrestige += gain;
   state = freshRunState();
-  log(`── 회차 ${runCount} 종료. 명성 포인트 +${gain} (누적 ${totalPrestige}, 배율 ×${mult().toFixed(2)}) ──`);
-  runCount++;
+  log(`── 회차 ${permanent.runCount} 종료. 명성 포인트 +${gain} (누적 ${permanent.totalPrestige}, 배율 ×${mult().toFixed(2)}) ──`);
+  permanent.runCount++;
   renderAll();
   saveGame();
 };
@@ -1048,10 +1099,10 @@ document.getElementById('prestigeBtn').onclick = ()=>{
 function updateNumbers(){
   updateNextHint();
   const hint = document.getElementById('firstGachaHint');
-  hint.textContent = window.firstGachaGranted
+  hint.textContent = permanent.firstGachaGranted
     ? '일반 60% · 희귀 25% · 영웅 12% · 전설 3%'
     : `첫 골드 ${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G를 모으면 첫 가챠권을 드려요 (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
-  document.getElementById('gachaTicketBtn').disabled = window.tickets < BALANCE.gacha.PULL_COST_TICKET;
+  document.getElementById('gachaTicketBtn').disabled = permanent.tickets < BALANCE.gacha.PULL_COST_TICKET;
   RESOURCES.forEach(r=>{
     const el = document.querySelector(`[data-amt="${r.key}"]`);
     if(el) el.textContent = fmt(state.resources[r.key]);
@@ -1122,8 +1173,8 @@ function tickLoop(){
 // passive ticket trickle — only once the first (50G-earned) ticket has been
 // granted, so this can't bypass the early progression gate by just idling
 function ticketTrickle(){
-  if(!window.firstGachaGranted) return;
-  window.tickets += 1;
+  if(!permanent.firstGachaGranted) return;
+  permanent.tickets += 1;
   log('가챠권 +1 (자동 지급)');
   renderCurrencies();
 }
@@ -1144,14 +1195,22 @@ function renderAll(){
 // on freshRunState() defaults.
 // ---------------------------------------------------------------------------
 let tickTimer, ticketTimer, autoSaveTimer;
-(function boot(){
+
+// Named (rather than an anonymous startup IIFE) purely so it reads like any
+// other function in the file; the startup sequence itself is unchanged:
+//   1. load save            5. tickTimer
+//   2. apply loaded state   6. ticketTimer
+//   3. renderAll()          7. autoSaveTimer
+//   4. startup log          8. visibilitychange listener
+//                           9. beforeunload listener
+// Load must finish before the timers are created, so the very first tick
+// ever operates on the restored state, never on freshRunState() defaults —
+// that ordering guarantee is unchanged.
+function boot(){
   const loaded = loadGame();
   if(loaded.ok){
     state = loaded.run;
-    totalPrestige = loaded.permanent.totalPrestige;
-    runCount = loaded.permanent.runCount;
-    window.tickets = loaded.permanent.tickets;
-    window.firstGachaGranted = loaded.permanent.firstGachaGranted;
+    permanent = loaded.permanent;
   } else if(loaded.reason === 'corrupted'){
     log('저장 데이터를 불러오지 못해 새로 시작합니다');
   } else if(loaded.reason === 'future'){
@@ -1172,7 +1231,8 @@ let tickTimer, ticketTimer, autoSaveTimer;
     if(document.visibilityState === 'hidden') saveGame();
   });
   window.addEventListener('beforeunload', ()=>{ saveGame(); });
-})();
+}
+boot();
 </script>
 </body>
 </html>

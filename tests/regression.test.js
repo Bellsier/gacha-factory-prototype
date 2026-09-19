@@ -70,8 +70,7 @@ function newDom(storage) {
   const expose = `
 ;window.__expose = {
   state: () => state,
-  totalPrestige: () => totalPrestige,
-  runCount: () => runCount,
+  permanent: () => permanent,
   saveBlocked: () => saveBlocked,
   RESOURCES: () => RESOURCES,
   RECIPES: () => RECIPES,
@@ -84,8 +83,11 @@ function newDom(storage) {
   win.eval(scriptEl.textContent + expose);
   Object.defineProperties(win, {
     state: { get: () => win.__expose.state(), configurable: true },
-    totalPrestige: { get: () => win.__expose.totalPrestige(), configurable: true },
-    runCount: { get: () => win.__expose.runCount(), configurable: true },
+    // permanent is the game's single cross-prestige state container
+    // (totalPrestige/runCount/tickets/firstGachaGranted), replacing the
+    // separate totalPrestige/runCount lets and window.tickets/
+    // window.firstGachaGranted globals this test file used to reach.
+    permanent: { get: () => win.__expose.permanent(), configurable: true },
     saveBlocked: { get: () => win.__expose.saveBlocked(), configurable: true },
     RESOURCES: { get: () => win.__expose.RESOURCES(), configurable: true },
     RECIPES: { get: () => win.__expose.RECIPES(), configurable: true },
@@ -110,8 +112,8 @@ function advanceTicks(win, n) {
   const storage = makeMemoryStorage();
   const win = newDom(storage).window;
   check('save/load: fresh start — gold=0', win.state.gold === 0);
-  check('save/load: fresh start — tickets=0', win.window.tickets === 0);
-  check('save/load: fresh start — firstGachaGranted=false', win.window.firstGachaGranted === false);
+  check('save/load: fresh start — tickets=0', win.permanent.tickets === 0);
+  check('save/load: fresh start — firstGachaGranted=false', win.permanent.firstGachaGranted === false);
   check('save/load: fresh start — characters=[]', Array.isArray(win.state.characters) && win.state.characters.length === 0);
 })();
 
@@ -123,15 +125,15 @@ function advanceTicks(win, n) {
   win.state.resources.coal = 100;
   for (let i = 0; i < 10; i++) win.startCraft(win.RECIPES.find((r) => r.key === 'steel'));
   win.sellAll(win.RECIPES.find((r) => r.key === 'steel'));
-  check('save/load: crossing 50G grants firstGachaGranted', win.window.firstGachaGranted === true);
-  check('save/load: crossing 50G grants a ticket', win.window.tickets >= 1);
+  check('save/load: crossing 50G grants firstGachaGranted', win.permanent.firstGachaGranted === true);
+  check('save/load: crossing 50G grants a ticket', win.permanent.tickets >= 1);
 
-  win.window.tickets = 1;
+  win.permanent.tickets = 1;
   win.pullGacha();
   check('save/load: worker pulled', win.state.characters.length === 1);
 
   const goldBefore = win.state.gold;
-  const ticketsBefore = win.window.tickets;
+  const ticketsBefore = win.permanent.tickets;
   const charsBefore = win.state.characters.map((c) => JSON.stringify(c, Object.keys(c).sort()));
 
   const saved = win.saveGame();
@@ -140,8 +142,8 @@ function advanceTicks(win, n) {
 
   win = newDom(storage).window;
   check('save/load: gold restored', win.state.gold === goldBefore, `${win.state.gold} vs ${goldBefore}`);
-  check('save/load: tickets restored', win.window.tickets === ticketsBefore);
-  check('save/load: firstGachaGranted restored', win.window.firstGachaGranted === true);
+  check('save/load: tickets restored', win.permanent.tickets === ticketsBefore);
+  check('save/load: firstGachaGranted restored', win.permanent.firstGachaGranted === true);
   check(
     'save/load: characters restored (order + all fields)',
     JSON.stringify(win.state.characters.map((c) => JSON.stringify(c, Object.keys(c).sort()))) === JSON.stringify(charsBefore)
@@ -166,19 +168,19 @@ function advanceTicks(win, n) {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
 
-  win.window.tickets = 1;
+  win.permanent.tickets = 1;
   win.pullGacha();
   win.state.runGold = 5000;
   const expectedGain = win.prestigeGain();
   win.document.getElementById('prestigeBtn').onclick();
-  check('prestige: totalPrestige increased by the expected amount', win.totalPrestige === expectedGain, `${win.totalPrestige} vs ${expectedGain}`);
+  check('prestige: totalPrestige increased by the expected amount', win.permanent.totalPrestige === expectedGain, `${win.permanent.totalPrestige} vs ${expectedGain}`);
   check('prestige: autosaves immediately on confirm', storage._raw()['gachaFactorySave'] !== undefined);
 
-  const prestigeAfter = win.totalPrestige;
-  const runCountAfter = win.runCount;
+  const prestigeAfter = win.permanent.totalPrestige;
+  const runCountAfter = win.permanent.runCount;
   win = newDom(storage).window;
-  check('prestige: totalPrestige persists across reload', win.totalPrestige === prestigeAfter);
-  check('prestige: runCount persists across reload', win.runCount === runCountAfter);
+  check('prestige: totalPrestige persists across reload', win.permanent.totalPrestige === prestigeAfter);
+  check('prestige: runCount persists across reload', win.permanent.runCount === runCountAfter);
   check('prestige: characters reset to empty on the new run', win.state.characters.length === 0);
 })();
 
@@ -186,7 +188,7 @@ function advanceTicks(win, n) {
   const storage = makeMemoryStorage();
   storage._setRaw('gachaFactorySave', '{not valid json!!!');
   const win = newDom(storage).window;
-  check('corrupted save: falls back to a clean default state', win.state.gold === 0 && win.window.tickets === 0);
+  check('corrupted save: falls back to a clean default state', win.state.gold === 0 && win.permanent.tickets === 0);
 })();
 
 (function test_invalidShapeAndFieldTypes() {
@@ -212,8 +214,8 @@ function advanceTicks(win, n) {
   check('field validation: non-numeric resource field falls back to 0', win.state.resources.iron === 0);
   check('field validation: valid sibling field (coal=42) is preserved', win.state.resources.coal === 42);
   check('field validation: non-array characters becomes []', Array.isArray(win.state.characters) && win.state.characters.length === 0);
-  check('field validation: non-integer runCount falls back to 1', win.runCount === 1);
-  check('field validation: valid permanent field (totalPrestige=5) is preserved', win.totalPrestige === 5);
+  check('field validation: non-integer runCount falls back to 1', win.permanent.runCount === 1);
+  check('field validation: valid permanent field (totalPrestige=5) is preserved', win.permanent.totalPrestige === 5);
   check('field validation: invalid craftQueue value becomes null', win.state.craftQueue.steel === null);
   check('field validation: valid gold(999) is preserved', win.state.gold === 999);
 })();
@@ -239,8 +241,8 @@ function advanceTicks(win, n) {
   storage._setRaw('gachaFactorySave', JSON.stringify(badPayload));
   const win = newDom(storage).window;
   check('negative values: gold=-100 rejected, falls back to 0', win.state.gold === 0);
-  check('negative values: tickets=-1 rejected, falls back to 0', win.window.tickets === 0);
-  check('negative values: totalPrestige=-1 rejected, falls back to 0', win.totalPrestige === 0);
+  check('negative values: tickets=-1 rejected, falls back to 0', win.permanent.tickets === 0);
+  check('negative values: totalPrestige=-1 rejected, falls back to 0', win.permanent.totalPrestige === 0);
   check('negative values: resources.iron=-5 rejected, falls back to 0', win.state.resources.iron === 0);
   check('negative values: products.steel=-2 rejected, falls back to 0', win.state.products.steel === 0);
   check('negative values: facility.iron=-3 rejected, falls back to 0', win.state.facility.iron === 0);
@@ -349,9 +351,9 @@ function advanceTicks(win, n) {
       // totalPrestige is read-only exposed; drive it via a prestige reset instead
       // for a couple of spot values, and otherwise verify the formula directly.
       const expected = (1 + p * REF.prestigeMultPerPoint) * (1 + h * REF.hqMultPerLevel);
-      const actual = (1 + win.totalPrestige * REF.prestigeMultPerPoint) * win.hqMult();
+      const actual = (1 + win.permanent.totalPrestige * REF.prestigeMultPerPoint) * win.hqMult();
       // Only meaningful when totalPrestige actually equals p; use the live value instead.
-      const liveExpected = (1 + win.totalPrestige * REF.prestigeMultPerPoint) * (1 + h * REF.hqMultPerLevel);
+      const liveExpected = (1 + win.permanent.totalPrestige * REF.prestigeMultPerPoint) * (1 + h * REF.hqMultPerLevel);
       check(`BALANCE: mult() matches reference formula (hqLevel=${h})`, Math.abs(win.mult() - liveExpected) < 1e-12);
     }
   }
@@ -391,7 +393,7 @@ function advanceTicks(win, n) {
   });
 
   // prestigeGain(): reference floor(sqrt(runGold/200)), gated on >=1 worker
-  win.window.tickets = 1;
+  win.permanent.tickets = 1;
   win.pullGacha();
   [[0, 0], [199, 0], [200, 1], [800, 2], [1800, 3], [3200, 4], [5000, 5]].forEach(([gold, expectedPts]) => {
     win.state.runGold = gold;
@@ -424,7 +426,7 @@ function advanceTicks(win, n) {
 
 (function test_newWorkerHasUniqueId() {
   const win = newDom(makeMemoryStorage()).window;
-  win.window.tickets = 5;
+  win.permanent.tickets = 5;
   for (let i = 0; i < 5; i++) win.pullGacha();
   const ids = win.state.characters.map((c) => c.id);
   check('worker id: every new worker has a non-empty string id', ids.every((id) => typeof id === 'string' && id.length > 0));
@@ -433,7 +435,7 @@ function advanceTicks(win, n) {
 
 (function test_upgradeAndReassignUseIdNotIndex() {
   const win = newDom(makeMemoryStorage()).window;
-  win.window.tickets = 2;
+  win.permanent.tickets = 2;
   win.pullGacha();
   win.pullGacha();
   const [w1, w2] = win.state.characters;
@@ -459,7 +461,7 @@ function advanceTicks(win, n) {
 
 (function test_idLookupSurvivesArrayReorder() {
   const win = newDom(makeMemoryStorage()).window;
-  win.window.tickets = 3;
+  win.permanent.tickets = 3;
   win.pullGacha(); win.pullGacha(); win.pullGacha();
   const idsInOrder = win.state.characters.map((c) => c.id);
 
@@ -487,7 +489,7 @@ function advanceTicks(win, n) {
 (function test_saveLoadPreservesIdOrderAndStats() {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
-  win.window.tickets = 3;
+  win.permanent.tickets = 3;
   win.pullGacha(); win.pullGacha(); win.pullGacha();
   win.state.gold = 100000;
   win.updateNumbers();
@@ -589,7 +591,7 @@ function advanceTicks(win, n) {
   let win = newDom(storage).window;
 
   // 1. Initial state.
-  check('flow: starts with 0 gold, 0 tickets, no workers', win.state.gold === 0 && win.window.tickets === 0 && win.state.characters.length === 0);
+  check('flow: starts with 0 gold, 0 tickets, no workers', win.state.gold === 0 && win.permanent.tickets === 0 && win.state.characters.length === 0);
 
   // 2. Manual mining (button click, exactly as a player would).
   const ironBtn = win.document.querySelector('[data-mine="iron"]');
@@ -608,7 +610,7 @@ function advanceTicks(win, n) {
   const sellBtn = win.document.querySelector('[data-sell="steel"]');
   sellBtn.click();
   check('flow: selling steel yields gold', win.state.gold > 0);
-  check('flow: crossing 50G granted the first ticket', win.window.firstGachaGranted === true && win.window.tickets >= 1);
+  check('flow: crossing 50G granted the first ticket', win.permanent.firstGachaGranted === true && win.permanent.tickets >= 1);
 
   // 5. Gacha (button click).
   win.updateNumbers();
@@ -625,13 +627,13 @@ function advanceTicks(win, n) {
   const expectedGain = win.prestigeGain();
   check('flow: prestige gain is available with a worker present', expectedGain > 0);
   win.document.getElementById('prestigeBtn').onclick();
-  check('flow: prestige increased totalPrestige', win.totalPrestige === expectedGain);
+  check('flow: prestige increased totalPrestige', win.permanent.totalPrestige === expectedGain);
   check('flow: prestige reset the run (0 workers, 0 gold)', win.state.characters.length === 0 && win.state.gold === 0);
 
   // 8. Permanent prestige value persists across a reload.
-  const prestigeAfter = win.totalPrestige;
+  const prestigeAfter = win.permanent.totalPrestige;
   win = newDom(storage).window; // no explicit save call — relies on the autosave-on-prestige from step 7
-  check('flow: permanent prestige persists after prestige + reload', win.totalPrestige === prestigeAfter);
+  check('flow: permanent prestige persists after prestige + reload', win.permanent.totalPrestige === prestigeAfter);
 })();
 
 // =============================================================================
@@ -647,8 +649,8 @@ function makeTestWorker(id, resource) {
   const win = newDom(makeMemoryStorage()).window;
   // Grant the first ticket (crosses 50G) but pull no worker yet.
   win.state.gold = 50;
-  win.window.firstGachaGranted = true;
-  win.window.tickets = 1;
+  win.permanent.firstGachaGranted = true;
+  win.permanent.tickets = 1;
   win.updateNextHint();
   const text = win.document.getElementById('nextHint').textContent;
   check('Task6-A: no-worker hint text is the original "뽑으세요" guidance', text.includes('일꾼') && text.includes('뽑'));
@@ -656,7 +658,7 @@ function makeTestWorker(id, resource) {
 
 (function test_B_ironOnlyShowsPartialAutomationHint() {
   const win = newDom(makeMemoryStorage()).window;
-  win.window.firstGachaGranted = true;
+  win.permanent.firstGachaGranted = true;
   win.state.characters.push(makeTestWorker('t1', 'iron'));
   win.updateNextHint();
   const text = win.document.getElementById('nextHint').textContent;
@@ -666,7 +668,7 @@ function makeTestWorker(id, resource) {
 
 (function test_C_coalOnlyShowsPartialAutomationHint() {
   const win = newDom(makeMemoryStorage()).window;
-  win.window.firstGachaGranted = true;
+  win.permanent.firstGachaGranted = true;
   win.state.characters.push(makeTestWorker('t1', 'coal'));
   win.updateNextHint();
   const text = win.document.getElementById('nextHint').textContent;
@@ -676,7 +678,7 @@ function makeTestWorker(id, resource) {
 
 (function test_D_bothSidesShowsFullAutomationHint() {
   const win = newDom(makeMemoryStorage()).window;
-  win.window.firstGachaGranted = true;
+  win.permanent.firstGachaGranted = true;
   win.state.characters.push(makeTestWorker('t1', 'iron'));
   win.state.characters.push(makeTestWorker('t2', 'coal'));
   win.updateNextHint();
@@ -694,7 +696,7 @@ function makeTestWorker(id, resource) {
 
 (function test_E_logFiresOnceNotEveryTick() {
   const win = newDom(makeMemoryStorage()).window;
-  win.window.firstGachaGranted = true;
+  win.permanent.firstGachaGranted = true;
   win.state.characters.push(makeTestWorker('t1', 'iron'));
   win.checkDualAutomation();
   win.state.characters.push(makeTestWorker('t2', 'coal'));
@@ -713,8 +715,8 @@ function makeTestWorker(id, resource) {
 
 (function test_F_reassignmentUpdatesAutomationStatus() {
   const win = newDom(makeMemoryStorage()).window;
-  win.window.firstGachaGranted = true;
-  win.window.tickets = 2;
+  win.permanent.firstGachaGranted = true;
+  win.permanent.tickets = 2;
   win.pullGacha();
   win.pullGacha();
   // Force both existing (randomly-assigned) workers onto iron directly, then
@@ -738,7 +740,7 @@ function makeTestWorker(id, resource) {
 (function test_G_flagSurvivesSaveLoad() {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
-  win.window.firstGachaGranted = true;
+  win.permanent.firstGachaGranted = true;
   win.state.characters.push(makeTestWorker('t1', 'iron'));
   win.state.characters.push(makeTestWorker('t2', 'coal'));
   win.checkDualAutomation();
@@ -756,7 +758,7 @@ function makeTestWorker(id, resource) {
 
 (function test_G2_flagResetsOnPrestige() {
   const win = newDom(makeMemoryStorage()).window;
-  win.window.tickets = 1;
+  win.permanent.tickets = 1;
   win.pullGacha();
   win.state.characters.push(makeTestWorker('t2', win.state.characters[0].resource === 'iron' ? 'coal' : 'iron'));
   win.checkDualAutomation();
@@ -932,6 +934,101 @@ function makeTestWorker(id, resource) {
   check('Task9-UI: card has a craft button', card && !!card.querySelector('[data-craft="coalBrick"]'));
   check('Task9-UI: card has a sell button', card && !!card.querySelector('[data-sell="coalBrick"]'));
   check('Task9-UI: card has an auto-craft checkbox', card && !!card.querySelector('[data-autocraft="coalBrick"]'));
+})();
+
+// =============================================================================
+// TASK 13 — code structure refactor: permanent state container, sellAll()'s
+// first-gacha milestone check split out, named action functions extracted
+// from build*() event callbacks, named boot(). No gameplay/balance/save-shape
+// change is intended by any of this — these tests exercise the new pieces
+// directly, on top of every test above (which already proves the externally
+// observable behavior is unchanged).
+// =============================================================================
+
+(function test_T13_permanentContainer() {
+  const win = newDom(makeMemoryStorage()).window;
+  check(
+    'Task13: permanent exposes totalPrestige/runCount/tickets/firstGachaGranted',
+    typeof win.permanent === 'object' &&
+      typeof win.permanent.totalPrestige === 'number' &&
+      typeof win.permanent.runCount === 'number' &&
+      typeof win.permanent.tickets === 'number' &&
+      typeof win.permanent.firstGachaGranted === 'boolean'
+  );
+  check(
+    'Task13: permanent starts at fresh-game defaults',
+    win.permanent.totalPrestige === 0 && win.permanent.runCount === 1 && win.permanent.tickets === 0 && win.permanent.firstGachaGranted === false
+  );
+})();
+
+(function test_T13_bootIsNamedFunction() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task13: boot is a named, callable function (not an anonymous IIFE)', typeof win.boot === 'function' && win.boot.name === 'boot');
+})();
+
+(function test_T13_firstGachaMilestoneExtracted() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task13: checkFirstGachaMilestone exists as its own function', typeof win.checkFirstGachaMilestone === 'function');
+  win.state.gold = 50;
+  win.checkFirstGachaMilestone();
+  check('Task13: calling it directly grants the ticket at the threshold', win.permanent.firstGachaGranted === true && win.permanent.tickets === 1);
+  win.state.gold = 999;
+  win.checkFirstGachaMilestone();
+  check('Task13: it does not re-grant once already granted', win.permanent.tickets === 1);
+})();
+
+(function test_T13_miningActions() {
+  const win = newDom(makeMemoryStorage()).window;
+
+  const before = win.state.resources.iron;
+  win.mineResource('iron');
+  check('Task13: mineResource(iron) adds manualAmount(iron)', win.state.resources.iron === before + win.manualAmount('iron'));
+
+  check('Task13: upgradeFacility fails with insufficient resources, no state change', win.upgradeFacility('iron') === false && win.state.facility.iron === 0);
+  win.state.resources.iron = 1000;
+  const facCost = win.facilityCost('iron');
+  const facOk = win.upgradeFacility('iron');
+  check('Task13: upgradeFacility succeeds when funded', facOk === true && win.state.facility.iron === 1 && win.state.resources.iron === 1000 - facCost);
+
+  win.state.resources.coal = 1000;
+  const wfCost = win.workforceCost('coal');
+  const wfOk = win.upgradeWorkforce('coal');
+  check('Task13: upgradeWorkforce succeeds when funded', wfOk === true && win.state.workforce.coal === 1 && win.state.resources.coal === 1000 - wfCost);
+
+  check('Task13: unlockSite fails with insufficient gold, no state change', win.unlockSite('manaVein') === false && win.state.unlockedSites.manaVein === false);
+  win.state.gold = 10000;
+  const siteOk = win.unlockSite('manaVein');
+  check('Task13: unlockSite succeeds when funded', siteOk === true && win.state.unlockedSites.manaVein === true);
+})();
+
+(function test_T13_buyAutoSellAction() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task13: buyAutoSell fails with insufficient gold, no state change', win.buyAutoSell('steel') === false && win.state.autoSell.steel === false);
+  win.state.gold = 10000;
+  const cost = win.autoSellCost(win.RECIPES.find((r) => r.key === 'steel'));
+  const ok = win.buyAutoSell('steel');
+  check(
+    'Task13: buyAutoSell succeeds when funded and sets both flags',
+    ok === true && win.state.autoSell.steel === true && win.state.autoSellOn.steel === true && win.state.gold === 10000 - cost
+  );
+})();
+
+(function test_T13_workerActions() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.permanent.tickets = 1;
+  win.pullGacha();
+  const worker = win.state.characters[0];
+  const otherRes = worker.resource === 'iron' ? 'coal' : 'iron';
+
+  check('Task13: reassignWorker fails for an unknown id (no throw)', win.reassignWorker('nope', 'iron') === false);
+  const reassignOk = win.reassignWorker(worker.id, otherRes);
+  check('Task13: reassignWorker succeeds and updates the resource', reassignOk === true && win.state.characters[0].resource === otherRes);
+
+  check('Task13: upgradeWorkerStat fails with insufficient gold', win.upgradeWorkerStat(worker.id, 'mining') === false);
+  win.state.gold = 100000;
+  const beforeMining = win.state.characters[0].mining;
+  const upOk = win.upgradeWorkerStat(worker.id, 'mining');
+  check('Task13: upgradeWorkerStat succeeds when funded', upOk === true && win.state.characters[0].mining === beforeMining + 1);
 })();
 
 // =============================================================================
