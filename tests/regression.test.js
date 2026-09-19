@@ -33,10 +33,6 @@ function check(name, condition, detail) {
   console.log(`[${condition ? 'PASS' : 'FAIL'}] ${name}${detail ? ' — ' + detail : ''}`);
 }
 
-// ---------------------------------------------------------------------------
-// A tiny in-memory localStorage we fully control, so tests can simulate
-// "no save", "corrupted save", "storage unavailable", etc. on demand.
-// ---------------------------------------------------------------------------
 function makeMemoryStorage() {
   let store = {};
   let throwOnAccess = false;
@@ -51,14 +47,6 @@ function makeMemoryStorage() {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Loads a fresh window running the real game script against a given
-// localStorage. Top-level `let`/`const` bindings from a classic <script>
-// don't survive across separate eval() calls in jsdom, so we append a tiny
-// exposure shim (read-only getters) purely for test access — this does not
-// touch index.html; it's appended only to the in-memory copy of the script
-// text used for this test run.
-// ---------------------------------------------------------------------------
 const allDoms = [];
 function newDom(storage) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.test/' });
@@ -108,3 +96,24 @@ function advanceTicks(win, n) {
   check('save/load: fresh start — firstGachaGranted=false', win.permanent.firstGachaGranted === false);
   check('save/load: fresh start — characters=[]', Array.isArray(win.state.characters) && win.state.characters.length === 0);
 })();
+
+(function test_T16_freshDefaultAndQueueShape() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task16: freshRunState craftFacility defaults to 1', win.state.craftFacility === 1);
+  check('Task16: craftQueue remains a plain map (not an array)', !Array.isArray(win.state.craftQueue) && typeof win.state.craftQueue === 'object');
+  check(
+    'Task16: craftQueue still keyed by recipe with null idle values',
+    win.RECIPES.every((r) => Object.prototype.hasOwnProperty.call(win.state.craftQueue, r.key) && win.state.craftQueue[r.key] === null)
+  );
+  check('Task16: RECIPES length unchanged (no new recipes)', win.RECIPES.length === 9);
+})();
+
+allDoms.forEach((d) => { try { d.window.close(); } catch (e) { /* ignore */ } });
+
+console.log('');
+console.log(`Total: ${passCount + failCount}  Pass: ${passCount}  Fail: ${failCount}`);
+if (failures.length) {
+  console.log('\nFailures:');
+  failures.forEach((f) => console.log(' - ' + f));
+}
+process.exit(failCount === 0 ? 0 : 1);
