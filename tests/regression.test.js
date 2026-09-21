@@ -33,6 +33,10 @@ function check(name, condition, detail) {
   console.log(`[${condition ? 'PASS' : 'FAIL'}] ${name}${detail ? ' — ' + detail : ''}`);
 }
 
+// ---------------------------------------------------------------------------
+// A tiny in-memory localStorage we fully control, so tests can simulate
+// "no save", "corrupted save", "storage unavailable", etc. on demand.
+// ---------------------------------------------------------------------------
 function makeMemoryStorage() {
   let store = {};
   let throwOnAccess = false;
@@ -47,6 +51,14 @@ function makeMemoryStorage() {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Loads a fresh window running the real game script against a given
+// localStorage. Top-level `let`/`const` bindings from a classic <script>
+// don't survive across separate eval() calls in jsdom, so we append a tiny
+// exposure shim (read-only getters) purely for test access — this does not
+// touch index.html; it's appended only to the in-memory copy of the script
+// text used for this test run.
+// ---------------------------------------------------------------------------
 const allDoms = [];
 function newDom(storage) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.test/' });
@@ -55,10 +67,26 @@ function newDom(storage) {
   win.confirm = () => true;
   win.alert = () => {};
   const scriptEl = win.document.querySelector('script');
-  const expose = `\n;window.__expose = {\n  state: () => state,\n  permanent: () => permanent,\n  saveBlocked: () => saveBlocked,\n  RESOURCES: () => RESOURCES,\n  RECIPES: () => RECIPES,\n  RARITY: () => RARITY,\n  SITES: () => SITES,\n  TICK_MS: () => TICK_MS,\n  TICKS_PER_SECOND: () => TICKS_PER_SECOND,\n};\n`;
+  const expose = `
+;window.__expose = {
+  state: () => state,
+  permanent: () => permanent,
+  saveBlocked: () => saveBlocked,
+  RESOURCES: () => RESOURCES,
+  RECIPES: () => RECIPES,
+  RARITY: () => RARITY,
+  SITES: () => SITES,
+  TICK_MS: () => TICK_MS,
+  TICKS_PER_SECOND: () => TICKS_PER_SECOND,
+};
+`;
   win.eval(scriptEl.textContent + expose);
   Object.defineProperties(win, {
     state: { get: () => win.__expose.state(), configurable: true },
+    // permanent is the game's single cross-prestige state container
+    // (totalPrestige/runCount/tickets/firstGachaGranted), replacing the
+    // separate totalPrestige/runCount lets and window.tickets/
+    // window.firstGachaGranted globals this test file used to reach.
     permanent: { get: () => win.__expose.permanent(), configurable: true },
     saveBlocked: { get: () => win.__expose.saveBlocked(), configurable: true },
     RESOURCES: { get: () => win.__expose.RESOURCES(), configurable: true },
@@ -76,24 +104,9 @@ function advanceTicks(win, n) {
   for (let i = 0; i < n; i++) win.tickLoop();
 }
 
-function makeTestWorker(id, resource) {
-  return { id, rarity: 'common', resource, mining: 1, carry: 2, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 };
-}
-
-function stockCrystalAlloyInputs(win) {
-  win.state.products.steel = 2;
-  win.state.resources.crystal = 1;
-}
-
-function showCrystalAlloyCard(win) {
-  win.state.unlockedSites.manaVein = true;
-  win.buildRecipes();
-}
-
-function timedCraftLabel(win, key) {
-  const btn = win.document.querySelector(`[data-craft="${key}"]`);
-  return btn ? btn.textContent : null;
-}
+// =============================================================================
+// SAVE / LOAD
+// =============================================================================
 
 (function test_freshStart() {
   const storage = makeMemoryStorage();
@@ -107,37 +120,46 @@ function timedCraftLabel(win, key) {
 (function test_saveThenLoadRoundTrip() {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
+
   win.state.resources.iron = 100;
   win.state.resources.coal = 100;
   for (let i = 0; i < 10; i++) win.startCraft(win.RECIPES.find((r) => r.key === 'steel'));
   win.sellAll(win.RECIPES.find((r) => r.key === 'steel'));
   check('save/load: crossing 50G grants firstGachaGranted', win.permanent.firstGachaGranted === true);
   check('save/load: crossing 50G grants a ticket', win.permanent.tickets >= 1);
+
   win.permanent.tickets = 1;
   win.pullGacha();
   check('save/load: worker pulled', win.state.characters.length === 1);
+
   const goldBefore = win.state.gold;
   const ticketsBefore = win.permanent.tickets;
   const charsBefore = win.state.characters.map((c) => JSON.stringify(c, Object.keys(c).sort()));
+
   const saved = win.saveGame();
   check('save/load: saveGame() succeeds', saved === true);
   check('save/load: payload actually written', storage._raw()['gachaFactorySave'] !== undefined);
+
   win = newDom(storage).window;
   check('save/load: gold restored', win.state.gold === goldBefore, `${win.state.gold} vs ${goldBefore}`);
   check('save/load: tickets restored', win.permanent.tickets === ticketsBefore);
   check('save/load: firstGachaGranted restored', win.permanent.firstGachaGranted === true);
-  check('save/load: characters restored (order + all fields)', JSON.stringify(win.state.characters.map((c) => JSON.stringify(c, Object.keys(c).sort()))) === JSON.stringify(charsBefore));
+  check(
+    'save/load: characters restored (order + all fields)',
+    JSON.stringify(win.state.characters.map((c) => JSON.stringify(c, Object.keys(c).sort()))) === JSON.stringify(charsBefore)
+  );
 })();
 
 (function test_craftQueueSurvivesReload() {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
-  win.state.craftQueue.specialAlloy = 2.7;
+  win.state.craftQueue.specialAlloy = 2.7; // pretend 2.7s remain on a paused craft
   win.saveGame();
+
   win = newDom(storage).window;
   check('craftQueue: exact remaining time restored', win.state.craftQueue.specialAlloy === 2.7, String(win.state.craftQueue.specialAlloy));
   const before = win.state.craftQueue.specialAlloy;
-  advanceTicks(win, 5);
+  advanceTicks(win, 5); // 5 * 100ms = 0.5s of normal tick progress
   const after = win.state.craftQueue.specialAlloy;
   check('craftQueue: resumes via the normal tick loop after reload', after !== null && Math.abs((before - after) - 0.5) < 1e-9, `${before} -> ${after}`);
 })();
@@ -145,6 +167,7 @@ function timedCraftLabel(win, key) {
 (function test_prestigeThenReload() {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
+
   win.permanent.tickets = 1;
   win.pullGacha();
   win.state.runGold = 5000;
@@ -152,6 +175,7 @@ function timedCraftLabel(win, key) {
   win.document.getElementById('prestigeBtn').onclick();
   check('prestige: totalPrestige increased by the expected amount', win.permanent.totalPrestige === expectedGain, `${win.permanent.totalPrestige} vs ${expectedGain}`);
   check('prestige: autosaves immediately on confirm', storage._raw()['gachaFactorySave'] !== undefined);
+
   const prestigeAfter = win.permanent.totalPrestige;
   const runCountAfter = win.permanent.runCount;
   win = newDom(storage).window;
@@ -232,6 +256,9 @@ function timedCraftLabel(win, key) {
 
 (function test_nanInfinityRejected() {
   const storage = makeMemoryStorage();
+  // JSON.parse can't itself produce NaN/Infinity, but a hand-crafted payload
+  // (or a future bug) could still assign them in-memory before saving; the
+  // sanitizer must reject them the same way it rejects any non-finite value.
   const win = newDom(storage).window;
   check('NaN rejected by isFiniteNumber-family checks', win.eval('isFiniteNumber(NaN)') === false);
   check('Infinity rejected by isFiniteNumber-family checks', win.eval('isFiniteNumber(Infinity)') === false);
@@ -265,11 +292,14 @@ function timedCraftLabel(win, key) {
   const storage = makeMemoryStorage();
   const win = newDom(storage).window;
   win.state.gold = 777;
+
   let saveWrites = 0;
   const originalSetItem = storage.setItem.bind(storage);
   storage.setItem = (k, v) => { if (k === 'gachaFactorySave') saveWrites++; return originalSetItem(k, v); };
-  advanceTicks(win, 50);
+
+  advanceTicks(win, 50); // 50 * 100ms = 5s of game time, tickLoop must never call saveGame
   check('tick loop never autosaves on its own (50 ticks, 0 writes)', saveWrites === 0, `writes=${saveWrites}`);
+
   win.saveGame();
   check('explicit saveGame() call writes exactly once', saveWrites === 1, `writes=${saveWrites}`);
 })();
@@ -291,45 +321,78 @@ function timedCraftLabel(win, key) {
   check('tickLoop() source contains no saveGame() call', tickFnBody.length > 0 && !tickFnBody.includes('saveGame'));
 })();
 
+// =============================================================================
+// BALANCE — compare the real game functions against independently hardcoded
+// reference values (the values approved for BALANCE in Task 2), not values
+// re-read from window.BALANCE. This way a regression IN BALANCE is caught.
+// =============================================================================
+
 (function test_balanceFormulas() {
   const win = newDom(makeMemoryStorage()).window;
+
   function refExpCost(base, growth, level) { return Math.round(base * Math.pow(growth, level)); }
   const REF = {
-    prestigeMultPerPoint: 0.15, prestigeGoldDivisor: 200, hqMultPerLevel: 0.08,
-    hqCostBase: 150, hqCostGrowth: 1.6, workforceBonusMult: 1.5,
-    facilityCostBase: 20, facilityCostGrowth: 1.4, workforceCostBase: 15, workforceCostGrowth: 1.35,
-    workerEffectiveDivisor: 16, statCostBase: { mining: 40, carry: 60, move: 50 }, statCostGrowth: 1.35, autoSellMult: 20,
+    prestigeMultPerPoint: 0.15,
+    prestigeGoldDivisor: 200,
+    hqMultPerLevel: 0.08,
+    hqCostBase: 150, hqCostGrowth: 1.6,
+    workforceBonusMult: 1.5,
+    facilityCostBase: 20, facilityCostGrowth: 1.4,
+    workforceCostBase: 15, workforceCostGrowth: 1.35,
+    workerEffectiveDivisor: 16,
+    statCostBase: { mining: 40, carry: 60, move: 50 }, statCostGrowth: 1.35,
+    autoSellMult: 20,
   };
+
+  // mult() — set totalPrestige/hqLevel directly via state/exposed vars.
   for (const p of [0, 1, 3, 7]) {
     for (const h of [0, 2, 5]) {
       win.state.hqLevel = h;
+      // totalPrestige is read-only exposed; drive it via a prestige reset instead
+      // for a couple of spot values, and otherwise verify the formula directly.
+      const expected = (1 + p * REF.prestigeMultPerPoint) * (1 + h * REF.hqMultPerLevel);
+      const actual = (1 + win.permanent.totalPrestige * REF.prestigeMultPerPoint) * win.hqMult();
+      // Only meaningful when totalPrestige actually equals p; use the live value instead.
       const liveExpected = (1 + win.permanent.totalPrestige * REF.prestigeMultPerPoint) * (1 + h * REF.hqMultPerLevel);
       check(`BALANCE: mult() matches reference formula (hqLevel=${h})`, Math.abs(win.mult() - liveExpected) < 1e-12);
     }
   }
+
   for (const h of [0, 1, 3, 8, 15]) {
     win.state.hqLevel = h;
     check(`BALANCE: hqCost() matches reference (L${h})`, win.hqCost() === refExpCost(REF.hqCostBase, REF.hqCostGrowth, h));
   }
+
   for (const lvl of [0, 1, 3, 8, 15]) {
     win.state.facility.iron = lvl;
     win.state.workforce.iron = lvl;
     check(`BALANCE: facilityCost() matches reference (L${lvl})`, win.facilityCost('iron') === refExpCost(REF.facilityCostBase, REF.facilityCostGrowth, lvl));
     check(`BALANCE: workforceCost() matches reference (L${lvl})`, win.workforceCost('iron') === refExpCost(REF.workforceCostBase, REF.workforceCostGrowth, lvl));
   }
+
   ['mining', 'carry', 'move'].forEach((stat) => {
     for (const lvl of [0, 1, 3, 8]) {
       const worker = { [stat + 'Lvl']: lvl };
-      check(`BALANCE: workerUpgradeCost(${stat}) matches reference (L${lvl})`, win.workerUpgradeCost(worker, stat) === refExpCost(REF.statCostBase[stat], REF.statCostGrowth, lvl));
+      check(
+        `BALANCE: workerUpgradeCost(${stat}) matches reference (L${lvl})`,
+        win.workerUpgradeCost(worker, stat) === refExpCost(REF.statCostBase[stat], REF.statCostGrowth, lvl)
+      );
     }
   });
+
   [[1, 2, 1], [2, 3, 2], [3, 5, 3], [5, 8, 5], [10, 10, 10]].forEach(([m, c, mv]) => {
     const worker = { mining: m, carry: c, move: mv };
-    check(`BALANCE: workerEffective() matches reference (${m},${c},${mv})`, Math.abs(win.workerEffective(worker) - (m * c * mv) / REF.workerEffectiveDivisor) < 1e-12);
+    check(
+      `BALANCE: workerEffective() matches reference (${m},${c},${mv})`,
+      Math.abs(win.workerEffective(worker) - (m * c * mv) / REF.workerEffectiveDivisor) < 1e-12
+    );
   });
+
   [5, 20, 45, 80, 400, 420].forEach((sell) => {
     check(`BALANCE: autoSellCost() matches reference (sell=${sell})`, win.autoSellCost({ sell }) === sell * REF.autoSellMult);
   });
+
+  // prestigeGain(): reference floor(sqrt(runGold/200)), gated on >=1 worker
   win.permanent.tickets = 1;
   win.pullGacha();
   [[0, 0], [199, 0], [200, 1], [800, 2], [1800, 3], [3200, 4], [5000, 5]].forEach(([gold, expectedPts]) => {
@@ -338,10 +401,16 @@ function timedCraftLabel(win, key) {
   });
 })();
 
+// =============================================================================
+// TICK / TIMER
+// =============================================================================
+
 (function test_tickTimingConstants() {
   const win = newDom(makeMemoryStorage()).window;
   check('tick: TICK_MS is 100 (unchanged engine constant)', win.TICK_MS === 100);
   check('tick: TICKS_PER_SECOND derives to exactly 10', win.TICKS_PER_SECOND === 10);
+
+  // Bit-identical to the pre-BALANCE-refactor rate/10 and -0.1 literals.
   const ticksPerSecond = win.TICKS_PER_SECOND;
   let allMatch = true;
   for (const rate of [0, 1, 3.7, 12.5, 0.125, 100000, 7, 2.3333333, Math.PI]) {
@@ -350,6 +419,10 @@ function timedCraftLabel(win, key) {
   check('tick: derived per-tick resource fraction is bit-identical to rate/10', allMatch);
   check('tick: derived per-tick craft-queue fraction is bit-identical to 0.1', 1 / ticksPerSecond === 0.1);
 })();
+
+// =============================================================================
+// WORKER ID
+// =============================================================================
 
 (function test_newWorkerHasUniqueId() {
   const win = newDom(makeMemoryStorage()).window;
@@ -363,16 +436,22 @@ function timedCraftLabel(win, key) {
 (function test_upgradeAndReassignUseIdNotIndex() {
   const win = newDom(makeMemoryStorage()).window;
   win.permanent.tickets = 2;
-  win.pullGacha(); win.pullGacha();
+  win.pullGacha();
+  win.pullGacha();
   const [w1, w2] = win.state.characters;
-  const id1Before = w1.id; const id2Before = w2.id;
-  const before1 = w1.mining; const before2 = w2.mining;
-  win.state.gold = 100000; win.updateNumbers();
+  const id1Before = w1.id;
+  const id2Before = w2.id;
+  const before1 = w1.mining;
+  const before2 = w2.mining;
+
+  win.state.gold = 100000;
+  win.updateNumbers(); // real gameplay always refreshes disabled state before a click is possible
   const btn2 = win.document.querySelectorAll('[data-upstat="mining"]')[1];
   btn2.click();
   check('worker id: upgrading worker #2 leaves its id unchanged', win.state.characters[1].id === id2Before);
   check('worker id: upgrade applies ONLY to worker #2', win.state.characters[1].mining === before2 + 1 && win.state.characters[0].mining === before1);
   check('worker id: worker #1 id unaffected by an unrelated upgrade', win.state.characters[0].id === id1Before);
+
   const sel1 = win.document.querySelectorAll('[data-reassign]')[0];
   sel1.value = 'coal';
   sel1.dispatchEvent(new win.window.Event('change'));
@@ -385,11 +464,18 @@ function timedCraftLabel(win, key) {
   win.permanent.tickets = 3;
   win.pullGacha(); win.pullGacha(); win.pullGacha();
   const idsInOrder = win.state.characters.map((c) => c.id);
+
+  // Simulate a future feature reordering the array (none exists yet in the
+  // product — this test exists specifically to guard the invariant Task 3
+  // was built for).
   win.state.characters.reverse();
   win.buildWorkers();
-  win.state.gold = 100000; win.updateNumbers();
-  const targetId = win.state.characters[0].id;
+  win.state.gold = 100000;
+  win.updateNumbers();
+
+  const targetId = win.state.characters[0].id; // was the LAST id before reversal
   check('reorder: targetId is indeed the pre-reversal last worker', targetId === idsInOrder[idsInOrder.length - 1]);
+
   const btn = win.document.querySelector(`[data-upstat="mining"][data-worker-id="${targetId}"]`);
   const othersBefore = win.state.characters.filter((c) => c.id !== targetId).map((c) => ({ id: c.id, mining: c.mining }));
   const beforeMining = win.state.characters.find((c) => c.id === targetId).mining;
@@ -405,15 +491,20 @@ function timedCraftLabel(win, key) {
   let win = newDom(storage).window;
   win.permanent.tickets = 3;
   win.pullGacha(); win.pullGacha(); win.pullGacha();
-  win.state.gold = 100000; win.updateNumbers();
+  win.state.gold = 100000;
+  win.updateNumbers();
   win.document.querySelectorAll('[data-upstat="carry"]')[1].click();
   const snapshot = win.state.characters.map((c) => ({ ...c }));
   win.saveGame();
+
   win = newDom(storage).window;
   const restored = win.state.characters;
   check('save/load: worker count preserved', restored.length === snapshot.length);
   check('save/load: worker order preserved (by id)', restored.every((c, i) => c.id === snapshot[i].id));
-  check('save/load: every worker field identical (stats/levels/id/order)', restored.every((c, i) => JSON.stringify(c, Object.keys(c).sort()) === JSON.stringify(snapshot[i], Object.keys(snapshot[i]).sort())));
+  check(
+    'save/load: every worker field identical (stats/levels/id/order)',
+    restored.every((c, i) => JSON.stringify(c, Object.keys(c).sort()) === JSON.stringify(snapshot[i], Object.keys(snapshot[i]).sort()))
+  );
 })();
 
 (function test_legacySaveMissingIdsBackfilled() {
@@ -424,10 +515,11 @@ function timedCraftLabel(win, key) {
     run: {
       resources: {}, products: {}, gold: 0, runGold: 0,
       characters: [
-        { rarity: 'common', resource: 'iron', mining: 1, carry: 2, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 },
-        { rarity: 'rare', resource: 'coal', mining: 2, carry: 3, move: 2, miningLvl: 1, carryLvl: 0, moveLvl: 2 },
+        { rarity: 'common', resource: 'iron', mining: 1, carry: 2, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 }, // pre-Task-3 shape, no id
+        { rarity: 'rare', resource: 'coal', mining: 2, carry: 3, move: 2, miningLvl: 1, carryLvl: 0, moveLvl: 2 },   // no id, already upgraded
       ],
-      lastPull: null, facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
+      lastPull: null,
+      facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
       autoCraft: {}, autoSell: {}, autoSellOn: {}, craftQueue: {}, hqLevel: 0,
     },
   };
@@ -438,20 +530,25 @@ function timedCraftLabel(win, key) {
   check('legacy save: every worker got a fresh id', chars.every((c) => typeof c.id === 'string' && c.id.length > 0));
   check('legacy save: backfilled ids are distinct', chars[0].id !== chars[1].id);
   check('legacy save: worker #1 stats/rarity untouched', chars[0].rarity === 'common' && chars[0].mining === 1 && chars[0].carry === 2 && chars[0].move === 1);
-  check('legacy save: worker #2 stats/levels (upgrade progress) untouched', chars[1].rarity === 'rare' && chars[1].mining === 2 && chars[1].carry === 3 && chars[1].move === 2 && chars[1].miningLvl === 1 && chars[1].moveLvl === 2);
+  check(
+    'legacy save: worker #2 stats/levels (upgrade progress) untouched',
+    chars[1].rarity === 'rare' && chars[1].mining === 2 && chars[1].carry === 3 && chars[1].move === 2 && chars[1].miningLvl === 1 && chars[1].moveLvl === 2
+  );
 })();
 
 (function test_duplicateIdSaveResolvedSafely() {
   const storage = makeMemoryStorage();
   const payload = {
-    saveVersion: 1, permanent: {},
+    saveVersion: 1,
+    permanent: {},
     run: {
       resources: {}, products: {}, gold: 0, runGold: 0,
       characters: [
         { id: 'w_dup', rarity: 'common', resource: 'iron', mining: 1, carry: 2, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 },
-        { id: 'w_dup', rarity: 'epic', resource: 'coal', mining: 3, carry: 5, move: 3, miningLvl: 0, carryLvl: 0, moveLvl: 0 },
+        { id: 'w_dup', rarity: 'epic', resource: 'coal', mining: 3, carry: 5, move: 3, miningLvl: 0, carryLvl: 0, moveLvl: 0 }, // corrupted duplicate
       ],
-      lastPull: null, facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
+      lastPull: null,
+      facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
       autoCraft: {}, autoSell: {}, autoSellOn: {}, craftQueue: {}, hqLevel: 0,
     },
   };
@@ -467,11 +564,15 @@ function timedCraftLabel(win, key) {
 (function test_validIdPassesThroughUnchanged() {
   const storage = makeMemoryStorage();
   const payload = {
-    saveVersion: 1, permanent: {},
+    saveVersion: 1,
+    permanent: {},
     run: {
       resources: {}, products: {}, gold: 0, runGold: 0,
-      characters: [{ id: 'w_keepme_123', rarity: 'legend', resource: 'plasma', mining: 5, carry: 8, move: 5, miningLvl: 3, carryLvl: 1, moveLvl: 0 }],
-      lastPull: null, facility: {}, workforce: {}, unlockedSites: { abandonedMine: true, spaceStation: true },
+      characters: [
+        { id: 'w_keepme_123', rarity: 'legend', resource: 'plasma', mining: 5, carry: 8, move: 5, miningLvl: 3, carryLvl: 1, moveLvl: 0 },
+      ],
+      lastPull: null,
+      facility: {}, workforce: {}, unlockedSites: { abandonedMine: true, spaceStation: true },
       autoCraft: {}, autoSell: {}, autoSellOn: {}, craftQueue: {}, hqLevel: 0,
     },
   };
@@ -480,47 +581,81 @@ function timedCraftLabel(win, key) {
   check('valid id: a well-formed existing id is preserved exactly', win.state.characters[0].id === 'w_keepme_123');
 })();
 
+// =============================================================================
+// GAME FLOW (smoke test) — mine -> craft -> sell -> first ticket -> gacha ->
+// worker auto-mining -> prestige -> reset -> permanent prestige persists
+// =============================================================================
+
 (function test_fullGameFlowSmoke() {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
+
+  // 1. Initial state.
   check('flow: starts with 0 gold, 0 tickets, no workers', win.state.gold === 0 && win.permanent.tickets === 0 && win.state.characters.length === 0);
+
+  // 2. Manual mining (button click, exactly as a player would).
   const ironBtn = win.document.querySelector('[data-mine="iron"]');
   const coalBtn = win.document.querySelector('[data-mine="coal"]');
   for (let i = 0; i < 20; i++) ironBtn.click();
   for (let i = 0; i < 10; i++) coalBtn.click();
   check('flow: manual mining accumulates resources', win.state.resources.iron >= 20 && win.state.resources.coal >= 10);
+
+  // 3. Craft (button click).
   win.updateNumbers();
   const craftBtn = win.document.querySelector('[data-craft="steel"]');
   for (let i = 0; i < 10; i++) { craftBtn.click(); win.updateNumbers(); }
   check('flow: crafting steel produces product', win.state.products.steel >= 10);
+
+  // 4. Sell (button click) -> crosses the 50G first-ticket threshold.
   const sellBtn = win.document.querySelector('[data-sell="steel"]');
   sellBtn.click();
   check('flow: selling steel yields gold', win.state.gold > 0);
   check('flow: crossing 50G granted the first ticket', win.permanent.firstGachaGranted === true && win.permanent.tickets >= 1);
+
+  // 5. Gacha (button click).
   win.updateNumbers();
   win.document.getElementById('gachaTicketBtn').click();
   check('flow: gacha pull produced a worker', win.state.characters.length === 1);
   check('flow: worker is assigned to an unlocked resource', ['iron', 'coal'].includes(win.state.characters[0].resource));
+
+  // 6. Auto-mining now active for the worker's resource.
   const workerRes = win.state.characters[0].resource;
   check('flow: auto rate is now > 0 for the worker\'s resource', win.autoRate(workerRes) > 0);
+
+  // 7. Build up enough runGold for a prestige point, then prestige.
   win.state.runGold = 5000;
   const expectedGain = win.prestigeGain();
   check('flow: prestige gain is available with a worker present', expectedGain > 0);
   win.document.getElementById('prestigeBtn').onclick();
   check('flow: prestige increased totalPrestige', win.permanent.totalPrestige === expectedGain);
   check('flow: prestige reset the run (0 workers, 0 gold)', win.state.characters.length === 0 && win.state.gold === 0);
+
+  // 8. Permanent prestige value persists across a reload.
   const prestigeAfter = win.permanent.totalPrestige;
-  win = newDom(storage).window;
+  win = newDom(storage).window; // no explicit save call — relies on the autosave-on-prestige from step 7
   check('flow: permanent prestige persists after prestige + reload', win.permanent.totalPrestige === prestigeAfter);
 })();
 
+// =============================================================================
+// TASK 6 — early automation guidance (Next Hint branches + one-time log +
+// locked-site recipe preview)
+// =============================================================================
+
+function makeTestWorker(id, resource) {
+  return { id, rarity: 'common', resource, mining: 1, carry: 2, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 };
+}
+
 (function test_A_noWorkersHintUnchanged() {
   const win = newDom(makeMemoryStorage()).window;
-  win.state.gold = 50; win.permanent.firstGachaGranted = true; win.permanent.tickets = 1;
+  // Grant the first ticket (crosses 50G) but pull no worker yet.
+  win.state.gold = 50;
+  win.permanent.firstGachaGranted = true;
+  win.permanent.tickets = 1;
   win.updateNextHint();
   const text = win.document.getElementById('nextHint').textContent;
   check('Task6-A: no-worker hint text is the original "뽑으세요" guidance', text.includes('일꾼') && text.includes('뽑'));
 })();
+
 (function test_B_ironOnlyShowsPartialAutomationHint() {
   const win = newDom(makeMemoryStorage()).window;
   win.permanent.firstGachaGranted = true;
@@ -530,6 +665,7 @@ function timedCraftLabel(win, key) {
   check('Task6-B: iron-only worker mentions coal as the missing side', text.includes('석탄'));
   check('Task6-B: iron-only worker does not claim full automation', !text.includes('자동화 완료'));
 })();
+
 (function test_C_coalOnlyShowsPartialAutomationHint() {
   const win = newDom(makeMemoryStorage()).window;
   win.permanent.firstGachaGranted = true;
@@ -539,6 +675,7 @@ function timedCraftLabel(win, key) {
   check('Task6-C: coal-only worker mentions iron as the missing side', text.includes('철광석'));
   check('Task6-C: coal-only worker does not claim full automation', !text.includes('자동화 완료'));
 })();
+
 (function test_D_bothSidesShowsFullAutomationHint() {
   const win = newDom(makeMemoryStorage()).window;
   win.permanent.firstGachaGranted = true;
@@ -547,12 +684,16 @@ function timedCraftLabel(win, key) {
   win.updateNextHint();
   const text = win.document.getElementById('nextHint').textContent;
   check('Task6-D: both sides covered shows the full-automation hint', text.includes('자동화 완료'));
+
+  // Once autoCraft is turned on, the hint must fall through to the existing
+  // prestige-related branches instead of hiding them forever (section E).
   win.state.autoCraft.steel = true;
   win.updateNextHint();
   const textAfter = win.document.getElementById('nextHint').textContent;
   check('Task6-E: after autoCraft is on, the automation-complete hint no longer shows', !textAfter.includes('자동화 완료'));
   check('Task6-E: prestige-related guidance is shown instead', textAfter.includes('명성') || textAfter.includes('200G'));
 })();
+
 (function test_E_logFiresOnceNotEveryTick() {
   const win = newDom(makeMemoryStorage()).window;
   win.permanent.firstGachaGranted = true;
@@ -560,26 +701,42 @@ function timedCraftLabel(win, key) {
   win.checkDualAutomation();
   win.state.characters.push(makeTestWorker('t2', 'coal'));
   win.checkDualAutomation();
+  const countLogLines = () => win.document.querySelectorAll('#log div').length;
   const countAfterFirst = Array.from(win.document.querySelectorAll('#log div')).filter((d) => d.textContent.includes('자동화 완료')).length;
   check('Task6-E: milestone log appears exactly once after reaching the condition', countAfterFirst === 1, `count=${countAfterFirst}`);
-  advanceTicks(win, 30); win.checkDualAutomation(); win.checkDualAutomation();
+
+  // Advance many ticks; the guard (state.autoLineLogged) must prevent repeats.
+  advanceTicks(win, 30);
+  win.checkDualAutomation();
+  win.checkDualAutomation();
   const countAfterMore = Array.from(win.document.querySelectorAll('#log div')).filter((d) => d.textContent.includes('자동화 완료')).length;
   check('Task6-E: milestone log does NOT repeat across ticks / repeated calls', countAfterMore === 1, `count=${countAfterMore}`);
 })();
+
 (function test_F_reassignmentUpdatesAutomationStatus() {
   const win = newDom(makeMemoryStorage()).window;
-  win.permanent.firstGachaGranted = true; win.permanent.tickets = 2;
-  win.pullGacha(); win.pullGacha();
-  win.state.characters[0].resource = 'iron'; win.state.characters[1].resource = 'iron';
-  win.buildWorkers(); win.updateNextHint();
+  win.permanent.firstGachaGranted = true;
+  win.permanent.tickets = 2;
+  win.pullGacha();
+  win.pullGacha();
+  // Force both existing (randomly-assigned) workers onto iron directly, then
+  // reassign one via the real UI control — exactly like a player would.
+  win.state.characters[0].resource = 'iron';
+  win.state.characters[1].resource = 'iron';
+  win.buildWorkers();
+  win.updateNextHint();
   check('Task6-F: both workers on iron shows the partial-automation hint', win.document.getElementById('nextHint').textContent.includes('석탄'));
+
   const sel = win.document.querySelectorAll('[data-reassign]')[1];
-  sel.value = 'coal'; sel.dispatchEvent(new win.window.Event('change')); win.updateNextHint();
+  sel.value = 'coal';
+  sel.dispatchEvent(new win.window.Event('change'));
+  win.updateNextHint();
   const text = win.document.getElementById('nextHint').textContent;
   check('Task6-F: reassigning the 2nd worker to coal completes automation', text.includes('자동화 완료'));
   const logHits = Array.from(win.document.querySelectorAll('#log div')).filter((d) => d.textContent.includes('자동화 완료')).length;
   check('Task6-F: reassignment-triggered milestone logs exactly once', logHits === 1, `count=${logHits}`);
 })();
+
 (function test_G_flagSurvivesSaveLoad() {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
@@ -589,32 +746,50 @@ function timedCraftLabel(win, key) {
   win.checkDualAutomation();
   check('Task6-G: autoLineLogged is true before save', win.state.autoLineLogged === true);
   win.saveGame();
+
   win = newDom(storage).window;
   check('Task6-G: autoLineLogged persists as true after reload', win.state.autoLineLogged === true);
+
+  // Re-checking after reload must NOT re-log, since the flag survived.
   win.checkDualAutomation();
   const logHits = Array.from(win.document.querySelectorAll('#log div')).filter((d) => d.textContent.includes('자동화 완료')).length;
-  check('Task6-G: no duplicate milestone log after reload', logHits === 0, `count=${logHits}`);
+  check('Task6-G: no duplicate milestone log after reload', logHits === 0, `count=${logHits}`); // the reload itself logs "이전 진행 상황을 불러왔습니다", not this milestone
 })();
+
 (function test_G2_flagResetsOnPrestige() {
   const win = newDom(makeMemoryStorage()).window;
-  win.permanent.tickets = 1; win.pullGacha();
+  win.permanent.tickets = 1;
+  win.pullGacha();
   win.state.characters.push(makeTestWorker('t2', win.state.characters[0].resource === 'iron' ? 'coal' : 'iron'));
   win.checkDualAutomation();
   check('Task6-G2: flag set before prestige', win.state.autoLineLogged === true);
+
   win.state.runGold = 5000;
   win.document.getElementById('prestigeBtn').onclick();
   check('Task6-G2: flag resets to false on the new run after prestige', win.state.autoLineLogged === false);
 })();
+
 (function test_H_lockedSiteShowsExistingRecipesOnly() {
   const win = newDom(makeMemoryStorage()).window;
   win.buildLines();
   const lockedCards = win.document.querySelectorAll('.line.locked');
   check('Task6-H: locked site cards still render (existing UI preserved)', lockedCards.length >= 3);
+
   const manaVeinText = Array.from(win.document.querySelectorAll('.site-group')).find((g) => g.textContent.includes('마정석 광맥'));
   check('Task6-H: manaVein card mentions its minerals', manaVeinText && manaVeinText.textContent.includes('마정석') && manaVeinText.textContent.includes('결정'));
-  check('Task6-H: manaVein card mentions only recipes that actually use its resources (from real RECIPES data)', manaVeinText && manaVeinText.textContent.includes('마법 합금') && manaVeinText.textContent.includes('결정 합금'));
-  check('Task6-H: manaVein card does not falsely mention ruins/spaceStation recipes', manaVeinText && !manaVeinText.textContent.includes('�텀 코어') && !manaVeinText.textContent.includes('정밀 부품'));
+  check(
+    'Task6-H: manaVein card mentions only recipes that actually use its resources (from real RECIPES data)',
+    manaVeinText && manaVeinText.textContent.includes('마법 합금') && manaVeinText.textContent.includes('결정 합금')
+  );
+  // Must NOT mention recipes belonging to other, unrelated sites.
+  check('Task6-H: manaVein card does not falsely mention ruins/spaceStation recipes', manaVeinText && !manaVeinText.textContent.includes('퀀텀 코어') && !manaVeinText.textContent.includes('정밀 부품'));
 })();
+
+// =============================================================================
+// TASK 9 — coalBrick recipe (candidate A from Task 8): coal-only, independent
+// of steel's iron/coal, reuses all existing RECIPES/canCraft/startCraft/
+// autoSell machinery with no new functions.
+// =============================================================================
 
 (function test_T9A_recipeData() {
   const win = newDom(makeMemoryStorage()).window;
@@ -625,6 +800,7 @@ function timedCraftLabel(win, key) {
   check('Task9-A: coalBrick.sell = 4', r && r.sell === 4);
   check('Task9-A: coalBrick.craftTime = 0', r && r.craftTime === 0);
 })();
+
 (function test_T9B_manualCraftConsumesExactly() {
   const win = newDom(makeMemoryStorage()).window;
   win.state.resources.coal = 3;
@@ -633,6 +809,7 @@ function timedCraftLabel(win, key) {
   check('Task9-B: coal reduced to 0', win.state.resources.coal === 0);
   check('Task9-B: coalBrick product +1', win.state.products.coalBrick === 1);
 })();
+
 (function test_T9C_insufficientMaterialBlocks() {
   const win = newDom(makeMemoryStorage()).window;
   win.state.resources.coal = 2;
@@ -643,6 +820,7 @@ function timedCraftLabel(win, key) {
   check('Task9-C: coal untouched on failed craft', win.state.resources.coal === 2);
   check('Task9-C: no product created on failed craft', win.state.products.coalBrick === 0);
 })();
+
 (function test_T9D_sellUsesRecipeSellAndMult() {
   const win = newDom(makeMemoryStorage()).window;
   win.state.products.coalBrick = 1;
@@ -651,53 +829,82 @@ function timedCraftLabel(win, key) {
   check('Task9-D: product cleared after sell', win.state.products.coalBrick === 0);
   check('Task9-D: gold increased by 4 * mult()', Math.abs(win.state.gold - (goldBefore + 4 * win.mult())) < 1e-9);
 })();
+
 (function test_T9E_autoCraftAndCraftQueueStaysNull() {
   const win = newDom(makeMemoryStorage()).window;
-  win.state.resources.coal = 30; win.state.autoCraft.coalBrick = true; win.tickLoop();
+  win.state.resources.coal = 30;
+  win.state.autoCraft.coalBrick = true;
+  win.tickLoop();
   check('Task9-E: auto-craft produced coalBrick on a tick with enough coal', win.state.products.coalBrick >= 1);
   check('Task9-E: craftQueue.coalBrick stays null (craftTime=0 never queues)', win.state.craftQueue.coalBrick === null);
   advanceTicks(win, 5);
   check('Task9-E: craftQueue.coalBrick still null after more ticks', win.state.craftQueue.coalBrick === null);
 })();
+
 (function test_T9F_autoSellCostAndFlow() {
   const win = newDom(makeMemoryStorage()).window;
   const recipe = win.RECIPES.find((r) => r.key === 'coalBrick');
   check('Task9-F: autoSellCost is computed (not hardcoded) as sell*20 = 80', win.autoSellCost(recipe) === 80);
-  win.state.gold = 1000; win.buildRecipes();
+
+  win.state.gold = 1000;
+  win.buildRecipes();
   const buyBtn = win.document.querySelector('[data-buyautosell="coalBrick"]');
   check('Task9-F: buy-auto-sell button exists for coalBrick', !!buyBtn);
   buyBtn.click();
   check('Task9-F: autoSell.coalBrick true after purchase', win.state.autoSell.coalBrick === true);
   check('Task9-F: autoSellOn.coalBrick true after purchase', win.state.autoSellOn.coalBrick === true);
+
   win.state.products.coalBrick = 5;
-  const goldBefore = win.state.gold; win.tickLoop();
+  const goldBefore = win.state.gold;
+  win.tickLoop();
   check('Task9-F: auto-sell cleared the product on tick', win.state.products.coalBrick === 0);
   check('Task9-F: auto-sell added gold on tick', win.state.gold > goldBefore);
 })();
+
 (function test_T9G_steelUnaffected() {
   const win = newDom(makeMemoryStorage()).window;
   const steel = win.RECIPES.find((r) => r.key === 'steel');
   check('Task9-G: steel.need unchanged (iron:2, coal:1)', steel.need.iron === 2 && steel.need.coal === 1 && Object.keys(steel.need).length === 2);
   check('Task9-G: steel.sell unchanged (5)', steel.sell === 5);
   check('Task9-G: steel.craftTime unchanged (0)', steel.craftTime === 0);
-  win.state.resources.iron = 100; win.state.resources.coal = 100;
-  win.state.autoCraft.steel = true; win.state.autoCraft.coalBrick = true;
+
+  // Steel auto-crafts identically whether or not coalBrick exists/auto-crafts,
+  // since they share no materials.
+  win.state.resources.iron = 100;
+  win.state.resources.coal = 100;
+  win.state.autoCraft.steel = true;
+  win.state.autoCraft.coalBrick = true; // both on at once — must not interfere
   advanceTicks(win, 10);
   const steelProducedWithBoth = win.state.products.steel;
+  const coalUsedByBoth = 100 - win.state.resources.coal;
+
   const win2 = newDom(makeMemoryStorage()).window;
-  win2.state.resources.iron = 100; win2.state.resources.coal = 100; win2.state.autoCraft.steel = true;
+  win2.state.resources.iron = 100;
+  win2.state.resources.coal = 100;
+  win2.state.autoCraft.steel = true; // coalBrick auto-craft left off
   advanceTicks(win2, 10);
-  check('Task9-G: steel production identical whether coalBrick auto-craft is on or off', steelProducedWithBoth === win2.state.products.steel, `${steelProducedWithBoth} vs ${win2.state.products.steel}`);
+  const steelProducedAlone = win2.state.products.steel;
+
+  check('Task9-G: steel production identical whether coalBrick auto-craft is on or off', steelProducedWithBoth === steelProducedAlone, `${steelProducedWithBoth} vs ${steelProducedAlone}`);
 })();
+
 (function test_T9H_saveLoadCompatibility() {
+  // A save written BEFORE this recipe existed (no coalBrick key anywhere)
+  // must still load safely — freshRunState()/sanitizeRunState() already
+  // derive their key sets from the live RECIPES array, so no explicit
+  // migration should be needed.
   const storage = makeMemoryStorage();
   const legacyPayload = {
     saveVersion: 1,
     permanent: { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: true },
     run: {
-      resources: { iron: 5, coal: 5 }, products: { steel: 2 }, gold: 10, runGold: 10,
-      characters: [], lastPull: null, facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
-      autoCraft: { steel: true }, autoSell: {}, autoSellOn: {}, craftQueue: { steel: null }, hqLevel: 0, autoLineLogged: false,
+      resources: { iron: 5, coal: 5 },
+      products: { steel: 2 }, // no coalBrick key at all — simulates a pre-Task-9 save
+      gold: 10, runGold: 10,
+      characters: [], lastPull: null,
+      facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
+      autoCraft: { steel: true }, autoSell: {}, autoSellOn: {},
+      craftQueue: { steel: null }, hqLevel: 0, autoLineLogged: false,
     },
   };
   storage._setRaw('gachaFactorySave', JSON.stringify(legacyPayload));
@@ -709,10 +916,15 @@ function timedCraftLabel(win, key) {
   check('Task9-H: coalBrick autoSellOn defaults to true', win.state.autoSellOn.coalBrick === true);
   check('Task9-H: coalBrick craftQueue defaults to null', win.state.craftQueue.coalBrick === null);
   check('Task9-H: pre-existing steel data untouched', win.state.products.steel === 2 && win.state.autoCraft.steel === true);
-  win.state.products.coalBrick = 7; win.state.autoCraft.coalBrick = true; win.saveGame();
+
+  // Round trip a save made WITH coalBrick data.
+  win.state.products.coalBrick = 7;
+  win.state.autoCraft.coalBrick = true;
+  win.saveGame();
   const win2 = newDom(storage).window;
   check('Task9-H: coalBrick data round-trips through save/load', win2.state.products.coalBrick === 7 && win2.state.autoCraft.coalBrick === true);
 })();
+
 (function test_T9_recipeCardRendersViaExistingBuildRecipes() {
   const win = newDom(makeMemoryStorage()).window;
   win.buildRecipes();
@@ -724,55 +936,94 @@ function timedCraftLabel(win, key) {
   check('Task9-UI: card has an auto-craft checkbox', card && !!card.querySelector('[data-autocraft="coalBrick"]'));
 })();
 
+// =============================================================================
+// TASK 13 — code structure refactor: permanent state container, sellAll()'s
+// first-gacha milestone check split out, named action functions extracted
+// from build*() event callbacks, named boot(). No gameplay/balance/save-shape
+// change is intended by any of this — these tests exercise the new pieces
+// directly, on top of every test above (which already proves the externally
+// observable behavior is unchanged).
+// =============================================================================
+
 (function test_T13_permanentContainer() {
   const win = newDom(makeMemoryStorage()).window;
-  check('Task13: permanent exposes totalPrestige/runCount/tickets/firstGachaGranted', typeof win.permanent === 'object' && typeof win.permanent.totalPrestige === 'number' && typeof win.permanent.runCount === 'number' && typeof win.permanent.tickets === 'number' && typeof win.permanent.firstGachaGranted === 'boolean');
-  check('Task13: permanent starts at fresh-game defaults', win.permanent.totalPrestige === 0 && win.permanent.runCount === 1 && win.permanent.tickets === 0 && win.permanent.firstGachaGranted === false);
+  check(
+    'Task13: permanent exposes totalPrestige/runCount/tickets/firstGachaGranted',
+    typeof win.permanent === 'object' &&
+      typeof win.permanent.totalPrestige === 'number' &&
+      typeof win.permanent.runCount === 'number' &&
+      typeof win.permanent.tickets === 'number' &&
+      typeof win.permanent.firstGachaGranted === 'boolean'
+  );
+  check(
+    'Task13: permanent starts at fresh-game defaults',
+    win.permanent.totalPrestige === 0 && win.permanent.runCount === 1 && win.permanent.tickets === 0 && win.permanent.firstGachaGranted === false
+  );
 })();
+
 (function test_T13_bootIsNamedFunction() {
   const win = newDom(makeMemoryStorage()).window;
   check('Task13: boot is a named, callable function (not an anonymous IIFE)', typeof win.boot === 'function' && win.boot.name === 'boot');
 })();
+
 (function test_T13_firstGachaMilestoneExtracted() {
   const win = newDom(makeMemoryStorage()).window;
   check('Task13: checkFirstGachaMilestone exists as its own function', typeof win.checkFirstGachaMilestone === 'function');
-  win.state.gold = 50; win.checkFirstGachaMilestone();
+  win.state.gold = 50;
+  win.checkFirstGachaMilestone();
   check('Task13: calling it directly grants the ticket at the threshold', win.permanent.firstGachaGranted === true && win.permanent.tickets === 1);
-  win.state.gold = 999; win.checkFirstGachaMilestone();
+  win.state.gold = 999;
+  win.checkFirstGachaMilestone();
   check('Task13: it does not re-grant once already granted', win.permanent.tickets === 1);
 })();
+
 (function test_T13_miningActions() {
   const win = newDom(makeMemoryStorage()).window;
-  const before = win.state.resources.iron; win.mineResource('iron');
+
+  const before = win.state.resources.iron;
+  win.mineResource('iron');
   check('Task13: mineResource(iron) adds manualAmount(iron)', win.state.resources.iron === before + win.manualAmount('iron'));
+
   check('Task13: upgradeFacility fails with insufficient resources, no state change', win.upgradeFacility('iron') === false && win.state.facility.iron === 0);
   win.state.resources.iron = 1000;
-  const facCost = win.facilityCost('iron'); const facOk = win.upgradeFacility('iron');
+  const facCost = win.facilityCost('iron');
+  const facOk = win.upgradeFacility('iron');
   check('Task13: upgradeFacility succeeds when funded', facOk === true && win.state.facility.iron === 1 && win.state.resources.iron === 1000 - facCost);
+
   win.state.resources.coal = 1000;
-  const wfCost = win.workforceCost('coal'); const wfOk = win.upgradeWorkforce('coal');
+  const wfCost = win.workforceCost('coal');
+  const wfOk = win.upgradeWorkforce('coal');
   check('Task13: upgradeWorkforce succeeds when funded', wfOk === true && win.state.workforce.coal === 1 && win.state.resources.coal === 1000 - wfCost);
+
   check('Task13: unlockSite fails with insufficient gold, no state change', win.unlockSite('manaVein') === false && win.state.unlockedSites.manaVein === false);
   win.state.gold = 10000;
   const siteOk = win.unlockSite('manaVein');
   check('Task13: unlockSite succeeds when funded', siteOk === true && win.state.unlockedSites.manaVein === true);
 })();
+
 (function test_T13_buyAutoSellAction() {
   const win = newDom(makeMemoryStorage()).window;
   check('Task13: buyAutoSell fails with insufficient gold, no state change', win.buyAutoSell('steel') === false && win.state.autoSell.steel === false);
   win.state.gold = 10000;
   const cost = win.autoSellCost(win.RECIPES.find((r) => r.key === 'steel'));
   const ok = win.buyAutoSell('steel');
-  check('Task13: buyAutoSell succeeds when funded and sets both flags', ok === true && win.state.autoSell.steel === true && win.state.autoSellOn.steel === true && win.state.gold === 10000 - cost);
+  check(
+    'Task13: buyAutoSell succeeds when funded and sets both flags',
+    ok === true && win.state.autoSell.steel === true && win.state.autoSellOn.steel === true && win.state.gold === 10000 - cost
+  );
 })();
+
 (function test_T13_workerActions() {
   const win = newDom(makeMemoryStorage()).window;
-  win.permanent.tickets = 1; win.pullGacha();
+  win.permanent.tickets = 1;
+  win.pullGacha();
   const worker = win.state.characters[0];
   const otherRes = worker.resource === 'iron' ? 'coal' : 'iron';
+
   check('Task13: reassignWorker fails for an unknown id (no throw)', win.reassignWorker('nope', 'iron') === false);
   const reassignOk = win.reassignWorker(worker.id, otherRes);
   check('Task13: reassignWorker succeeds and updates the resource', reassignOk === true && win.state.characters[0].resource === otherRes);
+
   check('Task13: upgradeWorkerStat fails with insufficient gold', win.upgradeWorkerStat(worker.id, 'mining') === false);
   win.state.gold = 100000;
   const beforeMining = win.state.characters[0].mining;
@@ -780,23 +1031,42 @@ function timedCraftLabel(win, key) {
   check('Task13: upgradeWorkerStat succeeds when funded', upOk === true && win.state.characters[0].mining === beforeMining + 1);
 })();
 
+// =============================================================================
+// TASK 16 — craft facility (run-scoped timed-craft speed). Does not change
+// craftQueue shape, instant recipes, autoCraft/autoSell, or saveVersion.
+// =============================================================================
+
+function stockCrystalAlloyInputs(win) {
+  win.state.products.steel = 2;
+  win.state.resources.crystal = 1;
+}
+
 (function test_T16_freshDefaultAndQueueShape() {
   const win = newDom(makeMemoryStorage()).window;
   check('Task16: freshRunState craftFacility defaults to 1', win.state.craftFacility === 1);
   check('Task16: craftQueue remains a plain map (not an array)', !Array.isArray(win.state.craftQueue) && typeof win.state.craftQueue === 'object');
-  check('Task16: craftQueue still keyed by recipe with null idle values', win.RECIPES.every((r) => Object.prototype.hasOwnProperty.call(win.state.craftQueue, r.key) && win.state.craftQueue[r.key] === null));
+  check(
+    'Task16: craftQueue still keyed by recipe with null idle values',
+    win.RECIPES.every((r) => Object.prototype.hasOwnProperty.call(win.state.craftQueue, r.key) && win.state.craftQueue[r.key] === null)
+  );
   check('Task16: RECIPES length unchanged (no new recipes)', win.RECIPES.length === 9);
 })();
+
 (function test_T16_legacySaveMissingFieldDefaults() {
   const storage = makeMemoryStorage();
   const legacyPayload = {
     saveVersion: 1,
     permanent: { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: true },
     run: {
-      resources: { iron: 5, coal: 5 }, products: { steel: 2 }, gold: 10, runGold: 10,
-      characters: [], lastPull: null, facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
-      autoCraft: {}, autoSell: {}, autoSellOn: {}, craftQueue: { steel: null, crystalAlloy: 1.5 },
+      resources: { iron: 5, coal: 5 },
+      products: { steel: 2 },
+      gold: 10, runGold: 10,
+      characters: [], lastPull: null,
+      facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
+      autoCraft: {}, autoSell: {}, autoSellOn: {},
+      craftQueue: { steel: null, crystalAlloy: 1.5 },
       hqLevel: 2, autoLineLogged: false,
+      // no craftFacility field — pre-Task-16 save
     },
   };
   storage._setRaw('gachaFactorySave', JSON.stringify(legacyPayload));
@@ -806,43 +1076,72 @@ function timedCraftLabel(win, key) {
   check('Task16: craftQueue values restore without migration', win.state.craftQueue.crystalAlloy === 1.5 && win.state.craftQueue.steel === null);
   check('Task16: saveVersion stays 1 on the next write', (() => { win.saveGame(); return JSON.parse(storage._raw()['gachaFactorySave']).saveVersion === 1; })());
 })();
+
 (function test_T16_invalidCraftFacilityFallsBack() {
   const storage = makeMemoryStorage();
-  const payload = { saveVersion: 1, permanent: {}, run: { resources: {}, products: {}, gold: 0, runGold: 0, characters: [], lastPull: null, facility: {}, workforce: {}, unlockedSites: { abandonedMine: true }, autoCraft: {}, autoSell: {}, autoSellOn: {}, craftQueue: {}, hqLevel: 0, craftFacility: 0 } };
+  const payload = {
+    saveVersion: 1,
+    permanent: {},
+    run: {
+      resources: {}, products: {}, gold: 0, runGold: 0,
+      characters: [], lastPull: null,
+      facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
+      autoCraft: {}, autoSell: {}, autoSellOn: {}, craftQueue: {}, hqLevel: 0,
+      craftFacility: 0,
+    },
+  };
   storage._setRaw('gachaFactorySave', JSON.stringify(payload));
   let win = newDom(storage).window;
   check('Task16: craftFacility=0 is rejected and becomes 1', win.state.craftFacility === 1);
-  payload.run.craftFacility = -3; storage._setRaw('gachaFactorySave', JSON.stringify(payload)); win = newDom(storage).window;
+
+  payload.run.craftFacility = -3;
+  storage._setRaw('gachaFactorySave', JSON.stringify(payload));
+  win = newDom(storage).window;
   check('Task16: negative craftFacility is rejected and becomes 1', win.state.craftFacility === 1);
-  payload.run.craftFacility = 2.5; storage._setRaw('gachaFactorySave', JSON.stringify(payload)); win = newDom(storage).window;
+
+  payload.run.craftFacility = 2.5;
+  storage._setRaw('gachaFactorySave', JSON.stringify(payload));
+  win = newDom(storage).window;
   check('Task16: non-integer craftFacility is rejected and becomes 1', win.state.craftFacility === 1);
 })();
+
 (function test_T16_saveLoadPreservesLevel() {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
-  win.state.craftFacility = 4; win.state.gold = 321; win.saveGame();
+  win.state.craftFacility = 4;
+  win.state.gold = 321;
+  win.saveGame();
   const written = JSON.parse(storage._raw()['gachaFactorySave']);
   check('Task16: new save writes craftFacility', written.run.craftFacility === 4);
   check('Task16: new save still uses saveVersion 1', written.saveVersion === 1);
+
   win = newDom(storage).window;
   check('Task16: craftFacility round-trips through save/load', win.state.craftFacility === 4);
   check('Task16: sibling gold also round-trips', win.state.gold === 321);
 })();
+
 (function test_T16_upgradeCostAndLevel() {
   const win = newDom(makeMemoryStorage()).window;
   function refExpCost(base, growth, level) { return Math.round(base * Math.pow(growth, level)); }
-  const REF_BASE = 100, REF_GROWTH = 1.5;
+  const REF_BASE = 100;
+  const REF_GROWTH = 1.5;
+
   check('Task16: upgradeCraftFacility exists', typeof win.upgradeCraftFacility === 'function');
   check('Task16: craftFacilityCost exists', typeof win.craftFacilityCost === 'function');
   check('Task16: first upgrade cost matches expCost(100, 1.5, 0)', win.craftFacilityCost() === refExpCost(REF_BASE, REF_GROWTH, 0));
+
   const cost = win.craftFacilityCost();
   check('Task16: upgrade refused with insufficient gold', win.upgradeCraftFacility() === false && win.state.craftFacility === 1 && win.state.gold === 0);
-  win.state.gold = 10000; const goldBefore = win.state.gold; const ok = win.upgradeCraftFacility();
+
+  win.state.gold = 10000;
+  const goldBefore = win.state.gold;
+  const ok = win.upgradeCraftFacility();
   check('Task16: upgrade succeeds when funded', ok === true);
   check('Task16: gold is deducted by the quoted cost', win.state.gold === goldBefore - cost);
   check('Task16: level increases by 1', win.state.craftFacility === 2);
   check('Task16: next cost uses expCost at the new level', win.craftFacilityCost() === refExpCost(REF_BASE, REF_GROWTH, 1));
 })();
+
 (function test_T16_defaultLevelKeepsCraftTimes() {
   const win = newDom(makeMemoryStorage()).window;
   const recipe = win.RECIPES.find((r) => r.key === 'crystalAlloy');
@@ -851,56 +1150,92 @@ function timedCraftLabel(win, key) {
   const started = win.startCraft(recipe);
   check('Task16: timed startCraft queues craftTime seconds', started === true && win.state.craftQueue.crystalAlloy === 3);
   check('Task16: timed startCraft does not grant product immediately', win.state.products.crystalAlloy === 0);
+
   win.tickLoop();
   check('Task16: default level still subtracts 0.1s per tick', Math.abs(win.state.craftQueue.crystalAlloy - 2.9) < 1e-12);
-  advanceTicks(win, 28);
+
+  advanceTicks(win, 28); // 1 + 28 = 29 ticks total → 2.9s elapsed, 0.1s remain
   check('Task16: 3s craft still in progress after 2.9s at default level', win.state.craftQueue.crystalAlloy !== null && win.state.products.crystalAlloy === 0);
-  win.tickLoop();
+
+  win.tickLoop(); // 30th tick → 3.0s elapsed
   check('Task16: 3s craft completes on the 30th tick at default level', win.state.craftQueue.crystalAlloy === null && win.state.products.crystalAlloy === 1);
 })();
+
 (function test_T16_upgradeSpeedsTimedCraft() {
   const win = newDom(makeMemoryStorage()).window;
   const recipe = win.RECIPES.find((r) => r.key === 'crystalAlloy');
-  win.state.gold = 10000; win.upgradeCraftFacility();
+  win.state.gold = 10000;
+  win.upgradeCraftFacility();
   check('Task16: upgraded craftFacility is 2 before timing check', win.state.craftFacility === 2);
-  stockCrystalAlloyInputs(win); win.startCraft(recipe);
-  const queued = win.state.craftQueue.crystalAlloy; win.tickLoop();
+
+  stockCrystalAlloyInputs(win);
+  win.startCraft(recipe);
+  const queued = win.state.craftQueue.crystalAlloy;
+  win.tickLoop();
   const progressed = queued - win.state.craftQueue.crystalAlloy;
   check('Task16: upgraded tick progresses timed craft faster than 0.1s', progressed > 0.1 + 1e-12, `progressed=${progressed}`);
-  check('Task16: Lv.2 speed is 1.1x (0.11s per tick)', Math.abs(progressed - 0.11) < 1e-12, `progressed=${progressed}`);
+  check(
+    'Task16: Lv.2 speed is 1.1x (0.11s per tick)',
+    Math.abs(progressed - 0.11) < 1e-12,
+    `progressed=${progressed}`
+  );
+
+  // Remaining after 1 tick at 0.11/tick: 3 - 0.11 = 2.89. 2.89 / 0.11 = 26.2727 more ticks → 27 more to finish? 
+  // After N additional ticks, remaining = 2.89 - 0.11*N. Completes when remaining <= 0 → N >= 2.89/0.11 = 26.2727 → 27 more.
+  // Total ticks including the first: 28, which is fewer than the default 30.
   let ticks = 1;
-  while (win.state.craftQueue.crystalAlloy !== null && ticks < 100) { win.tickLoop(); ticks++; }
+  while (win.state.craftQueue.crystalAlloy !== null && ticks < 100) {
+    win.tickLoop();
+    ticks++;
+  }
   check('Task16: upgraded 3s craft finishes in fewer than 30 ticks', ticks < 30 && win.state.products.crystalAlloy === 1, `ticks=${ticks}`);
 })();
+
 (function test_T16_instantRecipesUnchanged() {
   const win = newDom(makeMemoryStorage()).window;
-  win.state.gold = 10000; win.upgradeCraftFacility(); win.upgradeCraftFacility();
-  win.state.resources.iron = 2; win.state.resources.coal = 1;
+  win.state.gold = 10000;
+  win.upgradeCraftFacility();
+  win.upgradeCraftFacility();
+
+  win.state.resources.iron = 2;
+  win.state.resources.coal = 1;
   const steel = win.RECIPES.find((r) => r.key === 'steel');
   const okSteel = win.startCraft(steel);
   check('Task16: steel stays craftTime 0', steel.craftTime === 0);
   check('Task16: steel still crafts instantly after facility upgrades', okSteel === true && win.state.products.steel === 1 && win.state.craftQueue.steel === null);
+
   win.state.resources.coal = 3;
   const brick = win.RECIPES.find((r) => r.key === 'coalBrick');
   const okBrick = win.startCraft(brick);
   check('Task16: coalBrick stays craftTime 0', brick.craftTime === 0);
   check('Task16: coalBrick still crafts instantly (out=1, no queue)', okBrick === true && win.state.products.coalBrick === 1 && win.state.craftQueue.coalBrick === null);
-  win.state.products.steel = 2; win.state.resources.mana = 1;
+
+  win.state.products.steel = 2;
+  win.state.resources.mana = 1;
   const alloy = win.RECIPES.find((r) => r.key === 'alloy');
   const okAlloy = win.startCraft(alloy);
   check('Task16: alloy stays craftTime 0 and instant', alloy.craftTime === 0 && okAlloy === true && win.state.products.alloy === 1 && win.state.craftQueue.alloy === null);
 })();
+
 (function test_T16_autoCraftStillWorks() {
   const win = newDom(makeMemoryStorage()).window;
-  win.state.resources.iron = 20; win.state.resources.coal = 10; win.state.autoCraft.steel = true; win.tickLoop();
+  win.state.resources.iron = 20;
+  win.state.resources.coal = 10;
+  win.state.autoCraft.steel = true;
+  win.tickLoop();
   check('Task16: autoCraft still produces instant steel on a tick', win.state.products.steel >= 1);
   check('Task16: autoCraft still leaves steel craftQueue null', win.state.craftQueue.steel === null);
+
   const timed = newDom(makeMemoryStorage()).window;
-  timed.state.products.steel = 20; timed.state.resources.crystal = 10; timed.state.autoCraft.crystalAlloy = true; timed.tickLoop();
+  timed.state.products.steel = 20;
+  timed.state.resources.crystal = 10;
+  timed.state.autoCraft.crystalAlloy = true;
+  timed.tickLoop();
   check('Task16: autoCraft still starts a timed recipe into craftQueue', timed.state.craftQueue.crystalAlloy === 3 && timed.state.products.crystalAlloy === 0);
   advanceTicks(timed, 30);
   check('Task16: autoCraft timed recipe still completes via tickLoop', timed.state.products.crystalAlloy >= 1);
 })();
+
 (function test_T16_autoSellStillWorks() {
   const win = newDom(makeMemoryStorage()).window;
   win.state.gold = 10000;
@@ -909,23 +1244,35 @@ function timedCraftLabel(win, key) {
   const bought = win.buyAutoSell('steel');
   check('Task16: autoSell purchase still works', bought === true && win.state.autoSell.steel === true && win.state.autoSellOn.steel === true);
   check('Task16: autoSell gold cost unchanged', win.state.gold === 10000 - cost);
-  win.state.products.steel = 3; const goldBefore = win.state.gold; win.tickLoop();
+  win.state.products.steel = 3;
+  const goldBefore = win.state.gold;
+  win.tickLoop();
   check('Task16: autoSell still clears stock on tick', win.state.products.steel === 0);
   check('Task16: autoSell still grants gold on tick', win.state.gold > goldBefore);
 })();
+
 (function test_T16_prestigeResetsFacilityKeepsPermanent() {
   const storage = makeMemoryStorage();
   const win = newDom(storage).window;
-  win.state.gold = 10000; win.upgradeCraftFacility(); win.upgradeCraftFacility();
+  win.state.gold = 10000;
+  win.upgradeCraftFacility();
+  win.upgradeCraftFacility();
   check('Task16: craftFacility is upgraded before prestige', win.state.craftFacility === 3);
-  win.permanent.tickets = 3; win.permanent.firstGachaGranted = true; win.pullGacha(); win.state.runGold = 5000;
-  const expectedGain = win.prestigeGain(); const ticketsBefore = win.permanent.tickets;
+
+  win.permanent.tickets = 3;
+  win.permanent.firstGachaGranted = true;
+  win.pullGacha();
+  win.state.runGold = 5000;
+  const expectedGain = win.prestigeGain();
+  const ticketsBefore = win.permanent.tickets;
   win.document.getElementById('prestigeBtn').onclick();
+
   check('Task16: prestige resets craftFacility to 1', win.state.craftFacility === 1);
   check('Task16: prestige still awards totalPrestige', win.permanent.totalPrestige === expectedGain);
   check('Task16: prestige leaves tickets / firstGachaGranted intact', win.permanent.tickets === ticketsBefore && win.permanent.firstGachaGranted === true);
   check('Task16: prestige still resets run gold/workers', win.state.gold === 0 && win.state.characters.length === 0);
 })();
+
 (function test_T16_uiInDevTab() {
   const win = newDom(makeMemoryStorage()).window;
   const levelEl = win.document.getElementById('craftFacilityVal');
@@ -935,7 +1282,10 @@ function timedCraftLabel(win, key) {
   win.updateNumbers();
   check('Task16: UI level text starts at 1', levelEl && levelEl.textContent === '1');
   check('Task16: upgrade button quotes gold cost', btn && /G/.test(btn.textContent) && btn.textContent.includes(String(win.craftFacilityCost())));
-  win.state.gold = 10000; win.updateNumbers(); btn.click();
+
+  win.state.gold = 10000;
+  win.updateNumbers();
+  btn.click();
   check('Task16: clicking the UI button upgrades the facility', win.state.craftFacility === 2);
   win.updateNumbers();
   check('Task16: UI level text updates after upgrade', levelEl.textContent === '2');
@@ -946,36 +1296,57 @@ function timedCraftLabel(win, key) {
 // storage, startCraft, tickLoop, and craftSpeed() itself are unchanged.
 // =============================================================================
 
+function showCrystalAlloyCard(win) {
+  win.state.unlockedSites.manaVein = true;
+  win.buildRecipes();
+}
+
+function timedCraftLabel(win, key) {
+  const btn = win.document.querySelector(`[data-craft="${key}"]`);
+  return btn ? btn.textContent : null;
+}
+
 (function test_T18A_lv1DisplaysThreeSeconds() {
   const win = newDom(makeMemoryStorage()).window;
   showCrystalAlloyCard(win);
   const recipe = win.RECIPES.find((r) => r.key === 'crystalAlloy');
   check('Task18-A: crystalAlloy.craftTime is 3', recipe.craftTime === 3);
   check('Task18-A: Lv.1 craftSpeed is 1', win.craftSpeed() === 1);
-  win.state.products.steel = 2; win.state.resources.crystal = 1; win.startCraft(recipe);
+  win.state.products.steel = 2;
+  win.state.resources.crystal = 1;
+  win.startCraft(recipe);
   check('Task18-A: craftQueue starts at 3', win.state.craftQueue.crystalAlloy === 3);
   win.updateNumbers();
   check('Task18-A: Lv.1 remaining label is 3.0s', timedCraftLabel(win, 'crystalAlloy') === '제작 중... 3.0s');
 })();
+
 (function test_T18B_lv2DisplaysQueueOverSpeed() {
   const win = newDom(makeMemoryStorage()).window;
-  showCrystalAlloyCard(win); win.state.craftFacility = 2;
+  showCrystalAlloyCard(win);
+  win.state.craftFacility = 2;
   check('Task18-B: Lv.2 craftSpeed is 1.1', Math.abs(win.craftSpeed() - 1.1) < 1e-12);
-  win.state.craftQueue.crystalAlloy = 3; win.updateNumbers();
+  win.state.craftQueue.crystalAlloy = 3;
+  win.updateNumbers();
   check('Task18-B: craftQueue remains 3 (display-only change)', win.state.craftQueue.crystalAlloy === 3);
   check('Task18-B: Lv.2 remaining label is 2.7s', timedCraftLabel(win, 'crystalAlloy') === '제작 중... 2.7s');
 })();
+
 (function test_T18C_lv3DisplaysTwoPointFive() {
   const win = newDom(makeMemoryStorage()).window;
-  showCrystalAlloyCard(win); win.state.craftFacility = 3;
+  showCrystalAlloyCard(win);
+  win.state.craftFacility = 3;
   check('Task18-C: Lv.3 craftSpeed is 1.2', Math.abs(win.craftSpeed() - 1.2) < 1e-12);
-  win.state.craftQueue.crystalAlloy = 3; win.updateNumbers();
+  win.state.craftQueue.crystalAlloy = 3;
+  win.updateNumbers();
   check('Task18-C: Lv.3 remaining label is 2.5s', timedCraftLabel(win, 'crystalAlloy') === '제작 중... 2.5s');
 })();
+
 (function test_T18D_labelTracksQueueOverSpeedAfterTicks() {
   const win = newDom(makeMemoryStorage()).window;
-  showCrystalAlloyCard(win); win.state.craftFacility = 2;
-  win.state.products.steel = 2; win.state.resources.crystal = 1;
+  showCrystalAlloyCard(win);
+  win.state.craftFacility = 2;
+  win.state.products.steel = 2;
+  win.state.resources.crystal = 1;
   win.startCraft(win.RECIPES.find((r) => r.key === 'crystalAlloy'));
   win.tickLoop();
   const remaining = win.state.craftQueue.crystalAlloy;
@@ -983,20 +1354,31 @@ function timedCraftLabel(win, key) {
   const expected = `제작 중... ${(remaining / win.craftSpeed()).toFixed(1)}s`;
   check('Task18-D: label matches craftQueue / craftSpeed()', timedCraftLabel(win, 'crystalAlloy') === expected, timedCraftLabel(win, 'crystalAlloy'));
 })();
+
 (function test_T18E_instantRecipesStayInstant() {
   const win = newDom(makeMemoryStorage()).window;
-  win.state.craftFacility = 3; win.state.resources.iron = 2; win.state.resources.coal = 1;
+  win.state.craftFacility = 3;
+  win.state.resources.iron = 2;
+  win.state.resources.coal = 1;
   const steel = win.RECIPES.find((r) => r.key === 'steel');
   check('Task18-E: steel still crafts instantly at Lv.3', win.startCraft(steel) === true && win.state.products.steel === 1 && win.state.craftQueue.steel === null);
+
   win.state.resources.coal = 3;
   const brick = win.RECIPES.find((r) => r.key === 'coalBrick');
   check('Task18-E: coalBrick still crafts instantly at Lv.3', win.startCraft(brick) === true && win.state.products.coalBrick === 1 && win.state.craftQueue.coalBrick === null);
-  win.state.products.steel = 2; win.state.resources.mana = 1;
+
+  win.state.products.steel = 2;
+  win.state.resources.mana = 1;
   const alloy = win.RECIPES.find((r) => r.key === 'alloy');
   check('Task18-E: alloy still crafts instantly at Lv.3', win.startCraft(alloy) === true && win.state.products.alloy === 1 && win.state.craftQueue.alloy === null);
 })();
 
+// =============================================================================
+// SUMMARY
+// =============================================================================
+
 allDoms.forEach((d) => { try { d.window.close(); } catch (e) { /* ignore */ } });
+
 console.log('');
 console.log(`Total: ${passCount + failCount}  Pass: ${passCount}  Fail: ${failCount}`);
 if (failures.length) {
