@@ -1,1 +1,1 @@
-PLACEHOLDER_TESTS
+file:///workspace/tests/regression.test.js
