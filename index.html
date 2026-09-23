@@ -333,6 +333,18 @@ const BALANCE = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Task 20 (structure-only note, no behavior change): `state` vs `permanent`
+// is already the run-scoped vs cross-prestige boundary — everything
+// freshRunState() returns is wiped on prestige, everything in `permanent`
+// survives it. A future Factory system's data (grid/nodes/belts/etc.) resets
+// with prestige exactly like mining/crafting progress does today, so it
+// belongs as an ADDITIVE key on the object freshRunState() returns — e.g.
+// `factory: initialFactoryState()` alongside `craftFacility` below — using
+// the same additive-field pattern sanitizeRunState() already applies to
+// craftFacility (missing/invalid -> safe default) so old saves keep loading.
+// No `factory` key exists yet; nothing about this shape has changed.
+// ---------------------------------------------------------------------------
 let state = freshRunState();
 // Permanent (cross-prestige) state — totalPrestige/runCount/tickets/
 // firstGachaGranted all live here in one container instead of being split
@@ -835,19 +847,37 @@ function buildLines(){
   });
 }
 
+// ---------------------------------------------------------------------------
+// Task 20 (structure-only, Recipe/Production boundary): the two helpers
+// below pull the generic "does recipe.need fit in some stock?" / "subtract
+// recipe.need from some stock" operations out of canCraft()/startCraft(),
+// as plain functions of a stock accessor rather than of the global `state`
+// object directly. canCraft()/startCraft() keep their exact names and
+// behavior (existing callers/tests are unaffected) and simply close over
+// state.resources/state.products as before. A future Factory Production
+// Node needs this same check/consume shape against its own local
+// input buffers, not the global state — it can call recipeInputsAvailable()/
+// consumeRecipeInputs() directly with its own getStock/setStock instead of
+// re-deriving this logic. No crafting behavior, cost, or output changes.
+// ---------------------------------------------------------------------------
+function recipeInputsAvailable(recipe, getStock){
+  return Object.entries(recipe.need).every(([k,v]) => getStock(k) >= v);
+}
+function consumeRecipeInputs(recipe, getStock, setStock){
+  Object.entries(recipe.need).forEach(([k,v]) => setStock(k, getStock(k) - v));
+}
+
 function canCraft(recipe){
-  return Object.entries(recipe.need).every(([k,v])=>{
-    const stock = state.resources[k] ?? state.products[k] ?? 0;
-    return stock >= v;
-  });
+  return recipeInputsAvailable(recipe, k => state.resources[k] ?? state.products[k] ?? 0);
 }
 function startCraft(recipe){
   if(state.craftQueue[recipe.key] !== null) return false; // already crafting
   if(!canCraft(recipe)) return false;
-  Object.entries(recipe.need).forEach(([k,v])=>{
-    if(state.resources[k]!==undefined) state.resources[k]-=v;
-    else state.products[k]-=v;
-  });
+  consumeRecipeInputs(
+    recipe,
+    k => state.resources[k] !== undefined ? state.resources[k] : state.products[k],
+    (k, val) => { if(state.resources[k] !== undefined) state.resources[k] = val; else state.products[k] = val; }
+  );
   if(recipe.craftTime > 0){
     state.craftQueue[recipe.key] = recipe.craftTime;
   } else {
@@ -1188,11 +1218,32 @@ function updateNumbers(){
   renderCurrencies();
 }
 
-function tickLoop(){
+// ---------------------------------------------------------------------------
+// Task 20 (structure-only, Tick boundary): tickLoop()'s single mixed pass is
+// split into the per-system sections that actually exist today — mining
+// (auto-rate resource income) and crafting (craft-queue progress + autoCraft
+// restart), plus auto-sell as its own pass. This is a straight extraction:
+// each per-recipe operation still runs in the same relative order for that
+// recipe (craft-progress/completion before that recipe's auto-sell), and
+// splitting the single RECIPES.forEach into two separate forEach passes
+// (crafting, then auto-sell) cannot change the result, since every operation
+// here only ever reads/writes state keyed by that same recipe — nothing
+// about one recipe's tick depends on another recipe's tick within the same
+// pass. No new "Worker"/"Automation"/"Factory" sections are introduced:
+// worker output already flows through tickMining() via autoRate(), and
+// there is no standalone automation system beyond autoCraft/autoSell, both
+// already covered below. A future tickFactory() would be added as one more
+// named call in tickLoop(), in the same place a factory tick belongs —
+// nothing here reserves space for it yet.
+// ---------------------------------------------------------------------------
+function tickMining(){
   RESOURCES.forEach(r=>{
     const rate = autoRate(r.key);
     if(rate>0) state.resources[r.key] += rate / TICKS_PER_SECOND;
   });
+}
+
+function tickCrafting(){
   RECIPES.forEach(r=>{
     if(state.craftQueue[r.key] !== null){
       state.craftQueue[r.key] -= craftSpeed() / TICKS_PER_SECOND;
@@ -1203,8 +1254,19 @@ function tickLoop(){
     } else if(state.autoCraft[r.key]){
       startCraft(r);
     }
+  });
+}
+
+function tickAutoSell(){
+  RECIPES.forEach(r=>{
     if(state.autoSell[r.key] && state.autoSellOn[r.key]) sellAll(r, true);
   });
+}
+
+function tickLoop(){
+  tickMining();
+  tickCrafting();
+  tickAutoSell();
   updateNumbers();
 }
 
@@ -1217,6 +1279,15 @@ function ticketTrickle(){
   renderCurrencies();
 }
 
+// Task 20 (structure-only, UI/logic note): every state change already runs
+// through a named action function (unlockSite/mineResource/upgradeFacility/
+// startCraft/pullGacha/upgradeCraftFacility/etc., Task 13's pattern) that
+// returns before any DOM call, while buildLines()/buildRecipes()/buildWorkers()/
+// updateNumbers()/renderAll() only ever read `state` to rebuild or refresh
+// the DOM — they never mutate it. A future Factory UI panel should follow
+// the same shape (its own thin onclick -> action function -> re-render
+// calls) rather than mixing state writes into a render function. Existing
+// UI code/design is unchanged here.
 function renderAll(){
   renderCurrencies();
   buildLines();
