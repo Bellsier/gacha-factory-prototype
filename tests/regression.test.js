@@ -1374,6 +1374,106 @@ function timedCraftLabel(win, key) {
 })();
 
 // =============================================================================
+// TASK 21 — Factory core data model (structure-only; no Factory behavior/UI
+// exists yet). These confirm the data skeleton is present, safe to
+// save/load, and untouched by prestige/tick/UI beyond the reset itself.
+// =============================================================================
+
+(function test_T21_freshRunStateHasFactory() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task21: freshRunState() produces a state.factory object', typeof win.state.factory === 'object' && win.state.factory !== null);
+  check('Task21: factory has grid/nodes/links', 'grid' in win.state.factory && 'nodes' in win.state.factory && 'links' in win.state.factory);
+})();
+
+(function test_T21_defaultGridIs25x25() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task21: default grid width is 25', win.state.factory.grid.width === 25);
+  check('Task21: default grid height is 25', win.state.factory.grid.height === 25);
+})();
+
+(function test_T21_productionNodeRepresentable() {
+  const storage = makeMemoryStorage();
+  let win = newDom(storage).window;
+  win.state.factory.nodes.push({ id: 'node_test1', type: 'production', x: 3, y: 4, width: 2, height: 2 });
+  const saved = win.saveGame();
+  check('Task21: a production node saves successfully', saved === true);
+  win = newDom(storage).window;
+  const node = win.state.factory.nodes.find((n) => n.id === 'node_test1');
+  check('Task21: production node survives sanitize/reload with type intact', !!node && node.type === 'production' && node.x === 3 && node.y === 4 && node.width === 2 && node.height === 2);
+})();
+
+(function test_T21_storageNodeRepresentable() {
+  const win = newDom(makeMemoryStorage()).window;
+  const sanitized = win.sanitizeFactoryNode({ id: 'node_s1', type: 'storage', x: 0, y: 0, width: 1, height: 1 });
+  check('Task21: storage node type is representable', !!sanitized && sanitized.type === 'storage');
+})();
+
+(function test_T21_nodeIdIndependentOfArrayIndex() {
+  const win = newDom(makeMemoryStorage()).window;
+  const raw = [
+    { id: 'node_first', type: 'production', x: 0, y: 0, width: 1, height: 1 },
+    { id: 'node_second', type: 'storage', x: 1, y: 1, width: 1, height: 1 },
+  ];
+  const nodes = win.sanitizeFactoryNodes(raw);
+  // Reverse the array — if code used array index as identity, "the node at
+  // index 0" would now be the wrong node; id-based lookup must still work.
+  nodes.reverse();
+  const found = nodes.find((n) => n.id === 'node_second');
+  check('Task21: node id survives array reordering (not index-based)', !!found && found.type === 'storage' && found.x === 1);
+})();
+
+(function test_T21_nodeSizeSanitizeClampsTo1to3() {
+  const win = newDom(makeMemoryStorage()).window;
+  const tooSmall = win.sanitizeFactoryNode({ type: 'production', x: 0, y: 0, width: 0, height: -1 });
+  const tooBig = win.sanitizeFactoryNode({ type: 'production', x: 0, y: 0, width: 4, height: 99 });
+  const valid1 = win.sanitizeFactoryNode({ type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const valid3 = win.sanitizeFactoryNode({ type: 'production', x: 0, y: 0, width: 3, height: 3 });
+  check('Task21: width/height <= 0 falls back to a safe default (not 0 or negative)', tooSmall.width >= 1 && tooSmall.height >= 1);
+  check('Task21: width/height >= 4 falls back to a safe default (not left oversized)', tooBig.width <= 3 && tooBig.height <= 3);
+  check('Task21: width/height = 1 (min valid) passes through unchanged', valid1.width === 1 && valid1.height === 1);
+  check('Task21: width/height = 3 (max valid) passes through unchanged', valid3.width === 3 && valid3.height === 3);
+})();
+
+(function test_T21_legacySaveWithoutFactoryLoadsFine() {
+  const storage = makeMemoryStorage();
+  const legacyPayload = {
+    saveVersion: 1,
+    permanent: { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: true },
+    run: {
+      // Pre-Task-21 shape: no `factory` key at all.
+      resources: { iron: 5 }, products: {}, gold: 42, runGold: 0,
+      characters: [], lastPull: null,
+      facility: {}, workforce: {}, unlockedSites: { abandonedMine: true },
+      autoCraft: {}, autoSell: {}, autoSellOn: {}, craftQueue: {}, hqLevel: 0, craftFacility: 1,
+    },
+  };
+  storage._setRaw('gachaFactorySave', JSON.stringify(legacyPayload));
+  const win = newDom(storage).window;
+  check('Task21: legacy save (no factory field) still loads other fields correctly', win.state.gold === 42 && win.state.resources.iron === 5);
+  check('Task21: legacy save gets a fresh default factory state', win.state.factory.grid.width === 25 && win.state.factory.grid.height === 25 && win.state.factory.nodes.length === 0 && win.state.factory.links.length === 0);
+})();
+
+(function test_T21_prestigeResetsFactory() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.permanent.tickets = 1;
+  win.pullGacha();
+  win.state.factory.nodes.push({ id: 'node_beforeReset', type: 'production', x: 1, y: 1, width: 1, height: 1 });
+  check('Task21: factory node present before prestige', win.state.factory.nodes.length === 1);
+  win.state.runGold = 5000;
+  win.document.getElementById('prestigeBtn').onclick();
+  check('Task21: factory nodes cleared after prestige', win.state.factory.nodes.length === 0);
+  check('Task21: factory grid still defaults to 25x25 after prestige', win.state.factory.grid.width === 25 && win.state.factory.grid.height === 25);
+})();
+
+(function test_T21_linksRepresentFromTo() {
+  const win = newDom(makeMemoryStorage()).window;
+  const link = win.sanitizeFactoryLink({ id: 'link_test1', from: 'node_a', to: 'node_b' });
+  check('Task21: a link represents from/to node ids', !!link && link.from === 'node_a' && link.to === 'node_b');
+  const links = win.sanitizeFactoryLinks([{ from: 'node_a', to: 'node_b' }]); // no id supplied
+  check('Task21: a link missing an id gets one backfilled', links.length === 1 && typeof links[0].id === 'string' && links[0].id.length > 0);
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
