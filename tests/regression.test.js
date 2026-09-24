@@ -1581,6 +1581,152 @@ function gridNode(x, y, width, height, id) {
 })();
 
 // =============================================================================
+// TASK 23 — Factory Node placement action (addFactoryNode). Reuses Task 22's
+// validation functions directly; this only exercises the actual state.factory
+// mutation, id assignment, and failure-leaves-state-untouched behavior.
+// =============================================================================
+
+(function test_T23_basicPlacementSucceeds() {
+  const win = newDom(makeMemoryStorage()).window;
+
+  const n1 = win.addFactoryNode({ type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  check('Task23: 1x1 placement succeeds (truthy return)', !!n1);
+  check('Task23: nodes length is 1 after first add', win.state.factory.nodes.length === 1);
+
+  const n2 = win.addFactoryNode({ type: 'storage', x: 5, y: 5, width: 2, height: 2 });
+  check('Task23: 2x2 placement succeeds', !!n2);
+  check('Task23: nodes length is 2 after second add', win.state.factory.nodes.length === 2);
+
+  const n3 = win.addFactoryNode({ type: 'production', x: 10, y: 10, width: 3, height: 3 });
+  check('Task23: 3x3 placement succeeds', !!n3);
+  check('Task23: nodes length is 3 after third add', win.state.factory.nodes.length === 3);
+
+  check('Task23: added node preserves x/y/width/height/type (n2)', n2.x === 5 && n2.y === 5 && n2.width === 2 && n2.height === 2 && n2.type === 'storage');
+  const stored = win.state.factory.nodes.find((n) => n.id === n2.id);
+  check('Task23: added node is actually present in state.factory.nodes with same fields', !!stored && stored.x === 5 && stored.y === 5 && stored.width === 2 && stored.height === 2 && stored.type === 'storage');
+})();
+
+(function test_T23_gridValidation() {
+  const win = newDom(makeMemoryStorage()).window;
+
+  check('Task23: negative x rejected', win.addFactoryNode({ type: 'production', x: -1, y: 0, width: 1, height: 1 }) === null);
+  check('Task23: negative y rejected', win.addFactoryNode({ type: 'production', x: 0, y: -1, width: 1, height: 1 }) === null);
+  check('Task23: out-of-grid placement rejected (24,24 2x2 overflows)', win.addFactoryNode({ type: 'production', x: 24, y: 24, width: 2, height: 2 }) === null);
+  check('Task23: nothing was added by the rejected attempts above', win.state.factory.nodes.length === 0);
+
+  const fitExact = win.addFactoryNode({ type: 'production', x: 22, y: 22, width: 3, height: 3 });
+  check('Task23: 3x3 at (22,22) on a 25x25 grid succeeds (exact fit)', !!fitExact);
+
+  const win2 = newDom(makeMemoryStorage()).window;
+  check('Task23: 3x3 at (23,23) on a 25x25 grid fails (overflows by 1)', win2.addFactoryNode({ type: 'production', x: 23, y: 23, width: 3, height: 3 }) === null);
+})();
+
+(function test_T23_sizeValidation() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task23: 0x1 size rejected', win.addFactoryNode({ type: 'production', x: 0, y: 0, width: 0, height: 1 }) === null);
+  check('Task23: 4x1 size rejected', win.addFactoryNode({ type: 'production', x: 0, y: 0, width: 4, height: 1 }) === null);
+  check('Task23: 1x4 size rejected', win.addFactoryNode({ type: 'production', x: 0, y: 0, width: 1, height: 4 }) === null);
+  check('Task23: non-integer width rejected', win.addFactoryNode({ type: 'production', x: 0, y: 0, width: 1.5, height: 1 }) === null);
+  check('Task23: non-integer height rejected', win.addFactoryNode({ type: 'production', x: 0, y: 0, width: 1, height: 2.5 }) === null);
+  check('Task23: non-integer x rejected', win.addFactoryNode({ type: 'production', x: 0.5, y: 0, width: 1, height: 1 }) === null);
+  check('Task23: non-integer y rejected', win.addFactoryNode({ type: 'production', x: 0, y: 0.5, width: 1, height: 1 }) === null);
+  check('Task23: nothing was added by any of the invalid-size attempts', win.state.factory.nodes.length === 0);
+})();
+
+(function test_T23_overlapValidation() {
+  const win = newDom(makeMemoryStorage()).window;
+  const existing = win.addFactoryNode({ type: 'production', x: 5, y: 5, width: 2, height: 2 }); // occupies (5,5)-(6,6)
+  check('Task23: existing base node placed for overlap tests', !!existing);
+
+  check('Task23: full overlap (identical rect) rejected', win.addFactoryNode({ type: 'production', x: 5, y: 5, width: 2, height: 2 }) === null);
+  check('Task23: partial overlap rejected', win.addFactoryNode({ type: 'production', x: 6, y: 6, width: 2, height: 2 }) === null);
+  check('Task23: single-cell overlap rejected', win.addFactoryNode({ type: 'production', x: 6, y: 6, width: 1, height: 1 }) === null);
+  check('Task23: only the existing node remains after the rejected overlaps', win.state.factory.nodes.length === 1);
+
+  const rightOf = win.addFactoryNode({ type: 'production', x: 7, y: 5, width: 1, height: 2 }); // shares only the (7,x) edge
+  check('Task23: side-by-side placement (edge touch) succeeds', !!rightOf);
+
+  const below = win.addFactoryNode({ type: 'production', x: 5, y: 7, width: 2, height: 1 }); // shares only the y=7 edge
+  check('Task23: above/below adjacent placement (edge touch) succeeds', !!below);
+
+  const diagonal = win.addFactoryNode({ type: 'production', x: 7, y: 7, width: 1, height: 1 }); // touches only at the (7,7) corner
+  check('Task23: diagonal corner-touch placement succeeds', !!diagonal);
+
+  check('Task23: 4 nodes total after the 3 valid adjacent placements', win.state.factory.nodes.length === 4);
+})();
+
+(function test_T23_idHandling() {
+  const win = newDom(makeMemoryStorage()).window;
+
+  const n1 = win.addFactoryNode({ type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  check('Task23: a node with no id gets a non-empty string id', typeof n1.id === 'string' && n1.id.length > 0);
+
+  const n2 = win.addFactoryNode({ type: 'production', x: 1, y: 0, width: 1, height: 1 });
+  check('Task23: two consecutive additions get distinct ids', n1.id !== n2.id);
+
+  // Supplying an id that collides with an existing node's id must be handled
+  // safely (a fresh id assigned), not rejected as a validation failure and
+  // not allowed to silently overwrite/duplicate the existing node's id.
+  const n3 = win.addFactoryNode({ id: n1.id, type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  check('Task23: a colliding supplied id is accepted (placement still succeeds)', !!n3);
+  check('Task23: the colliding id was replaced with a fresh, different id', n3.id !== n1.id);
+  check('Task23: all three nodes now have mutually distinct ids', new Set([n1.id, n2.id, n3.id]).size === 3);
+  check('Task23: the original node (n1) was left completely untouched by the collision', win.state.factory.nodes.find((n) => n.id === n1.id).type === 'production');
+
+  // A non-colliding, well-formed supplied id is kept as-is.
+  const n4 = win.addFactoryNode({ id: 'node_keepme_custom', type: 'production', x: 3, y: 0, width: 1, height: 1 });
+  check('Task23: a valid non-colliding supplied id is preserved exactly', n4.id === 'node_keepme_custom');
+
+  // Ids must not be array-index-based: reordering the array must not change
+  // which node a given id refers to.
+  const idsInOrder = win.state.factory.nodes.map((n) => n.id);
+  win.state.factory.nodes.reverse();
+  const found = win.state.factory.nodes.find((n) => n.id === idsInOrder[0]);
+  check('Task23: node identity survives array reordering (id-based, not index-based)', !!found && found.id === idsInOrder[0]);
+})();
+
+(function test_T23_invalidInputLeavesStateUntouched() {
+  const win = newDom(makeMemoryStorage()).window;
+  const existingNode = win.addFactoryNode({ type: 'production', x: 5, y: 5, width: 2, height: 2 });
+  check('Task23: baseline node placed before failure attempts', !!existingNode);
+
+  const linkBefore = win.sanitizeFactoryLink({ from: existingNode.id, to: existingNode.id });
+  win.state.factory.links.push(linkBefore);
+  const nodesBefore = JSON.stringify(win.state.factory.nodes);
+  const linksBefore = JSON.stringify(win.state.factory.links);
+  const gridBefore = JSON.stringify(win.state.factory.grid);
+
+  const badAttempts = [
+    { type: 'belt', x: 0, y: 0, width: 1, height: 1 },       // invalid type
+    { type: 'production', y: 0, width: 1, height: 1 },        // missing x
+    { type: 'production', x: 0, width: 1, height: 1 },        // missing y
+    { type: 'production', x: 0, y: 0, height: 1 },            // missing width
+    { type: 'production', x: 0, y: 0, width: 1 },              // missing height
+    { type: 'production', x: 0.5, y: 0, width: 1, height: 1 },// non-integer x
+    { type: 'production', x: 0, y: 0, width: 4, height: 1 },  // out-of-range width
+    { type: 'production', x: -1, y: 0, width: 1, height: 1 }, // negative x
+    { type: 'production', x: 5, y: 5, width: 2, height: 2 },  // overlaps existing
+    null,
+    'not an object',
+    42,
+  ];
+  const results = badAttempts.map((n) => win.addFactoryNode(n));
+  check('Task23: every invalid attempt returns null', results.every((r) => r === null));
+  check('Task23: state.factory.nodes unchanged after every invalid attempt', JSON.stringify(win.state.factory.nodes) === nodesBefore);
+  check('Task23: state.factory.links unchanged after every invalid attempt', JSON.stringify(win.state.factory.links) === linksBefore);
+  check('Task23: state.factory.grid unchanged after every invalid attempt', JSON.stringify(win.state.factory.grid) === gridBefore);
+})();
+
+(function test_T23_existingRegressionUntouched() {
+  // Sanity check that Task 22's pure validators are unaffected by Task 23's
+  // new action function existing alongside them.
+  const win = newDom(makeMemoryStorage()).window;
+  const grid = { width: 25, height: 25 };
+  check('Task23: canPlaceFactoryNode still works standalone (unrelated to addFactoryNode)', win.canPlaceFactoryNode(gridNode(0, 0, 1, 1), grid, []) === true);
+  check('Task23: saveVersion is still 1', (() => { win.saveGame(); return JSON.parse(win.localStorage.getItem('gachaFactorySave')).saveVersion === 1; })());
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
