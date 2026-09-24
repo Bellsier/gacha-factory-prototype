@@ -166,7 +166,7 @@
     <div class="cur prestige"><div class="label">명성 포인트</div><div class="value" id="prestigeVal">0</div></div>
   </div>
 
-  <div class="next-hint" id="nextHint">채굴 탭에서 광석을 칐 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다.</div>
+  <div class="next-hint" id="nextHint">채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다.</div>
 
   <div class="tabbar">
     <button class="tab-btn active" data-tab="mining">채굴</button>
@@ -177,7 +177,7 @@
   <div id="tab-mining" class="tab-panel active">
     <section>
       <h2>채굴장</h2>
-      <p class="rate" style="margin:0 0 10px;">칐 광석은 골드가 아닙니다. 위쪽 <b>개발</b> 탭에서 제작·판매해야 골드가 됩니다.</p>
+      <p class="rate" style="margin:0 0 10px;">캔 광석은 골드가 아닙니다. 위쪽 <b>개발</b> 탭에서 제작·판매해야 골드가 됩니다.</p>
       <div id="lines"></div>
     </section>
   </div>
@@ -230,7 +230,7 @@
       <div id="prestigeInfoBox" style="display:none; font-size:0.7rem; color:var(--dim); background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin:0 0 10px; line-height:1.6;">
         정확한 공식: 명성 포인트 = ⌊√(골드 ÷ 200)⌋ (일꾼 1명 이상일 때만)<br>
         200G→1점 · 800G→2점 · 1,800G→3점 · 3,200G→4점 · 5,000G→5점<br>
-        첫 가챠권(50G)과 겠치지 않게, 일꾼을 뽑고 공방을 굴린 뒤에 초기화하세요.
+        첫 가챠권(50G)과 겹치지 않게, 일꾼을 뽑고 공방을 굴린 뒤에 초기화하세요.
       </div>
       <div style="margin-bottom:10px; font-size:0.8rem;">지금 초기화하면 <span id="prestigeGainPreview" style="color:var(--legend); font-family:'Space Grotesk'; font-weight:700;">+0</span> 획득</div>
       <button id="prestigeBtn">초기화하고 명성 얻기</button>
@@ -259,7 +259,7 @@ const RESOURCES = [
   {key:'rareMetal', name:'희귀 금속', base:1, site:'ruins'},
   {key:'relic', name:'고대 유물', base:1, site:'ruins'},
   {key:'cosmicShard', name:'우주 파편', base:1, site:'spaceStation'},
-  {key:'plasma', name:'플라즐마', base:1, site:'spaceStation'},
+  {key:'plasma', name:'플라즈마', base:1, site:'spaceStation'},
 ];
 const RECIPES = [
   {key:'steel', name:'강철', need:{iron:2, coal:1}, out:1, sell:5, craftTime:0},
@@ -269,8 +269,8 @@ const RECIPES = [
   {key:'specialAlloy', name:'특수 합금', need:{alloy:3, coal:3}, out:1, sell:45, craftTime:4},
   {key:'precisionPart', name:'정밀 부품', need:{alloy:2, rareMetal:1}, out:1, sell:80, craftTime:6},
   {key:'relicPart', name:'유물 부품', need:{alloy:2, relic:1}, out:1, sell:85, craftTime:6},
-  {key:'quantumCore', name:'킀텀 코어', need:{precisionPart:2, cosmicShard:1}, out:1, sell:400, craftTime:15},
-  {key:'plasmaCore', name:'플라즐마 코어', need:{precisionPart:2, plasma:1}, out:1, sell:420, craftTime:15},
+  {key:'quantumCore', name:'퀀텀 코어', need:{precisionPart:2, cosmicShard:1}, out:1, sell:400, craftTime:15},
+  {key:'plasmaCore', name:'플라즈마 코어', need:{precisionPart:2, plasma:1}, out:1, sell:420, craftTime:15},
 ];
 const RARITY = [
   {key:'common', label:'일반', chance:60, mining:1, carry:2, move:1, cls:'common'},
@@ -870,7 +870,7 @@ function updateNextHint(){
   const ironHas = hasWorkerOn('iron');
   const coalHas = hasWorkerOn('coal');
   if(!permanent.firstGachaGranted){
-    el.textContent = `채굴 탭에서 광석을 칐 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     el.textContent = permanent.tickets >= 1
       ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
@@ -971,7 +971,7 @@ function buildLines(){
         <h3><span class="site-name">🔒 ${site.name}</span></h3>
         <div class="lines">
           <div class="line locked">
-            <div class="rate">이 채굴장은 아직 탐사하지 않았습니다.<br>탐사하면 이곳만의 고유 광물(${siteResources.map(r=>r.name).join(', ')})을 칐 수 있어요.${relatedRecipes.length ? '<br>관련 제작품: ' + relatedRecipes.join(', ') : ''}</div>
+            <div class="rate">이 채굴장은 아직 탐사하지 않았습니다.<br>탐사하면 이곳만의 고유 광물(${siteResources.map(r=>r.name).join(', ')})을 캘 수 있어요.${relatedRecipes.length ? '<br>관련 제작품: ' + relatedRecipes.join(', ') : ''}</div>
             <button data-unlocksite="${site.key}" ${dis(state.gold < site.unlockCost)}>채굴장 탐사 (${site.unlockCost}G)</button>
           </div>
         </div>
@@ -1527,3 +1527,5 @@ function boot(){
 }
 boot();
 </script>
+</body>
+</html>
