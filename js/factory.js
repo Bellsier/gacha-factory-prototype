@@ -124,3 +124,21 @@ function addFactoryLink(rawLink){
   return link;
 }
 
+// ---------------------------------------------------------------------------
+// Task 26: Factory Link removal — the one place allowed to actually splice
+// state.factory.links. Deletes by id only (never by array index, matching
+// every other Factory identity rule in this file); an id that doesn't match
+// any existing Link is a no-op failure, not an error. Nodes, other Links,
+// and the rest of run state are left completely untouched on both success
+// and failure. Once a Link is removed, its exact from->to pair is no longer
+// present in state.factory.links, so addFactoryLink() (whose duplicate check
+// only looks at existingLinks) will accept that same from->to pair again —
+// no separate "allow re-creation" logic is needed here.
+// ---------------------------------------------------------------------------
+function removeFactoryLink(linkId){
+  if(typeof linkId !== 'string' || linkId.length === 0) return null;
+  const index = state.factory.links.findIndex(link => link && link.id === linkId);
+  if(index === -1) return null;
+  const [removed] = state.factory.links.splice(index, 1);
+  return removed;
+}

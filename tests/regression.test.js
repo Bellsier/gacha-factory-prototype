@@ -1735,7 +1735,6 @@ function gridNode(x, y, width, height, id) {
   check('Task23: saveVersion is still 1', (() => { win.saveGame(); return JSON.parse(win.localStorage.getItem('gachaFactorySave')).saveVersion === 1; })());
 })();
 
-
 // =============================================================================
 // TASK 25 — Factory Link model and connection validation/action.
 // A Link connects two existing Factory Nodes by directed from/to ids.
@@ -1847,14 +1846,130 @@ function gridNode(x, y, width, height, id) {
   win.addFactoryLink({ id: 'link_save_forward', from: source.id, to: target.id });
   win.addFactoryLink({ id: 'link_save_reverse', from: reverseTarget.id, to: source.id });
 
-  const before = JSON.stringify(win.state.factory.links);
+  // Compared with sorted object keys, not raw JSON.stringify(): addFactoryLink()
+  // builds a link as {id, from, to} while sanitizeFactoryLink() (used on
+  // reload) builds it as {from, to, id}. Both are the same link with the
+  // same field values — only the key insertion order differs — so a raw
+  // JSON.stringify() comparison would report a false mismatch here. This
+  // normalization was already the established pattern elsewhere in this file
+  // (e.g. the worker save/load tests above use the same
+  // JSON.stringify(x, Object.keys(x).sort()) technique for the same reason).
+  const normalizeLinks = (links) => JSON.stringify(links.map((l) => JSON.stringify(l, Object.keys(l).sort())));
+  const before = normalizeLinks(win.state.factory.links);
   const saved = win.saveGame();
   check('Task25: saveGame succeeds with Factory Links present', saved === true);
 
   win = newDom(storage).window;
-  check('Task25: saved links are restored after reload', JSON.stringify(win.state.factory.links) === before);
+  check('Task25: saved links are restored after reload', normalizeLinks(win.state.factory.links) === before);
   check('Task25: restored link count is preserved', win.state.factory.links.length === 2);
   check('Task25: restored link fields are preserved', win.state.factory.links.every((link) => typeof link.id === 'string' && typeof link.from === 'string' && typeof link.to === 'string'));
+})();
+
+// =============================================================================
+// TASK 26 — Factory Link removal (removeFactoryLink). Deletes exactly one
+// Link by id; belt geometry, throughput, splitter/merger behavior, tick
+// simulation, and UI remain intentionally outside this task.
+// =============================================================================
+
+(function test_T26_removeExistingLinkSucceeds() {
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_a', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_b', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  const link = win.addFactoryLink({ from: source.id, to: target.id });
+  check('Task26: baseline link created before removal', !!link);
+
+  const removed = win.removeFactoryLink(link.id);
+  check('Task26: removeFactoryLink returns the removed link (truthy)', !!removed);
+  check('Task26: removed link matches the requested id', removed && removed.id === link.id);
+  check('Task26: state.factory.links is empty after removing the only link', win.state.factory.links.length === 0);
+})();
+
+(function test_T26_removeNonexistentLinkFails() {
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_a', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_b', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  win.addFactoryLink({ from: source.id, to: target.id });
+  const before = win.state.factory.links.length;
+
+  check('Task26: removing an id that was never used fails', win.removeFactoryLink('link_never_existed') === null);
+  check('Task26: removing an empty string id fails', win.removeFactoryLink('') === null);
+  check('Task26: removing a non-string id fails (no throw)', win.removeFactoryLink(42) === null);
+  check('Task26: removing null fails (no throw)', win.removeFactoryLink(null) === null);
+  check('Task26: removing undefined fails (no throw)', win.removeFactoryLink(undefined) === null);
+  check('Task26: failed removals leave the existing link untouched', win.state.factory.links.length === before);
+})();
+
+(function test_T26_removeOnlyTargetedLinkLeavesOthersIntact() {
+  const win = newDom(makeMemoryStorage()).window;
+  const a = win.addFactoryNode({ id: 'node_a', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const b = win.addFactoryNode({ id: 'node_b', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  const c = win.addFactoryNode({ id: 'node_c', type: 'storage', x: 4, y: 0, width: 1, height: 1 });
+  const linkAB = win.addFactoryLink({ from: a.id, to: b.id });
+  const linkBC = win.addFactoryLink({ from: b.id, to: c.id });
+  const linkCA = win.addFactoryLink({ from: c.id, to: a.id });
+  check('Task26: three links exist before removal', win.state.factory.links.length === 3);
+
+  const removed = win.removeFactoryLink(linkBC.id);
+  check('Task26: the targeted link is removed', !!removed && removed.id === linkBC.id);
+  check('Task26: exactly two links remain', win.state.factory.links.length === 2);
+  check('Task26: the untargeted links are still present, unchanged', win.state.factory.links.some((l) => l.id === linkAB.id) && win.state.factory.links.some((l) => l.id === linkCA.id));
+  check('Task26: the removed link is no longer present', !win.state.factory.links.some((l) => l.id === linkBC.id));
+
+  // Nodes are a completely separate concern from Link removal.
+  check('Task26: removing a Link does not touch state.factory.nodes', win.state.factory.nodes.length === 3);
+})();
+
+(function test_T26_removedLinkFromToCanBeRecreated() {
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_source', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_target', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  const original = win.addFactoryLink({ from: source.id, to: target.id });
+  check('Task26: original A -> B link created', !!original);
+
+  // Before removal, addFactoryLink already rejects this exact duplicate
+  // (Task 25 behavior, unchanged by this task).
+  check('Task26: duplicate A -> B is still rejected before removal', win.addFactoryLink({ from: source.id, to: target.id }) === null);
+
+  const removed = win.removeFactoryLink(original.id);
+  check('Task26: original link removed successfully', !!removed);
+
+  const recreated = win.addFactoryLink({ from: source.id, to: target.id });
+  check('Task26: the same A -> B link can be recreated after removal', !!recreated);
+  check('Task26: the recreated link gets a fresh id, not the old one', recreated.id !== original.id);
+  check('Task26: exactly one A -> B link exists after recreation', win.state.factory.links.length === 1 && win.state.factory.links[0].from === source.id && win.state.factory.links[0].to === target.id);
+})();
+
+(function test_T26_saveLoadUnaffectedByRemoval() {
+  const storage = makeMemoryStorage();
+  let win = newDom(storage).window;
+  const source = win.addFactoryNode({ id: 'node_source', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_target', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  const keep = win.addFactoryNode({ id: 'node_keep', type: 'storage', x: 4, y: 0, width: 1, height: 1 });
+  const toRemove = win.addFactoryLink({ from: source.id, to: target.id });
+  const toKeep = win.addFactoryLink({ from: source.id, to: keep.id });
+
+  win.removeFactoryLink(toRemove.id);
+  check('Task26: one link remains before save', win.state.factory.links.length === 1);
+  const saved = win.saveGame();
+  check('Task26: saveGame succeeds after a Link removal', saved === true);
+
+  win = newDom(storage).window;
+  check('Task26: removed link stays removed after reload', win.state.factory.links.length === 1);
+  check('Task26: the surviving link is the one that was kept', win.state.factory.links[0].id === toKeep.id && win.state.factory.links[0].from === source.id && win.state.factory.links[0].to === keep.id);
+
+  // saveVersion/save shape is unchanged by this task.
+  check('Task26: saveVersion is still 1', (() => { win.saveGame(); return JSON.parse(win.localStorage.getItem('gachaFactorySave')).saveVersion === 1; })());
+})();
+
+(function test_T26_existingRegressionUntouched() {
+  // Sanity check that Task 25's addFactoryLink/validation are unaffected by
+  // removeFactoryLink existing alongside them.
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_a', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_b', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  const link = win.addFactoryLink({ from: source.id, to: target.id });
+  check('Task26: addFactoryLink still works standalone (unrelated to removeFactoryLink)', !!link);
+  check('Task26: self-link is still rejected', win.addFactoryLink({ from: source.id, to: source.id }) === null);
 })();
 
 // =============================================================================
