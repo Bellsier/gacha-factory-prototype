@@ -1735,6 +1735,128 @@ function gridNode(x, y, width, height, id) {
   check('Task23: saveVersion is still 1', (() => { win.saveGame(); return JSON.parse(win.localStorage.getItem('gachaFactorySave')).saveVersion === 1; })());
 })();
 
+
+// =============================================================================
+// TASK 25 — Factory Link model and connection validation/action.
+// A Link connects two existing Factory Nodes by directed from/to ids.
+// Belt geometry, throughput, item movement, splitter/merger behavior, and
+// production simulation are intentionally outside this task.
+// =============================================================================
+
+(function test_T25_validLinkSucceeds() {
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_source', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_target', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+
+  const link = win.addFactoryLink({ from: source.id, to: target.id });
+  check('Task25: valid Node -> Node link succeeds', !!link);
+  check('Task25: valid link preserves from/to ids', !!link && link.from === source.id && link.to === target.id);
+  check('Task25: valid link is stored in state.factory.links', win.state.factory.links.length === 1 && win.state.factory.links[0].id === link.id);
+})();
+
+(function test_T25_invalidEndpointsRejected() {
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_source', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_target', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  const before = JSON.stringify(win.state.factory.links);
+
+  check('Task25: nonexistent source is rejected', win.addFactoryLink({ from: 'node_missing', to: target.id }) === null);
+  check('Task25: nonexistent target is rejected', win.addFactoryLink({ from: source.id, to: 'node_missing' }) === null);
+  check('Task25: missing source is rejected', win.addFactoryLink({ to: target.id }) === null);
+  check('Task25: missing target is rejected', win.addFactoryLink({ from: source.id }) === null);
+  check('Task25: empty source is rejected', win.addFactoryLink({ from: '', to: target.id }) === null);
+  check('Task25: empty target is rejected', win.addFactoryLink({ from: source.id, to: '' }) === null);
+  check('Task25: invalid endpoint attempts leave links unchanged', JSON.stringify(win.state.factory.links) === before);
+})();
+
+(function test_T25_selfLinkRejected() {
+  const win = newDom(makeMemoryStorage()).window;
+  const node = win.addFactoryNode({ id: 'node_self', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  check('Task25: self-link is rejected', win.addFactoryLink({ from: node.id, to: node.id }) === null);
+  check('Task25: self-link rejection leaves links empty', win.state.factory.links.length === 0);
+})();
+
+(function test_T25_duplicateDirectionRejectedAndReverseAllowed() {
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_a', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_b', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+
+  const forward = win.addFactoryLink({ from: source.id, to: target.id });
+  check('Task25: first A -> B link succeeds', !!forward);
+  const beforeDuplicate = JSON.stringify(win.state.factory.links);
+
+  check('Task25: duplicate A -> B link is rejected', win.addFactoryLink({ from: source.id, to: target.id }) === null);
+  check('Task25: duplicate same-direction rejection leaves links unchanged', JSON.stringify(win.state.factory.links) === beforeDuplicate);
+
+  const reverse = win.addFactoryLink({ from: target.id, to: source.id });
+  check('Task25: reverse B -> A link is allowed', !!reverse);
+  check('Task25: forward and reverse links coexist', win.state.factory.links.length === 2);
+})();
+
+(function test_T25_idHandling() {
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_a', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_b', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+
+  const generated = win.addFactoryLink({ from: source.id, to: target.id });
+  check('Task25: link without id gets a non-empty string id', typeof generated.id === 'string' && generated.id.length > 0);
+
+  const secondTarget = win.addFactoryNode({ id: 'node_c', type: 'storage', x: 4, y: 0, width: 1, height: 1 });
+  const supplied = win.addFactoryLink({ id: 'link_keepme_custom', from: target.id, to: secondTarget.id });
+  check('Task25: non-colliding supplied link id is preserved', !!supplied && supplied.id === 'link_keepme_custom');
+
+  const thirdTarget = win.addFactoryNode({ id: 'node_d', type: 'storage', x: 6, y: 0, width: 1, height: 1 });
+  const colliding = win.addFactoryLink({ id: generated.id, from: source.id, to: thirdTarget.id });
+  check('Task25: colliding supplied link id does not reject the valid connection', !!colliding);
+  check('Task25: colliding supplied link id is replaced with a fresh id', !!colliding && colliding.id !== generated.id);
+  check('Task25: all three link ids are distinct', new Set([generated.id, supplied.id, colliding.id]).size === 3);
+})();
+
+(function test_T25_invalidInputLeavesStateUntouched() {
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_source', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_target', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  const valid = win.addFactoryLink({ from: source.id, to: target.id });
+  check('Task25: baseline link exists before failure tests', !!valid);
+
+  const linksBefore = JSON.stringify(win.state.factory.links);
+  const nodesBefore = JSON.stringify(win.state.factory.nodes);
+  const badAttempts = [
+    null,
+    'not an object',
+    42,
+    {},
+    { from: source.id, to: source.id },
+    { from: 'missing', to: target.id },
+    { from: source.id, to: 'missing' },
+    { from: source.id, to: target.id },
+  ];
+
+  const results = badAttempts.map((link) => win.addFactoryLink(link));
+  check('Task25: every invalid link attempt returns null', results.every((result) => result === null));
+  check('Task25: invalid link attempts leave links unchanged', JSON.stringify(win.state.factory.links) === linksBefore);
+  check('Task25: invalid link attempts leave nodes unchanged', JSON.stringify(win.state.factory.nodes) === nodesBefore);
+})();
+
+(function test_T25_saveLoadRoundTrip() {
+  const storage = makeMemoryStorage();
+  let win = newDom(storage).window;
+  const source = win.addFactoryNode({ id: 'node_save_source', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_save_target', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  const reverseTarget = win.addFactoryNode({ id: 'node_save_reverse', type: 'storage', x: 4, y: 0, width: 1, height: 1 });
+  win.addFactoryLink({ id: 'link_save_forward', from: source.id, to: target.id });
+  win.addFactoryLink({ id: 'link_save_reverse', from: reverseTarget.id, to: source.id });
+
+  const before = JSON.stringify(win.state.factory.links);
+  const saved = win.saveGame();
+  check('Task25: saveGame succeeds with Factory Links present', saved === true);
+
+  win = newDom(storage).window;
+  check('Task25: saved links are restored after reload', JSON.stringify(win.state.factory.links) === before);
+  check('Task25: restored link count is preserved', win.state.factory.links.length === 2);
+  check('Task25: restored link fields are preserved', win.state.factory.links.every((link) => typeof link.id === 'string' && typeof link.from === 'string' && typeof link.to === 'string'));
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================
