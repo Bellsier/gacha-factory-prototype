@@ -1474,6 +1474,113 @@ function timedCraftLabel(win, key) {
 })();
 
 // =============================================================================
+// TASK 22 — Factory Node placement validation (pure functions only; no
+// addFactoryNode()/removeFactoryNode()/UI exists yet). isFactoryNodeWithinGrid/
+// isFactoryNodeSizeValid/doFactoryNodesOverlap/factoryNodeOverlapsExisting/
+// canPlaceFactoryNode are exercised directly and never read/write win.state.
+// =============================================================================
+
+function gridNode(x, y, width, height, id) {
+  return { id: id || 'node_test', type: 'production', x, y, width, height };
+}
+
+(function test_T22_gridBoundaryTopLeftAndBottomRight() {
+  const win = newDom(makeMemoryStorage()).window;
+  const grid = { width: 25, height: 25 };
+  check('Task22: 1x1 fits at top-left (0,0)', win.canPlaceFactoryNode(gridNode(0, 0, 1, 1), grid, []) === true);
+  check('Task22: 1x1 fits at bottom-right (24,24)', win.canPlaceFactoryNode(gridNode(24, 24, 1, 1), grid, []) === true);
+  check('Task22: 3x3 fits at top-left (0,0)', win.canPlaceFactoryNode(gridNode(0, 0, 3, 3), grid, []) === true);
+  check('Task22: 3x3 fits exactly at bottom-right (22,22)', win.canPlaceFactoryNode(gridNode(22, 22, 3, 3), grid, []) === true);
+})();
+
+(function test_T22_gridBoundaryOverflowAndNegative() {
+  const win = newDom(makeMemoryStorage()).window;
+  const grid = { width: 25, height: 25 };
+  check('Task22: 2x2 at (24,24) overflows the grid by 1 cell -> invalid', win.canPlaceFactoryNode(gridNode(24, 24, 2, 2), grid, []) === false);
+  check('Task22: 3x3 at (23,23) overflows the grid by 1 cell -> invalid', win.canPlaceFactoryNode(gridNode(23, 23, 3, 3), grid, []) === false);
+  check('Task22: 4x1 at (23,23) overflows -> invalid', win.canPlaceFactoryNode(gridNode(23, 23, 4, 1), grid, []) === false);
+  check('Task22: negative x is invalid', win.canPlaceFactoryNode(gridNode(-1, 0, 1, 1), grid, []) === false);
+  check('Task22: negative y is invalid', win.canPlaceFactoryNode(gridNode(0, -1, 1, 1), grid, []) === false);
+})();
+
+(function test_T22_nodeSizeRange() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task22: 1x1 size is valid', win.isFactoryNodeSizeValid(1, 1) === true);
+  check('Task22: 2x2 size is valid', win.isFactoryNodeSizeValid(2, 2) === true);
+  check('Task22: 3x3 size is valid', win.isFactoryNodeSizeValid(3, 3) === true);
+  check('Task22: 0-width size is invalid', win.isFactoryNodeSizeValid(0, 1) === false);
+  check('Task22: 0-height size is invalid', win.isFactoryNodeSizeValid(1, 0) === false);
+  check('Task22: 4x1 size is invalid', win.isFactoryNodeSizeValid(4, 1) === false);
+  check('Task22: 1x4 size is invalid', win.isFactoryNodeSizeValid(1, 4) === false);
+  check('Task22: 3x4 size is invalid', win.isFactoryNodeSizeValid(3, 4) === false);
+})();
+
+(function test_T22_nonIntegerRejectedByPlacementValidation() {
+  const win = newDom(makeMemoryStorage()).window;
+  const grid = { width: 25, height: 25 };
+  check('Task22: non-integer width is rejected', win.isFactoryNodeSizeValid(1.5, 1) === false);
+  check('Task22: non-integer height is rejected', win.isFactoryNodeSizeValid(1, 2.5) === false);
+  check('Task22: non-integer x is rejected by isFactoryNodeWithinGrid', win.isFactoryNodeWithinGrid(gridNode(0.5, 0, 1, 1), grid) === false);
+  check('Task22: non-integer y is rejected by isFactoryNodeWithinGrid', win.isFactoryNodeWithinGrid(gridNode(0, 2.5, 1, 1), grid) === false);
+  check('Task22: non-integer coords are rejected by canPlaceFactoryNode', win.canPlaceFactoryNode(gridNode(0.5, 0.5, 1, 1), grid, []) === false);
+})();
+
+(function test_T22_overlapDetection() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = gridNode(5, 5, 2, 2, 'node_base'); // occupies (5,5)-(6,6)
+
+  check('Task22: identical rectangle fully overlaps', win.doFactoryNodesOverlap(base, gridNode(5, 5, 2, 2)) === true);
+  check('Task22: partially overlapping rectangle overlaps', win.doFactoryNodesOverlap(base, gridNode(6, 6, 2, 2)) === true);
+  check('Task22: sharing exactly one cell overlaps', win.doFactoryNodesOverlap(gridNode(0, 0, 2, 2), gridNode(1, 1, 1, 1)) === true);
+  check('Task22: adjacent horizontally (edge touch) does not overlap', win.doFactoryNodesOverlap(gridNode(0, 0, 2, 1), gridNode(2, 0, 1, 1)) === false);
+  check('Task22: adjacent vertically (edge touch) does not overlap', win.doFactoryNodesOverlap(gridNode(0, 0, 1, 2), gridNode(0, 2, 1, 1)) === false);
+  check('Task22: diagonal corner touch does not overlap', win.doFactoryNodesOverlap(gridNode(0, 0, 1, 1), gridNode(1, 1, 1, 1)) === false);
+})();
+
+(function test_T22_overlapExistingList() {
+  const win = newDom(makeMemoryStorage()).window;
+  const existing = [gridNode(5, 5, 2, 2, 'node_a'), gridNode(10, 10, 1, 1, 'node_b')];
+  check('Task22: overlaps when colliding with any existing node', win.factoryNodeOverlapsExisting(gridNode(6, 6, 1, 1), existing) === true);
+  check('Task22: no overlap when clear of every existing node', win.factoryNodeOverlapsExisting(gridNode(0, 0, 1, 1), existing) === false);
+  check('Task22: empty existing list never overlaps', win.factoryNodeOverlapsExisting(gridNode(5, 5, 2, 2), []) === false);
+})();
+
+(function test_T22_canPlaceFactoryNodeComposite() {
+  const win = newDom(makeMemoryStorage()).window;
+  const grid = { width: 25, height: 25 };
+  const existing = [gridNode(5, 5, 2, 2, 'node_a')];
+
+  check('Task22: valid grid + valid size + no overlap -> true', win.canPlaceFactoryNode(gridNode(10, 10, 2, 2), grid, existing) === true);
+  check('Task22: out of grid range -> false', win.canPlaceFactoryNode(gridNode(24, 24, 2, 2), grid, existing) === false);
+  check('Task22: invalid node size -> false', win.canPlaceFactoryNode(gridNode(10, 10, 4, 1), grid, existing) === false);
+  check('Task22: invalid (negative) coordinate -> false', win.canPlaceFactoryNode(gridNode(-1, 10, 1, 1), grid, existing) === false);
+  check('Task22: overlapping an existing node -> false', win.canPlaceFactoryNode(gridNode(6, 6, 1, 1), grid, existing) === false);
+  check('Task22: adjacent to an existing node (edge touch only) -> true', win.canPlaceFactoryNode(gridNode(7, 5, 1, 2), grid, existing) === true);
+})();
+
+(function test_T22_validationIsPure() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.factory.nodes.push(gridNode(5, 5, 2, 2, 'node_real'));
+  const nodesBefore = JSON.stringify(win.state.factory.nodes);
+  const gridBefore = JSON.stringify(win.state.factory.grid);
+
+  win.canPlaceFactoryNode(gridNode(0, 0, 1, 1), win.state.factory.grid, win.state.factory.nodes);
+  win.canPlaceFactoryNode(gridNode(5, 5, 3, 3), win.state.factory.grid, win.state.factory.nodes); // overlapping call too
+  win.isFactoryNodeWithinGrid(gridNode(100, 100, 1, 1), win.state.factory.grid);
+  win.factoryNodeOverlapsExisting(gridNode(5, 5, 1, 1), win.state.factory.nodes);
+
+  check('Task22: placement validation never mutates state.factory.nodes', JSON.stringify(win.state.factory.nodes) === nodesBefore);
+  check('Task22: placement validation never mutates state.factory.grid', JSON.stringify(win.state.factory.grid) === gridBefore);
+})();
+
+(function test_T22_realFactoryGridDefaultUsedDirectly() {
+  // Sanity check: the real default factory state (from Task 21) works
+  // directly with these validators without any adaptation.
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task22: a node fits in the fresh default 25x25 grid with no existing nodes', win.canPlaceFactoryNode(gridNode(0, 0, 3, 3), win.state.factory.grid, win.state.factory.nodes) === true);
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
