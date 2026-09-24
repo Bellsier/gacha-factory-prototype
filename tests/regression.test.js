@@ -19,6 +19,16 @@ const { JSDOM } = require('jsdom');
 const HTML_PATH = path.join(__dirname, '..', 'index.html');
 const html = fs.readFileSync(HTML_PATH, 'utf8');
 
+// Task 24: the game script now lives in js/*.js (loaded by index.html via
+// <script src> tags, in this same order) instead of one inline <script>.
+// jsdom's automatic external-<script>-fetching is unreliable/slow for local
+// files, so the harness reads and concatenates the real module files itself,
+// in the exact same order the browser loads them — this is not a reimplementation,
+// it is the literal file content index.html points at.
+const JS_DIR = path.join(__dirname, '..', 'js');
+const MODULE_FILES = ['data.js', 'balance.js', 'state.js', 'systems.js', 'factory.js', 'ui.js', 'main.js'];
+const moduleSource = MODULE_FILES.map((f) => fs.readFileSync(path.join(JS_DIR, f), 'utf8')).join('\n');
+
 let passCount = 0;
 let failCount = 0;
 const failures = [];
@@ -66,7 +76,6 @@ function newDom(storage) {
   Object.defineProperty(win, 'localStorage', { value: storage, configurable: true });
   win.confirm = () => true;
   win.alert = () => {};
-  const scriptEl = win.document.querySelector('script');
   const expose = `
 ;window.__expose = {
   state: () => state,
@@ -80,7 +89,7 @@ function newDom(storage) {
   TICKS_PER_SECOND: () => TICKS_PER_SECOND,
 };
 `;
-  win.eval(scriptEl.textContent + expose);
+  win.eval(moduleSource + expose);
   Object.defineProperties(win, {
     state: { get: () => win.__expose.state(), configurable: true },
     // permanent is the game's single cross-prestige state container
@@ -315,7 +324,7 @@ function advanceTicks(win, n) {
 })();
 
 (function test_tickLoopSourceNeverCallsSaveGame() {
-  const src = html;
+  const src = moduleSource; // Task 24: tickLoop() now lives in js/systems.js, not inline in index.html
   const tickFnMatch = src.match(/function tickLoop\(\)\{[\s\S]*?\n\}/);
   const tickFnBody = tickFnMatch ? tickFnMatch[0] : '';
   check('tickLoop() source contains no saveGame() call', tickFnBody.length > 0 && !tickFnBody.includes('saveGame'));
