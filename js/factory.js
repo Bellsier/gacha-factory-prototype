@@ -82,3 +82,45 @@ function addFactoryNode(rawNode){
   return node;
 }
 
+
+// ---------------------------------------------------------------------------
+// Task 25: Factory Link connection validation/action.
+// A Link is the abstract directed connection between two existing Factory
+// Nodes. Belt geometry, throughput, item movement, splitter/merger behavior,
+// and production simulation are intentionally outside this task.
+// ---------------------------------------------------------------------------
+function isFactoryLinkEndpointValid(nodeId, nodes){
+  if(typeof nodeId !== 'string' || nodeId.length === 0) return false;
+  if(!Array.isArray(nodes)) return false;
+  return nodes.some(node => node && node.id === nodeId);
+}
+
+function isFactoryLinkValid(link, nodes, existingLinks){
+  if(!isPlainObject(link)) return false;
+  if(!isFactoryLinkEndpointValid(link.from, nodes)) return false;
+  if(!isFactoryLinkEndpointValid(link.to, nodes)) return false;
+  if(link.from === link.to) return false;
+  if(!Array.isArray(existingLinks)) return false;
+  return !existingLinks.some(existing => existing && existing.from === link.from && existing.to === link.to);
+}
+
+function addFactoryLink(rawLink){
+  if(!isPlainObject(rawLink)) return null;
+
+  const candidate = {
+    from: rawLink.from,
+    to: rawLink.to,
+  };
+
+  if(!isFactoryLinkValid(candidate, state.factory.nodes, state.factory.links)) return null;
+
+  const existingIds = new Set(state.factory.links.map(link => link.id));
+  const id = (typeof rawLink.id === 'string' && rawLink.id.length > 0 && !existingIds.has(rawLink.id))
+    ? rawLink.id
+    : makeEntityId('link_', existingIds);
+
+  const link = { id, from: candidate.from, to: candidate.to };
+  state.factory.links.push(link);
+  return link;
+}
+
