@@ -155,18 +155,18 @@
   <header>
     <div>
       <h1>채굴 공방</h1>
-      <div class="sub">뽑기 × 공장형 프로토타입</div>
+      <div class="sub">봑기 × 공장형 프로토타입</div>
     </div>
     <div class="sub">회차 <span id="runNum">1</span> · <span id="saveStatus"></span></div>
   </header>
 
   <div class="currencies">
     <div class="cur"><div class="label">골드</div><div class="value" id="goldVal">0</div></div>
-    <div class="cur ticket"><div class="label">가챠권</div><div class="value" id="ticketVal">0</div></div>
+    <div class="cur ticket"><div class="label">가챩권</div><div class="value" id="ticketVal">0</div></div>
     <div class="cur prestige"><div class="label">명성 포인트</div><div class="value" id="prestigeVal">0</div></div>
   </div>
 
-  <div class="next-hint" id="nextHint">채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다.</div>
+  <div class="next-hint" id="nextHint">채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 쳫 가챩권을 받습니다.</div>
 
   <div class="tabbar">
     <button class="tab-btn active" data-tab="mining">채굴</button>
@@ -197,7 +197,7 @@
       <h2>본사 투자</h2>
       <div class="prestige-box" style="border-color:var(--amber);">
         <div>현재 투자 배율 <span class="mult" id="hqMultVal" style="color:var(--amber);">×1.00</span></div>
-        <p>골드를 투자해서 이번 회차 동안 모든 채굴·판매 수익에 곱연산 보너스를 붙입니다 (이번 회차 한정, 프레스티지 시 초기화). 레벨이 오를수록 비용이 크게 늘어납니다.</p>
+        <p>골드를 투자해서 이번 회차 동안 모든 채굴·판매 수익에 곱연산 보너스를 붙입니다 (이번 회차 한정, 프레스티지 시 초기화). 레벨이 오름수록 비용이 크게 늘어납니다.</p>
         <button id="hqBtn"></button>
       </div>
     </section>
@@ -205,13 +205,13 @@
 
   <div id="tab-workers" class="tab-panel">
     <section>
-      <h2>뽑기</h2>
+      <h2>봑기</h2>
       <div class="gacha-box">
-        <div>일꾼을 뽑아 채굴장에 배치하세요</div>
+        <div>일꾼을 뵑아 채굴장에 배치하세요</div>
         <div class="rates" id="firstGachaHint"></div>
         <div class="gacha-actions">
-          <button id="gachaTicketBtn">가챠권으로 뽑기 (1장)</button>
-          <button id="gachaGoldBtn" class="ghost">골드로 뽑기 (50G)</button>
+          <button id="gachaTicketBtn">가챩권으로 뵑기 (1장)</button>
+          <button id="gachaGoldBtn" class="ghost">골드로 뵑기 (50G)</button>
         </div>
         <div class="roster" id="lastPull"></div>
       </div>
@@ -230,7 +230,7 @@
       <div id="prestigeInfoBox" style="display:none; font-size:0.7rem; color:var(--dim); background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin:0 0 10px; line-height:1.6;">
         정확한 공식: 명성 포인트 = ⌊√(골드 ÷ 200)⌋ (일꾼 1명 이상일 때만)<br>
         200G→1점 · 800G→2점 · 1,800G→3점 · 3,200G→4점 · 5,000G→5점<br>
-        첫 가챠권(50G)과 겹치지 않게, 일꾼을 뽑고 공방을 굴린 뒤에 초기화하세요.
+        쳫 가챩권(50G)과 겹치지 않게, 일꾼을 뵑고 공방을 굴린 뒤에 초기화하세요.
       </div>
       <div style="margin-bottom:10px; font-size:0.8rem;">지금 초기화하면 <span id="prestigeGainPreview" style="color:var(--legend); font-family:'Space Grotesk'; font-weight:700;">+0</span> 획득</div>
       <button id="prestigeBtn">초기화하고 명성 얻기</button>
@@ -671,6 +671,44 @@ function sanitizeFactoryState(raw){
   };
 }
 
+// ---------------------------------------------------------------------------
+// Task 22: Factory Node placement validation — pure functions that answer
+// "can this exact Node go here, right now, against this grid and these
+// other Nodes?" with a plain boolean. This is a different job from the
+// Task 21 sanitize helpers above: sanitizeFactoryNode() takes possibly-
+// malformed SAVE DATA and coerces it into a safe default value; the
+// functions below never coerce anything and never touch state — they just
+// check. Nothing calls these yet: there is no addFactoryNode() and no
+// Factory UI wired up this task.
+//
+// A Node occupies the half-open rectangle x <= cell.x < x+width,
+// y <= cell.y < y+height, so two Nodes that only share an edge or a corner
+// do not overlap (see doFactoryNodesOverlap below).
+// ---------------------------------------------------------------------------
+function isFactoryNodeSizeValid(width, height){
+  return isValidNodeSize(width) && isValidNodeSize(height);
+}
+function isFactoryNodeWithinGrid(node, grid){
+  if(!isPlainObject(node) || !isPlainObject(grid)) return false;
+  if(!isValidGridCoord(node.x) || !isValidGridCoord(node.y)) return false;
+  if(!isFactoryNodeSizeValid(node.width, node.height)) return false;
+  return (node.x + node.width) <= grid.width && (node.y + node.height) <= grid.height;
+}
+function doFactoryNodesOverlap(a, b){
+  if(a.x + a.width <= b.x || b.x + b.width <= a.x) return false;
+  if(a.y + a.height <= b.y || b.y + b.height <= a.y) return false;
+  return true;
+}
+function factoryNodeOverlapsExisting(node, existingNodes){
+  if(!Array.isArray(existingNodes)) return false;
+  return existingNodes.some(n => doFactoryNodesOverlap(node, n));
+}
+function canPlaceFactoryNode(node, grid, existingNodes){
+  if(!isFactoryNodeWithinGrid(node, grid)) return false;
+  if(factoryNodeOverlapsExisting(node, existingNodes)) return false;
+  return true;
+}
+
 // Rebuilds a fully-valid run state from (possibly malformed) saved data.
 // Any single bad field falls back to its default; every other, valid field
 // is kept — a corrupted `characters` array doesn't wipe out `resources`, etc.
@@ -797,14 +835,14 @@ function updateNextHint(){
   const ironHas = hasWorkerOn('iron');
   const coalHas = hasWorkerOn('coal');
   if(!permanent.firstGachaGranted){
-    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 쳫 가챩권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     el.textContent = permanent.tickets >= 1
-      ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
-      : '인부 탭에서 일꾼을 뽑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
+      ? '인부 탭에서 가챩권으로 일꾼을 뵑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
+      : '인부 탭에서 일꾼을 뵑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
   } else if(ironHas !== coalHas){
     const missing = ironHas ? 'coal' : 'iron';
-    el.textContent = `${resName(missing)}은 아직 수동입니다. 일꾼을 한 명 더 뽑으면 강철도 완전 자동화할 수 있어요.`;
+    el.textContent = `${resName(missing)}은 아직 수동입니다. 일꾼을 한 명 더 뵑으면 강철도 완전 자동화할 수 있어요.`;
   } else if(ironHas && coalHas && !state.autoCraft.steel){
     el.textContent = '철광석/석탄 자동화 완료! 자동 제작을 켜면 강철도 자동으로 만들어져요.';
   } else if(prestigeGain() <= 0){
@@ -898,7 +936,7 @@ function buildLines(){
         <h3><span class="site-name">🔒 ${site.name}</span></h3>
         <div class="lines">
           <div class="line locked">
-            <div class="rate">이 채굴장은 아직 탐사하지 않았습니다.<br>탐사하면 이곳만의 고유 광물(${siteResources.map(r=>r.name).join(', ')})을 캘 수 있어요.${relatedRecipes.length ? '<br>관련 제작품: ' + relatedRecipes.join(', ') : ''}</div>
+            <div class="rate">이 채굴장은 아직 탐사하지 않았습니다.<br>탐사하면 이곳만의 고유 광물(${siteResources.map(r=>r.name).join(', ')})을 캐 수 있어요.${relatedRecipes.length ? '<br>관련 제작품: ' + relatedRecipes.join(', ') : ''}</div>
             <button data-unlocksite="${site.key}" ${dis(state.gold < site.unlockCost)}>채굴장 탐사 (${site.unlockCost}G)</button>
           </div>
         </div>
@@ -1009,7 +1047,7 @@ function checkFirstGachaMilestone(){
   if(state.gold < BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD) return;
   permanent.firstGachaGranted = true;
   permanent.tickets += 1;
-  log('🎟️ 첫 가챠권 획득! 이제 인부를 뽑을 수 있습니다.');
+  log('🎟️ 쳫 가챩권 획득! 이제 인부를 뵑을 수 있습니다.');
 }
 
 function sellAll(recipe, silent){
@@ -1112,7 +1150,7 @@ function renderLastPull(){
   const resName = RESOURCES.find(r=>r.key===c.resource).name;
   const chip = document.createElement('span');
   chip.className = 'chip ' + rarity.cls;
-  chip.textContent = `방금 뽑음: [${rarity.label}] ${resName} 담당 (종합 +${workerEffective(c).toFixed(2)}/초)`;
+  chip.textContent = `방금 뵑음: [${rarity.label}] ${resName} 담당 (종합 +${workerEffective(c).toFixed(2)}/초)`;
   wrap.appendChild(chip);
 }
 
@@ -1149,7 +1187,7 @@ function buildWorkers(){
   const wrap = document.getElementById('workers');
   wrap.innerHTML = '';
   if(state.characters.length===0){
-    wrap.innerHTML = '<div class="rate">아직 뽑은 일꾼이 없습니다. 위에서 뽑기를 진행해보세요.</div>';
+    wrap.innerHTML = '<div class="rate">아직 뵑은 일꾼이 없습니다. 위에서 뵑기를 진행해보세요.</div>';
     return;
   }
   const unlockedList = RESOURCES.filter(r=>isUnlocked(r.key));
@@ -1251,7 +1289,7 @@ document.getElementById('prestigeInfoBtn').onclick = ()=>{
 
 document.getElementById('prestigeBtn').onclick = ()=>{
   if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
-    log('일꾼을 한 명 이상 뽑은 뒤에 초기화할 수 있습니다.');
+    log('일꾼을 한 명 이상 뵑은 뒤에 초기화할 수 있습니다.');
     return;
   }
   const gain = prestigeGain();
@@ -1276,7 +1314,7 @@ function updateNumbers(){
   const hint = document.getElementById('firstGachaHint');
   hint.textContent = permanent.firstGachaGranted
     ? '일반 60% · 희귀 25% · 영웅 12% · 전설 3%'
-    : `첫 골드 ${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G를 모으면 첫 가챠권을 드려요 (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+    : `쳫 골드 ${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G를 모으면 쳫 가챩권을 드려요 (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   document.getElementById('gachaTicketBtn').disabled = permanent.tickets < BALANCE.gacha.PULL_COST_TICKET;
   RESOURCES.forEach(r=>{
     const el = document.querySelector(`[data-amt="${r.key}"]`);
@@ -1386,7 +1424,7 @@ function tickLoop(){
 function ticketTrickle(){
   if(!permanent.firstGachaGranted) return;
   permanent.tickets += 1;
-  log('가챠권 +1 (자동 지급)');
+  log('가챩권 +1 (자동 지급)');
   renderCurrencies();
 }
 
