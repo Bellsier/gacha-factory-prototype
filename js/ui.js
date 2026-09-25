@@ -4,7 +4,7 @@ function updateNextHint(){
   const ironHas = hasWorkerOn('iron');
   const coalHas = hasWorkerOn('coal');
   if(!permanent.firstGachaGranted){
-    el.textContent = `쳄굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+    el.textContent = `캄굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     el.textContent = permanent.tickets >= 1
       ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
@@ -19,4 +19,13 @@ function updateNextHint(){
   } else {
     el.textContent = `이번 회차를 초기화하면 명성 +${prestigeGain()}점을 얻습니다. 일꾼·자원은 사라지고 영구 배율이 남습니다.`;
   }
+}
+
+function renderCurrencies(){
+  document.getElementById('goldVal').textContent = fmt(state.gold);
+  document.getElementById('ticketVal').textContent = fmt(permanent.tickets);
+  document.getElementById('prestigeVal').textContent = fmt(permanent.totalPrestige);
+  document.getElementById('multVal').textContent = '×' + mult().toFixed(2);
+  document.getElementById('runGoldVal').textContent = fmt(state.runGold);
+  document.getElementById('runNum').textContent = permanent.runCount;
 }
