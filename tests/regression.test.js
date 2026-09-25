@@ -2243,6 +2243,7 @@ function gridNode(x, y, width, height, id) {
     const before = win.state.resources.iron;
     win.secureMine(mine.id);
     win.mineMine(mine.id);
+    win.updateNumbers();
     return win.state.resources.iron === before + mine.miningPower &&
       wrap.querySelector('[data-shared-amt="iron"]').textContent === String(before + mine.miningPower);
   })());
