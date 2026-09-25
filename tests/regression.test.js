@@ -3,18 +3,31 @@
 /**
  * Regression test suite for 채굴 공방 (gacha-factory-prototype).
  *
- * This does NOT reimplement the game — it loads the actual index.html,
- * evaluates its <script> in a jsdom window, and drives the real functions
- * and DOM (buttons, selects) exactly as a browser would. Balance-formula
- * tests compare the game's real output against independently hardcoded
- * reference values (not values re-read from BALANCE), so a regression in
- * BALANCE itself would be caught rather than silently treated as correct.
+ * The suite is split into tests/chunks/*.js so GitHub file writes stay
+ * within MCP size limits. Concatenating those chunks in order recreates
+ * the original single-file suite. This loader evaluates that source with
+ * __dirname set to tests/, matching the previous harness paths.
  *
  * Run: npm test   (or)   node tests/regression.test.js
  */
 const fs = require('fs');
 const path = require('path');
-const { JSDOM } = require('jsdom');
 
-const HTML_PATH = path.join(__dirname, '..', 'index.html');
-const html = fs.readFileSync(HTML_PATH, 'utf8');
+const chunkDir = path.join(__dirname, 'chunks');
+const files = fs.readdirSync(chunkDir).filter((f) => /^\d{2}\.js$/.test(f)).sort();
+if (files.length === 0) {
+  console.error('tests/chunks is empty');
+  process.exit(2);
+}
+const src = files.map((f) => fs.readFileSync(path.join(chunkDir, f), 'utf8')).join('');
+const code = src.replace(/^#![^\n]*\n/, '');
+new Function(
+  'require',
+  'module',
+  'exports',
+  '__dirname',
+  '__filename',
+  'process',
+  'console',
+  code
+)(require, module, exports, __dirname, __filename, process, console);
