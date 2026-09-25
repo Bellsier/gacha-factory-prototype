@@ -18,7 +18,10 @@ const MINE_DEVELOPMENT_STATES = ['unsecured', 'secured'];
 function freshWorldState(){
   return {
     base: { x: 0, y: 0, level: 1 },
-    mines: [],
+    mines: [
+      { id: 'mine_start_iron', x: 2, y: 0, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+      { id: 'mine_start_coal', x: 0, y: 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+    ],
   };
 }
 
