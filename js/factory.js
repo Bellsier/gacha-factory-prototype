@@ -204,3 +204,17 @@ function secureMine(mineId){
   mine.developmentState = 'secured';
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Task 31: Manual mining from a secured Mine.
+// The mine's miningPower is the direct amount added to the shared resource
+// pool for one manual mining action. Grade remains descriptive data until a
+// later balance Task defines how it modifies output.
+function mineMine(mineId){
+  if(typeof mineId !== 'string' || mineId.length === 0) return false;
+  const mine = state.world.mines.find(m => m && m.id === mineId);
+  if(!mine || mine.developmentState !== 'secured') return false;
+  if(!isMineResourceValid(mine.resource) || !isNonNegativeFinite(mine.miningPower) || mine.miningPower <= 0) return false;
+  state.resources[mine.resource] += mine.miningPower;
+  return true;
+}
