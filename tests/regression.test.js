@@ -1982,7 +1982,7 @@ function gridNode(x, y, width, height, id) {
   check('Task27: fresh run has world state', !!win.state.world);
   check('Task27: base starts at the origin', win.state.world.base.x === 0 && win.state.world.base.y === 0);
   check('Task27: base starts at level 1', win.state.world.base.level === 1);
-  check('Task27: fresh world has no mines yet', Array.isArray(win.state.world.mines) && win.state.world.mines.length === 0);
+  check('Task27: fresh world has the seeded starting mines', Array.isArray(win.state.world.mines) && win.state.world.mines.length === 2);
 })();
 
 (function test_T27_sanitizeValidMineAndIds() {
@@ -2190,6 +2190,38 @@ function gridNode(x, y, width, height, id) {
   check('Task33: base level is rendered', wrap.textContent.includes('거점 Lv.3'));
   check('Task33: base coordinates are rendered', wrap.textContent.includes('위치 (12, 7)'));
 })();
+
+
+// =============================================================================
+// TASK 34 — Starting world mine seed.
+// A brand-new run starts with a small, visible pair of unsecured mines so the
+// world loop is playable without an external addMine() call.
+// =============================================================================
+(function test_T34_startingWorldMineSeed() {
+  const win = newDom(makeMemoryStorage()).window;
+  const mines = win.state.world.mines;
+  check('Task34: fresh run starts with two mines', mines.length === 2);
+  check('Task34: starting iron mine is present at (2,0)', mines.some(m => m.id === 'mine_start_iron' && m.x === 2 && m.y === 0 && m.resource === 'iron'));
+  check('Task34: starting coal mine is present at (0,2)', mines.some(m => m.id === 'mine_start_coal' && m.x === 0 && m.y === 2 && m.resource === 'coal'));
+  check('Task34: starting mines begin unsecured', mines.every(m => m.developmentState === 'unsecured'));
+  check('Task34: starting mines use grade 1 and miningPower 1', mines.every(m => m.grade === 1 && m.miningPower === 1));
+})();
+
+(function test_T34_missingWorldGetsStartingSeed() {
+  const storage = makeMemoryStorage();
+  storage._setRaw('gachaFactorySave', JSON.stringify({
+    saveVersion: 1,
+    permanent: { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: false },
+    run: {
+      resources: {}, products: {}, gold: 0, runGold: 0, characters: [], lastPull: null,
+      facility: {}, workforce: {}, unlockedSites: {}, autoCraft: {}, autoSell: {}, autoSellOn: {},
+      craftQueue: {}, hqLevel: 0, craftFacility: 1, autoLineLogged: false, factory: {}
+    }
+  }));
+  const win = newDom(storage).window;
+  check('Task34: saves without world data receive the starting seed', win.state.world.mines.length === 2);
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================
