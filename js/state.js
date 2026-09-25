@@ -238,7 +238,7 @@ function sanitizeMine(m){
     y: isValidGridCoord(m.y) ? m.y : 0,
     resource: RESOURCES.some(r => r.key === m.resource) ? m.resource : RESOURCES[0].key,
     grade: isNonNegativeInt(m.grade) && m.grade >= 1 ? m.grade : 1,
-    miningPower: isNonNegativeFinite(m.miningPower) ? m.miningPower : 1,
+    miningPower: isNonNegativeFinite(m.miningPower) && m.miningPower > 0 ? m.miningPower : 1,
     developmentState: MINE_DEVELOPMENT_STATES.includes(m.developmentState) ? m.developmentState : 'unsecured',
   };
   if(typeof m.id === 'string' && m.id.length > 0) result.id = m.id;
@@ -264,7 +264,7 @@ function sanitizeWorkshop(w){
     level: isNonNegativeInt(w.level) && w.level >= 1 ? w.level : 1,
     recipeKey: typeof w.recipeKey === 'string' && RECIPES.some(r => r.key === w.recipeKey) ? w.recipeKey : null,
     auto: typeof w.auto === 'boolean' ? w.auto : false,
-    progress: isNonNegativeFinite(w.progress) ? w.progress : null,
+    progress: isNonNegativeFinite(w.progress) && w.progress > 0 ? w.progress : null,
   };
   if(typeof w.id === 'string' && w.id.length > 0) result.id = w.id;
   return result;
