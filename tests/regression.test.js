@@ -2531,13 +2531,11 @@ function gridNode(x, y, width, height, id) {
 
 (function test_T52_workshopBalanceConstant() {
   const win = newDom(makeMemoryStorage()).window;
-  check('Task52: workshop level speed tuning is positive', win.BALANCE.crafting.WORKSHOP_LEVEL_SPEED_PER_LEVEL > 0);
-  check('Task52: workshop level 2 is faster than level 1', (() => {
-    const a = win.addWorkshop({id:'balance_a',x:7,y:1,level:1,recipeKey:'crystalAlloy'});
-    const b = win.addWorkshop({id:'balance_b',x:8,y:1,level:2,recipeKey:'crystalAlloy'});
-    return win.workshopCraftTime(b, win.RECIPES.find(r=>r.key==='crystalAlloy')) <
-      win.workshopCraftTime(a, win.RECIPES.find(r=>r.key==='crystalAlloy'));
-  })());
+  const recipe = { key:'test_timed', craftTime:10 };
+  const a = win.addWorkshop({id:'balance_a',x:7,y:1,level:1,recipeKey:'steel'});
+  const b = win.addWorkshop({id:'balance_b',x:8,y:1,level:2,recipeKey:'steel'});
+  check('Task52: workshop level 2 is faster than level 1', win.workshopCraftTime(b, recipe) < win.workshopCraftTime(a, recipe));
+  check('Task52: level 1 keeps base craft time', win.workshopCraftTime(a, recipe) === 10);
 })();
 
 (function test_T53_fullLoopMineToWorkshop() {
