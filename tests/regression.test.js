@@ -2286,6 +2286,50 @@ function gridNode(x, y, width, height, id) {
   check('Task36: workshop data survives save/load', loaded.ok === true && loaded.run.world.workshops.length === 1 && loaded.run.world.workshops[0].id === 'workshop_save' && loaded.run.world.workshops[0].level === 3);
 })();
 
+
+// =============================================================================
+// TASK 37 — Workshop registration.
+// =============================================================================
+(function test_T37_addWorkshop() {
+  const win = newDom(makeMemoryStorage()).window;
+  const workshop = win.addWorkshop({ x: 4, y: 4, level: 1 });
+  check('Task37: valid workshop is added', !!workshop && win.state.world.workshops.length === 1);
+  check('Task37: workshop data is preserved', workshop.x === 4 && workshop.y === 4 && workshop.level === 1);
+  check('Task37: workshop receives generated id', typeof workshop.id === 'string' && workshop.id.startsWith('workshop_'));
+
+  const custom = win.addWorkshop({ id: 'workshop_custom', x: 6, y: 4, level: 2 });
+  check('Task37: valid custom workshop id is preserved', !!custom && custom.id === 'workshop_custom');
+
+  const duplicateBefore = JSON.stringify(win.state.world.workshops);
+  check('Task37: duplicate workshop coordinates are rejected', win.addWorkshop({ x: 4, y: 4, level: 3 }) === null);
+  check('Task37: duplicate coordinate rejection leaves state unchanged', JSON.stringify(win.state.world.workshops) === duplicateBefore);
+
+  const invalidCases = [
+    { x: -1, y: 1, level: 1 },
+    { x: 1.5, y: 1, level: 1 },
+    { x: 1, y: 1.5, level: 1 },
+    { x: 1, y: 1, level: 0 },
+    { x: 1, y: 1, level: 1.5 },
+    { x: 1, y: 1 },
+    null,
+    'not an object',
+  ];
+  invalidCases.forEach((raw, index) => {
+    const before = JSON.stringify(win.state.world.workshops);
+    check('Task37: invalid workshop rejected #' + (index + 1), win.addWorkshop(raw) === null);
+    check('Task37: invalid workshop leaves state unchanged #' + (index + 1), JSON.stringify(win.state.world.workshops) === before);
+  });
+})();
+
+(function test_T37_workshopIdCollision() {
+  const win = newDom(makeMemoryStorage()).window;
+  const first = win.addWorkshop({ id: 'workshop_same', x: 8, y: 8, level: 1 });
+  const second = win.addWorkshop({ id: 'workshop_same', x: 9, y: 8, level: 1 });
+  check('Task37: first workshop keeps requested id', first && first.id === 'workshop_same');
+  check('Task37: second workshop is accepted despite id collision', !!second);
+  check('Task37: colliding workshop id is replaced', second && second.id !== 'workshop_same');
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================

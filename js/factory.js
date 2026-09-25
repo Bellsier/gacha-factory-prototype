@@ -193,6 +193,38 @@ function addMine(rawMine){
 }
 
 // ---------------------------------------------------------------------------
+// Task 37: Workshop registration.
+// A Workshop is a world/base facility, separate from the legacy Factory Node
+// data model. Placement is currently only unique within the workshop
+// collection; build costs and recipe assignment are deferred to later Tasks.
+function isWorkshopValid(workshop, existingWorkshops){
+  if(!isPlainObject(workshop)) return false;
+  if(!isValidGridCoord(workshop.x) || !isValidGridCoord(workshop.y)) return false;
+  if(!isNonNegativeInt(workshop.level) || workshop.level < 1) return false;
+  if(!Array.isArray(existingWorkshops)) return false;
+  return !existingWorkshops.some(existing => existing && existing.x === workshop.x && existing.y === workshop.y);
+}
+
+function addWorkshop(rawWorkshop){
+  if(!isPlainObject(rawWorkshop)) return null;
+  const candidate = {
+    x: rawWorkshop.x,
+    y: rawWorkshop.y,
+    level: rawWorkshop.level,
+  };
+  if(!isWorkshopValid(candidate, state.world.workshops)) return null;
+
+  const existingIds = new Set(state.world.workshops.map(workshop => workshop.id));
+  const id = (typeof rawWorkshop.id === 'string' && rawWorkshop.id.length > 0 && !existingIds.has(rawWorkshop.id))
+    ? rawWorkshop.id
+    : makeEntityId('workshop_', existingIds);
+
+  const workshop = { id, ...candidate };
+  state.world.workshops.push(workshop);
+  return workshop;
+}
+
+// ---------------------------------------------------------------------------
 // Task 30: Mine securing.
 // Securing is only the development-state transition for now. Costs, region
 // requirements, and expansion rules are intentionally deferred to later
