@@ -206,6 +206,7 @@ function isWorkshopValid(workshop, existingWorkshops){
   if(!isValidGridCoord(workshop.x) || !isValidGridCoord(workshop.y)) return false;
   if(!isNonNegativeInt(workshop.level) || workshop.level < 1) return false;
   if(!isWorkshopRecipeValid(workshop.recipeKey)) return false;
+  if(!(workshop.progress === null || isNonNegativeFinite(workshop.progress))) return false;
   if(!Array.isArray(existingWorkshops)) return false;
   return !existingWorkshops.some(existing => existing && existing.x === workshop.x && existing.y === workshop.y);
 }
