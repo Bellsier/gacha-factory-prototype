@@ -2140,6 +2140,18 @@ function gridNode(x, y, width, height, id) {
 })();
  
 // =============================================================================
+// TASK 30 — Mine securing.
+// =============================================================================
+(function test_T30_secureMine() {
+  const win = newDom(makeMemoryStorage()).window;
+  const mine = win.addMine({ id:'mine_secure', x:2, y:2, resource:'iron', grade:1, miningPower:1, developmentState:'unsecured' });
+  check('Task30: unsecured mine is created', !!mine && mine.developmentState === 'unsecured');
+  check('Task30: secureMine transitions mine to secured', win.secureMine('mine_secure') === true && win.state.world.mines[0].developmentState === 'secured');
+  check('Task30: securing an already secured mine is rejected', win.secureMine('mine_secure') === false);
+  check('Task30: invalid mine id is rejected', win.secureMine('missing') === false && win.secureMine('') === false);
+  check('Task30: failed securing leaves mine state unchanged', win.state.world.mines[0].developmentState === 'secured');
+})();
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
