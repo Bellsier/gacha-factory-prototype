@@ -142,3 +142,52 @@ function removeFactoryLink(linkId){
   const [removed] = state.factory.links.splice(index, 1);
   return removed;
 }
+
+// ---------------------------------------------------------------------------
+// Task 28: World Mine registration.
+// A Mine is a world point, not a Factory node. Registration validates the
+// minimal world data only; mining, yield, region unlocks, and UI are separate
+// tasks. A coordinate can contain only one Mine, while id collisions are
+// resolved by generating a fresh mine_... id.
+function isMineResourceValid(resource){
+  return typeof resource === 'string' && RESOURCES.some(r => r.key === resource);
+}
+
+function isMineDevelopmentStateValid(developmentState){
+  return typeof developmentState === 'string' && MINE_DEVELOPMENT_STATES.includes(developmentState);
+}
+
+function isMineValid(mine, existingMines){
+  if(!isPlainObject(mine)) return false;
+  if(!isValidGridCoord(mine.x) || !isValidGridCoord(mine.y)) return false;
+  if(!isMineResourceValid(mine.resource)) return false;
+  if(!isNonNegativeInt(mine.grade) || mine.grade < 1) return false;
+  if(!isNonNegativeFinite(mine.miningPower) || mine.miningPower <= 0) return false;
+  if(!isMineDevelopmentStateValid(mine.developmentState)) return false;
+  if(!Array.isArray(existingMines)) return false;
+  return !existingMines.some(existing => existing && existing.x === mine.x && existing.y === mine.y);
+}
+
+function addMine(rawMine){
+  if(!isPlainObject(rawMine)) return null;
+
+  const candidate = {
+    x: rawMine.x,
+    y: rawMine.y,
+    resource: rawMine.resource,
+    grade: rawMine.grade,
+    miningPower: rawMine.miningPower,
+    developmentState: rawMine.developmentState,
+  };
+
+  if(!isMineValid(candidate, state.world.mines)) return null;
+
+  const existingIds = new Set(state.world.mines.map(mine => mine.id));
+  const id = (typeof rawMine.id === 'string' && rawMine.id.length > 0 && !existingIds.has(rawMine.id))
+    ? rawMine.id
+    : makeEntityId('mine_', existingIds);
+
+  const mine = { id, ...candidate };
+  state.world.mines.push(mine);
+  return mine;
+}

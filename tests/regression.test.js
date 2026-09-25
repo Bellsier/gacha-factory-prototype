@@ -2060,6 +2060,86 @@ function gridNode(x, y, width, height, id) {
 })();
 
 // =============================================================================
+// TASK 28 — Mine registration.
+// Validates a mine as a unique world point and adds it to state.world.mines.
+// =============================================================================
+
+(function test_T28_addMineValidAndIdGeneration() {
+  const win = newDom(makeMemoryStorage()).window;
+  const mine = win.addMine({
+    x: 3, y: 5, resource: 'iron', grade: 2, miningPower: 4, developmentState: 'unsecured'
+  });
+  check('Task28: valid mine is added', !!mine && win.state.world.mines.length === 1);
+  check('Task28: mine keeps its gameplay data', mine.x === 3 && mine.y === 5 && mine.resource === 'iron' && mine.grade === 2 && mine.miningPower === 4 && mine.developmentState === 'unsecured');
+  check('Task28: mine receives generated id', typeof mine.id === 'string' && mine.id.startsWith('mine_'));
+})();
+
+(function test_T28_addMineKeepsUniqueProvidedId() {
+  const win = newDom(makeMemoryStorage()).window;
+  const mine = win.addMine({
+    id: 'mine_custom', x: 1, y: 2, resource: 'coal', grade: 1, miningPower: 2, developmentState: 'secured'
+  });
+  check('Task28: valid provided mine id is preserved', mine && mine.id === 'mine_custom');
+})();
+
+(function test_T28_addMineRejectsInvalidAndDuplicateCoordinates() {
+  const win = newDom(makeMemoryStorage()).window;
+  const original = {
+    id: 'mine_first', x: 4, y: 4, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured'
+  };
+  check('Task28: first mine is accepted', !!win.addMine(original));
+
+  const before = JSON.stringify(win.state.world.mines);
+  check('Task28: duplicate coordinates are rejected', win.addMine({
+    x: 4, y: 4, resource: 'coal', grade: 2, miningPower: 2, developmentState: 'secured'
+  }) === null);
+  check('Task28: duplicate coordinate rejection does not mutate state', JSON.stringify(win.state.world.mines) === before);
+
+  const invalidCases = [
+    { x: -1, y: 1, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+    { x: 1.5, y: 2, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+    { x: 2, y: 2, resource: 'missing', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+    { x: 2, y: 3, resource: 'iron', grade: 0, miningPower: 1, developmentState: 'unsecured' },
+    { x: 2, y: 4, resource: 'iron', grade: 1, miningPower: 0, developmentState: 'unsecured' },
+    { x: 2, y: 5, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unknown' },
+  ];
+  invalidCases.forEach((raw, index) => {
+    const beforeInvalid = JSON.stringify(win.state.world.mines);
+    check('Task28: invalid mine is rejected #' + (index + 1), win.addMine(raw) === null);
+    check('Task28: invalid mine leaves state unchanged #' + (index + 1), JSON.stringify(win.state.world.mines) === beforeInvalid);
+  });
+})();
+
+(function test_T28_addMineHandlesIdCollisionWithoutReplacingMine() {
+  const win = newDom(makeMemoryStorage()).window;
+  const first = win.addMine({
+    id: 'mine_same', x: 6, y: 6, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured'
+  });
+  const second = win.addMine({
+    id: 'mine_same', x: 7, y: 6, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'secured'
+  });
+  check('Task28: first mine keeps requested id', first && first.id === 'mine_same');
+  check('Task28: second mine is added despite id collision', !!second && win.state.world.mines.length === 2);
+  check('Task28: colliding id is replaced with a generated id', second && second.id !== 'mine_same' && second.id.startsWith('mine_'));
+})();
+
+(function test_T28_addMineSaveLoadAndFactoryRegression() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const mine = win.addMine({
+    id: 'mine_save', x: 9, y: 3, resource: 'iron', grade: 3, miningPower: 7, developmentState: 'secured'
+  });
+  check('Task28: save test mine was added', !!mine);
+  win.saveGame();
+  const loaded = win.loadGame();
+  check('Task28: mine survives save/load', loaded.ok === true && loaded.run.world.mines.length === 1 && loaded.run.world.mines[0].id === 'mine_save');
+  check('Task28: mine gameplay data survives save/load', loaded.ok === true && loaded.run.world.mines[0].resource === 'iron' && loaded.run.world.mines[0].grade === 3 && loaded.run.world.mines[0].miningPower === 7 && loaded.run.world.mines[0].developmentState === 'secured');
+
+  const source = win.addFactoryNode({ id: 'node_a', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  check('Task28: Factory Node API remains available', !!source);
+})();
+ 
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
