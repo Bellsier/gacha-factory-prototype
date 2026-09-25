@@ -197,10 +197,15 @@ function addMine(rawMine){
 // A Workshop is a world/base facility, separate from the legacy Factory Node
 // data model. Placement is currently only unique within the workshop
 // collection; build costs and recipe assignment are deferred to later Tasks.
+function isWorkshopRecipeValid(recipeKey){
+  return recipeKey === null || (typeof recipeKey === 'string' && RECIPES.some(recipe => recipe.key === recipeKey));
+}
+
 function isWorkshopValid(workshop, existingWorkshops){
   if(!isPlainObject(workshop)) return false;
   if(!isValidGridCoord(workshop.x) || !isValidGridCoord(workshop.y)) return false;
   if(!isNonNegativeInt(workshop.level) || workshop.level < 1) return false;
+  if(!isWorkshopRecipeValid(workshop.recipeKey)) return false;
   if(!Array.isArray(existingWorkshops)) return false;
   return !existingWorkshops.some(existing => existing && existing.x === workshop.x && existing.y === workshop.y);
 }
@@ -211,6 +216,7 @@ function addWorkshop(rawWorkshop){
     x: rawWorkshop.x,
     y: rawWorkshop.y,
     level: rawWorkshop.level,
+    recipeKey: rawWorkshop.recipeKey === undefined ? null : rawWorkshop.recipeKey,
   };
   if(!isWorkshopValid(candidate, state.world.workshops)) return null;
 
@@ -222,6 +228,16 @@ function addWorkshop(rawWorkshop){
   const workshop = { id, ...candidate };
   state.world.workshops.push(workshop);
   return workshop;
+}
+
+function setWorkshopRecipe(workshopId, recipeKey){
+  if(typeof workshopId !== 'string' || workshopId.length === 0) return false;
+  if(!isWorkshopRecipeValid(recipeKey)) return false;
+  const workshop = state.world.workshops.find(item => item && item.id === workshopId);
+  if(!workshop) return false;
+  if(workshop.recipeKey === recipeKey) return false;
+  workshop.recipeKey = recipeKey;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
