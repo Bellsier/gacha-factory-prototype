@@ -2248,6 +2248,44 @@ function gridNode(x, y, width, height, id) {
   })());
 })();
 
+
+// =============================================================================
+// TASK 36 — Minimal Workshop data model.
+// =============================================================================
+(function test_T36_workshopDataModel() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task36: fresh world has a workshops collection', Array.isArray(win.state.world.workshops) && win.state.world.workshops.length === 0);
+
+  const world = win.sanitizeWorldState({
+    base: { x: 0, y: 0, level: 1 },
+    mines: [],
+    workshops: [
+      { id: 'workshop_1', x: 4, y: 3, level: 2 },
+      { x: 7, y: 1, level: 1 },
+      { id: 'workshop_1', x: 9, y: 2, level: 4 },
+    ],
+  });
+  check('Task36: valid workshop fields survive sanitization', world.workshops[0].x === 4 && world.workshops[0].y === 3 && world.workshops[0].level === 2);
+  check('Task36: workshop without id receives an id', typeof world.workshops[1].id === 'string' && world.workshops[1].id.startsWith('workshop_'));
+  check('Task36: duplicate workshop ids are replaced', world.workshops[2].id !== 'workshop_1');
+  check('Task36: workshop ids are unique', new Set(world.workshops.map(w => w.id)).size === 3);
+
+  const invalid = win.sanitizeWorldState({
+    workshops: [{ x: -1, y: 1.5, level: 0 }],
+  });
+  check('Task36: invalid workshop position falls back safely', invalid.workshops[0].x === 0 && invalid.workshops[0].y === 0);
+  check('Task36: invalid workshop level falls back to 1', invalid.workshops[0].level === 1);
+})();
+
+(function test_T36_workshopsSaveLoad() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  win.state.world.workshops = [{ id: 'workshop_save', x: 5, y: 6, level: 3 }];
+  check('Task36: saveVersion remains 1', (() => { win.saveGame(); return JSON.parse(storage.getItem('gachaFactorySave')).saveVersion === 1; })());
+  const loaded = win.loadGame();
+  check('Task36: workshop data survives save/load', loaded.ok === true && loaded.run.world.workshops.length === 1 && loaded.run.world.workshops[0].id === 'workshop_save' && loaded.run.world.workshops[0].level === 3);
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================

@@ -22,6 +22,7 @@ function freshWorldState(){
       { id: 'mine_start_iron', x: 2, y: 0, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' },
       { id: 'mine_start_coal', x: 0, y: 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
     ],
+    workshops: [],
   };
 }
 
@@ -255,6 +256,30 @@ function sanitizeMines(raw){
   });
   return mines;
 }
+function sanitizeWorkshop(w){
+  if(!isPlainObject(w)) return null;
+  const result = {
+    x: isValidGridCoord(w.x) ? w.x : 0,
+    y: isValidGridCoord(w.y) ? w.y : 0,
+    level: isNonNegativeInt(w.level) && w.level >= 1 ? w.level : 1,
+  };
+  if(typeof w.id === 'string' && w.id.length > 0) result.id = w.id;
+  return result;
+}
+
+function sanitizeWorkshops(raw){
+  if(!Array.isArray(raw)) return [];
+  const workshops = raw.map(sanitizeWorkshop).filter(w => w !== null);
+  const seenIds = new Set();
+  workshops.forEach(w => {
+    if(typeof w.id !== 'string' || w.id.length === 0 || seenIds.has(w.id)){
+      w.id = makeEntityId('workshop_', seenIds);
+    }
+    seenIds.add(w.id);
+  });
+  return workshops;
+}
+
 function sanitizeWorldState(raw){
   if(!isPlainObject(raw)) return freshWorldState();
   const baseRaw = isPlainObject(raw.base) ? raw.base : {};
@@ -265,6 +290,7 @@ function sanitizeWorldState(raw){
       level: isNonNegativeInt(baseRaw.level) && baseRaw.level >= 1 ? baseRaw.level : 1,
     },
     mines: sanitizeMines(raw.mines),
+    workshops: sanitizeWorkshops(raw.workshops),
   };
 }
 
