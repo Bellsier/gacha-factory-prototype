@@ -217,6 +217,8 @@ function addWorkshop(rawWorkshop){
     y: rawWorkshop.y,
     level: rawWorkshop.level,
     recipeKey: rawWorkshop.recipeKey === undefined ? null : rawWorkshop.recipeKey,
+    auto: typeof rawWorkshop.auto === 'boolean' ? rawWorkshop.auto : false,
+    progress: rawWorkshop.progress === undefined ? null : rawWorkshop.progress,
   };
   if(!isWorkshopValid(candidate, state.world.workshops)) return null;
 
