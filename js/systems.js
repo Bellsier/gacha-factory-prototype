@@ -105,12 +105,44 @@ function checkDualAutomation(){
 // callbacks so the state-change logic itself can be read/tested apart from
 // the DOM-building code around it. Behavior and log text are unchanged.
 // ---------------------------------------------------------------------------
+function seedWorldMinesForSite(siteKey){
+  const seeds = WORLD_MINE_SEEDS[siteKey] || [];
+  seeds.forEach(seed=>{
+    const exists = state.world.mines.some(mine => mine && mine.x === seed.x && mine.y === seed.y);
+    if(exists) return;
+    addMine({
+      id: 'mine_' + siteKey + '_' + seed.resource,
+      x: seed.x,
+      y: seed.y,
+      resource: seed.resource,
+      grade: seed.grade,
+      miningPower: seed.miningPower,
+      developmentState: 'unsecured',
+    });
+  });
+}
+
 function unlockSite(key){
   const site = SITES.find(s=>s.key===key);
+  if(!site || state.unlockedSites[key]) return false;
   if(state.gold < site.unlockCost) return false;
   state.gold -= site.unlockCost;
   state.unlockedSites[key] = true;
+  seedWorldMinesForSite(key);
   log(`채굴장 탐사: ${site.name}`);
+  return true;
+}
+
+function expandBase(){
+  const order = BALANCE.world.EXPANSION_SITE_ORDER;
+  const nextKey = order.find(key => !state.unlockedSites[key]);
+  if(!nextKey) return false;
+  const site = SITES.find(s=>s.key===nextKey);
+  if(!site) return false;
+  if(state.gold < site.unlockCost) return false;
+  if(!unlockSite(nextKey)) return false;
+  state.world.base.level += 1;
+  log(`거점 확장 Lv.${state.world.base.level}`);
   return true;
 }
 
@@ -324,6 +356,7 @@ function tickAutoSell(){
 function tickLoop(){
   tickMining();
   tickCrafting();
+  tickWorkshops();
   tickAutoSell();
   updateNumbers();
 }

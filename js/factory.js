@@ -206,6 +206,7 @@ function isWorkshopValid(workshop, existingWorkshops){
   if(!isValidGridCoord(workshop.x) || !isValidGridCoord(workshop.y)) return false;
   if(!isNonNegativeInt(workshop.level) || workshop.level < 1) return false;
   if(!isWorkshopRecipeValid(workshop.recipeKey)) return false;
+  if(!(workshop.progress === null || isNonNegativeFinite(workshop.progress))) return false;
   if(!Array.isArray(existingWorkshops)) return false;
   return !existingWorkshops.some(existing => existing && existing.x === workshop.x && existing.y === workshop.y);
 }
@@ -217,6 +218,8 @@ function addWorkshop(rawWorkshop){
     y: rawWorkshop.y,
     level: rawWorkshop.level,
     recipeKey: rawWorkshop.recipeKey === undefined ? null : rawWorkshop.recipeKey,
+    auto: typeof rawWorkshop.auto === 'boolean' ? rawWorkshop.auto : false,
+    progress: rawWorkshop.progress === undefined ? null : rawWorkshop.progress,
   };
   if(!isWorkshopValid(candidate, state.world.workshops)) return null;
 
@@ -228,6 +231,60 @@ function addWorkshop(rawWorkshop){
   const workshop = { id, ...candidate };
   state.world.workshops.push(workshop);
   return workshop;
+}
+
+function workshopRecipe(workshopId){
+  if(typeof workshopId !== 'string' || workshopId.length === 0) return null;
+  const workshop = state.world.workshops.find(item => item && item.id === workshopId);
+  if(!workshop || typeof workshop.recipeKey !== 'string') return null;
+  return RECIPES.find(recipe => recipe.key === workshop.recipeKey) || null;
+}
+
+function workshopCraftTime(workshop, recipe){
+  if(!workshop || !recipe) return 0;
+  if(recipe.craftTime <= 0) return 0;
+  const speed = 1 + Math.max(0, workshop.level - 1) * BALANCE.crafting.WORKSHOP_LEVEL_SPEED_PER_LEVEL;
+  return recipe.craftTime / speed;
+}
+
+function craftWorkshop(workshopId){
+  const workshop = state.world.workshops.find(item => item && item.id === workshopId);
+  if(!workshop) return false;
+  if(workshop.progress !== null) return false;
+  const recipe = workshopRecipe(workshopId);
+  if(!recipe || !canCraft(recipe)) return false;
+  consumeRecipeInputs(
+    recipe,
+    k => state.resources[k] !== undefined ? state.resources[k] : state.products[k],
+    (k, val) => { if(state.resources[k] !== undefined) state.resources[k] = val; else state.products[k] = val; }
+  );
+  const time = workshopCraftTime(workshop, recipe);
+  if(time > 0){
+    workshop.progress = time;
+  } else {
+    state.products[recipe.key] += recipe.out;
+  }
+  return true;
+}
+
+function tickWorkshops(){
+  state.world.workshops.forEach(workshop=>{
+    if(!workshop || workshop.progress === null) return;
+    const recipe = workshopRecipe(workshop.id);
+    if(!recipe){
+      workshop.progress = null;
+      return;
+    }
+    workshop.progress -= 1 / TICKS_PER_SECOND;
+    if(workshop.progress <= 0){
+      workshop.progress = null;
+      state.products[recipe.key] += recipe.out;
+    }
+  });
+  state.world.workshops.forEach(workshop=>{
+    if(!workshop || !workshop.auto || workshop.progress !== null) return;
+    craftWorkshop(workshop.id);
+  });
 }
 
 function setWorkshopRecipe(workshopId, recipeKey){

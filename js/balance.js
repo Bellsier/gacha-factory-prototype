@@ -39,9 +39,14 @@ const BALANCE = {
     AUTO_SELL_COST_MULTIPLIER: 20, // autoSellCost(): recipe.sell * AUTO_SELL_COST_MULTIPLIER
   },
   crafting: {
+    WORKSHOP_LEVEL_SPEED_PER_LEVEL: 0.25,
     FACILITY_COST_BASE: 100,          // craftFacilityCost(): base gold cost of the first upgrade (level 1 → 2)
     FACILITY_COST_GROWTH: 1.5,        // craftFacilityCost(): cost growth factor per facility level
     FACILITY_SPEED_PER_LEVEL: 0.1,    // craftSpeed(): +10% timed-craft speed per level above 1
+  },
+  world: {
+    EXPANSION_SITE_ORDER: ['abandonedMine','manaVein','ruins','spaceStation'],
+    BASE_EXPANSION_COST: 250,
   },
   gacha: {
     FIRST_TICKET_GOLD_THRESHOLD: 50, // one-time gold milestone that grants the first ticket
