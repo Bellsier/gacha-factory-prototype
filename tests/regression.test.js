@@ -2354,6 +2354,57 @@ function gridNode(x, y, width, height, id) {
 })();
 
 // =============================================================================
+// TASK 39 — Workshop recipe target.
+// A workshop can optionally point at one existing recipe. This only stores the
+// production target; it does not craft, consume resources, or create products.
+// =============================================================================
+(function test_T39_workshopRecipeTarget() {
+  const win = newDom(makeMemoryStorage()).window;
+  const workshop = win.addWorkshop({ id:'workshop_recipe', x:4, y:4, level:1 });
+  check('Task39: workshop starts without a recipe target', !!workshop && workshop.recipeKey === null);
+
+  check('Task39: valid recipe can be assigned', win.setWorkshopRecipe('workshop_recipe', 'steel') === true);
+  check('Task39: assigned recipe is stored on workshop', win.state.world.workshops[0].recipeKey === 'steel');
+
+  check('Task39: assigning the same recipe again is rejected', win.setWorkshopRecipe('workshop_recipe', 'steel') === false);
+  const beforeInvalid = JSON.stringify(win.state.world.workshops);
+  check('Task39: invalid recipe is rejected', win.setWorkshopRecipe('workshop_recipe', 'missing_recipe') === false);
+  check('Task39: invalid recipe leaves workshop unchanged', JSON.stringify(win.state.world.workshops) === beforeInvalid);
+
+  check('Task39: recipe can be cleared', win.setWorkshopRecipe('workshop_recipe', null) === true);
+  check('Task39: cleared workshop has no recipe target', win.state.world.workshops[0].recipeKey === null);
+  check('Task39: unknown workshop is rejected', win.setWorkshopRecipe('missing_workshop', 'steel') === false);
+})();
+
+(function test_T39_workshopRecipeSaveLoad() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  win.state.world.workshops = [{ id:'workshop_save_recipe', x:2, y:3, level:2, recipeKey:'steel' }];
+  win.saveGame();
+  const loaded = win.loadGame();
+  check('Task39: workshop recipe target survives save/load',
+    loaded.ok === true &&
+    loaded.run.world.workshops.length === 1 &&
+    loaded.run.world.workshops[0].recipeKey === 'steel');
+})();
+
+(function test_T39_invalidWorkshopRecipeSanitizesSafely() {
+  const win = newDom(makeMemoryStorage()).window;
+  const world = win.sanitizeWorldState({
+    base: { x:0, y:0, level:1 },
+    mines: [],
+    workshops: [
+      { id:'valid_recipe', x:1, y:1, level:1, recipeKey:'steel' },
+      { id:'invalid_recipe', x:2, y:1, level:1, recipeKey:'not_a_recipe' },
+      { id:'missing_recipe', x:3, y:1, level:1 },
+    ],
+  });
+  check('Task39: valid workshop recipe survives sanitization', world.workshops[0].recipeKey === 'steel');
+  check('Task39: invalid workshop recipe becomes null', world.workshops[1].recipeKey === null);
+  check('Task39: missing workshop recipe becomes null', world.workshops[2].recipeKey === null);
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
