@@ -4,10 +4,10 @@ function updateNextHint(){
   const ironHas = hasWorkerOn('iron');
   const coalHas = hasWorkerOn('coal');
   if(!permanent.firstGachaGranted){
-    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가차권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+    el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     el.textContent = permanent.tickets >= 1
-      ? '인부 탭에서 가차권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
+      ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
       : '인부 탭에서 일꾼을 뽑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
   } else if(ironHas !== coalHas){
     const missing = ironHas ? 'coal' : 'iron';
@@ -112,7 +112,7 @@ function buildLines(){
         <h3><span class="site-name">🔒 ${site.name}</span></h3>
         <div class="lines">
           <div class="line locked">
-            <div class="rate">이 채굴장은 아직 탐사하지 않았습니다.<br>탐사하면 이곳만의 고유 광물(${siteResources.map(r=>r.name).join(', ')})을 칠 수 있어요.${relatedRecipes.length ? '<br>관련 제작품: ' + relatedRecipes.join(', ') : ''}</div>
+            <div class="rate">이 채굴장은 아직 탐사하지 않았습니다.<br>탐사하면 이곳만의 고유 광물(${siteResources.map(r=>r.name).join(', ')})을 캘 수 있어요.${relatedRecipes.length ? '<br>관련 제작품: ' + relatedRecipes.join(', ') : ''}</div>
             <button data-unlocksite="${site.key}" ${dis(state.gold < site.unlockCost)}>채굴장 탐사 (${site.unlockCost}G)</button>
           </div>
         </div>
@@ -421,7 +421,7 @@ function updateNumbers(){
   const hint = document.getElementById('firstGachaHint');
   hint.textContent = permanent.firstGachaGranted
     ? '일반 60% · 희귀 25% · 영웅 12% · 전설 3%'
-    : `첫 골드 ${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G를 모으면 첫 가차권을 드려요 (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
+    : `첫 골드 ${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G를 모으면 첫 가챠권을 드려요 (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   document.getElementById('gachaTicketBtn').disabled = permanent.tickets < BALANCE.gacha.PULL_COST_TICKET;
   RESOURCES.forEach(r=>{
     const sharedEl = document.querySelector(`[data-shared-amt="${r.key}"]`);
