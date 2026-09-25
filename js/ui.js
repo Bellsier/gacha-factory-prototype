@@ -155,6 +155,27 @@ function buildLines(){
   });
 }
 
+// Task 38: Minimal workshop UI. Workshops are displayed as world/base
+// facilities; recipe assignment and production behavior are intentionally
+// deferred to later Tasks.
+function renderWorkshops(){
+  const wrap = document.getElementById('workshops');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  if(state.world.workshops.length === 0){
+    wrap.innerHTML = '<div class="rate">아직 설치된 제작소가 없습니다.</div>';
+    return;
+  }
+  state.world.workshops.forEach(workshop=>{
+    const card = document.createElement('div');
+    card.className = 'line';
+    card.innerHTML =
+      '<div class="res-name">제작소 Lv.' + workshop.level + '</div>' +
+      '<div class="rate">위치 (' + workshop.x + ', ' + workshop.y + ')</div>';
+    wrap.appendChild(card);
+  });
+}
+
 // Full rebuild: only called after structural changes (auto-craft unlock
 // toggling, site unlock, prestige reset). Buttons keep their identity between ticks.
 function buildRecipes(){
@@ -411,6 +432,7 @@ function renderAll(){
   renderBaseInfo();
   renderSharedStorage();
   buildMines();
+  renderWorkshops();
   buildLines();
   buildRecipes();
   buildWorkers();
