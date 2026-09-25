@@ -191,3 +191,16 @@ function addMine(rawMine){
   state.world.mines.push(mine);
   return mine;
 }
+
+// ---------------------------------------------------------------------------
+// Task 30: Mine securing.
+// Securing is only the development-state transition for now. Costs, region
+// requirements, and expansion rules are intentionally deferred to later
+// design/implementation Tasks.
+function secureMine(mineId){
+  if(typeof mineId !== 'string' || mineId.length === 0) return false;
+  const mine = state.world.mines.find(m => m && m.id === mineId);
+  if(!mine || mine.developmentState !== 'unsecured') return false;
+  mine.developmentState = 'secured';
+  return true;
+}
