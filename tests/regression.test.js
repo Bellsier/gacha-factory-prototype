@@ -2152,6 +2152,19 @@ function gridNode(x, y, width, height, id) {
   check('Task30: failed securing leaves mine state unchanged', win.state.world.mines[0].developmentState === 'secured');
 })();
 // =============================================================================
+// TASK 31 — Manual mining.
+// =============================================================================
+(function test_T31_mineMine() {
+  const win = newDom(makeMemoryStorage()).window;
+  const mine = win.addMine({ id:'mine_manual', x:3, y:3, resource:'iron', grade:4, miningPower:2.5, developmentState:'unsecured' });
+  check('Task31: unsecured mine cannot be mined', win.mineMine('mine_manual') === false && win.state.resources.iron === 0);
+  check('Task31: mine is secured before mining', win.secureMine('mine_manual') === true);
+  check('Task31: secured mine can be mined manually', win.mineMine('mine_manual') === true);
+  check('Task31: mining adds miningPower to shared resource storage', win.state.resources.iron === 2.5);
+  check('Task31: repeated mining accumulates in shared storage', win.mineMine('mine_manual') === true && win.state.resources.iron === 5);
+  check('Task31: invalid mine id does not mutate storage', win.mineMine('missing') === false && win.state.resources.iron === 5);
+})();
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
