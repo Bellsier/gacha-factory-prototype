@@ -1973,6 +1973,93 @@ function gridNode(x, y, width, height, id) {
 })();
 
 // =============================================================================
+// TASK 27 — Minimal World/Base/Mine data model.
+// Data only: no mining tick, no world UI, no region expansion behavior.
+// =============================================================================
+
+(function test_T27_freshWorldDefaults() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task27: fresh run has world state', !!win.state.world);
+  check('Task27: base starts at the origin', win.state.world.base.x === 0 && win.state.world.base.y === 0);
+  check('Task27: base starts at level 1', win.state.world.base.level === 1);
+  check('Task27: fresh world has no mines yet', Array.isArray(win.state.world.mines) && win.state.world.mines.length === 0);
+})();
+
+(function test_T27_sanitizeValidMineAndIds() {
+  const win = newDom(makeMemoryStorage()).window;
+  const world = win.sanitizeWorldState({
+    base: { x: 4, y: 7, level: 3 },
+    mines: [
+      { id: 'mine_iron_1', x: 8, y: 2, resource: 'iron', grade: 2, miningPower: 4, developmentState: 'secured' },
+      { x: 12, y: 5, resource: 'coal', grade: 1, miningPower: 2, developmentState: 'unsecured' },
+      { id: 'mine_iron_1', x: 14, y: 6, resource: 'iron', grade: 3, miningPower: 6, developmentState: 'secured' },
+    ],
+  });
+  check('Task27: valid base fields survive sanitization', world.base.x === 4 && world.base.y === 7 && world.base.level === 3);
+  check('Task27: valid mine data survives sanitization', world.mines[0].resource === 'iron' && world.mines[0].grade === 2 && world.mines[0].miningPower === 4 && world.mines[0].developmentState === 'secured');
+  check('Task27: mine without an id receives an id', typeof world.mines[1].id === 'string' && world.mines[1].id.length > 0);
+  check('Task27: duplicate mine ids are replaced', world.mines[2].id !== 'mine_iron_1');
+  check('Task27: sanitized mine ids are unique', new Set(world.mines.map(m => m.id)).size === 3);
+})();
+
+(function test_T27_invalidMineFieldsFallbackIndependently() {
+  const win = newDom(makeMemoryStorage()).window;
+  const world = win.sanitizeWorldState({
+    base: { x: -1, y: 1.5, level: 0 },
+    mines: [{
+      id: 'mine_bad',
+      x: -3,
+      y: 2.5,
+      resource: 'missing_resource',
+      grade: 0,
+      miningPower: -5,
+      developmentState: 'mining',
+    }],
+  });
+  const mine = world.mines[0];
+  check('Task27: invalid base fields fall back independently', world.base.x === 0 && world.base.y === 0 && world.base.level === 1);
+  check('Task27: invalid mine position falls back independently', mine.x === 0 && mine.y === 0);
+  check('Task27: invalid mine resource falls back to a real resource', win.RESOURCES.some(r => r.key === mine.resource));
+  check('Task27: invalid mine grade falls back to 1', mine.grade === 1);
+  check('Task27: invalid mine power falls back to 1', mine.miningPower === 1);
+  check('Task27: invalid development state falls back to unsecured', mine.developmentState === 'unsecured');
+})();
+
+(function test_T27_legacySaveAndRoundTrip() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const legacyPayload = {
+    saveVersion: 1,
+    savedAt: Date.now(),
+    permanent: { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: false },
+    run: { resources: { iron: 7 } },
+  };
+  storage._setRaw('gachaFactorySave', JSON.stringify(legacyPayload));
+  const legacy = win.loadGame();
+  check('Task27: legacy save without world still loads', legacy.ok === true);
+  check('Task27: legacy save receives fresh world defaults', legacy.ok === true && legacy.run.world.base.level === 1 && legacy.run.world.mines.length === 0);
+
+  win.state.world = {
+    base: { x: 6, y: 9, level: 2 },
+    mines: [{ id: 'mine_roundtrip', x: 10, y: 11, resource: 'iron', grade: 3, miningPower: 8, developmentState: 'secured' }],
+  };
+  check('Task27: save still uses saveVersion 1', (() => { win.saveGame(); return JSON.parse(storage.getItem('gachaFactorySave')).saveVersion === 1; })());
+
+  const loaded = win.loadGame();
+  check('Task27: world survives save/load', loaded.ok === true && loaded.run.world.base.level === 2 && loaded.run.world.mines[0].id === 'mine_roundtrip');
+  check('Task27: mine values survive save/load', loaded.ok === true && loaded.run.world.mines[0].resource === 'iron' && loaded.run.world.mines[0].grade === 3 && loaded.run.world.mines[0].miningPower === 8 && loaded.run.world.mines[0].developmentState === 'secured');
+})();
+
+(function test_T27_existingFactoryRegressionUntouched() {
+  const win = newDom(makeMemoryStorage()).window;
+  const source = win.addFactoryNode({ id: 'node_a', type: 'production', x: 0, y: 0, width: 1, height: 1 });
+  const target = win.addFactoryNode({ id: 'node_b', type: 'storage', x: 2, y: 0, width: 1, height: 1 });
+  check('Task27: existing Factory Node API still works', !!source && !!target);
+  check('Task27: existing Factory Link API still works', !!win.addFactoryLink({ from: source.id, to: target.id }));
+  check('Task27: existing Link removal still works', !!win.removeFactoryLink(win.state.factory.links[0].id));
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
