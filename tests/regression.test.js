@@ -2222,6 +2222,32 @@ function gridNode(x, y, width, height, id) {
   check('Task34: saves without world data receive the starting seed', win.state.world.mines.length === 2);
 })();
 
+
+// =============================================================================
+// TASK 35 — Shared storage UI.
+// =============================================================================
+(function test_T35_sharedStorageUI() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.resources.iron = 12;
+  win.state.resources.coal = 4.5;
+  win.renderSharedStorage();
+  const wrap = win.document.getElementById('sharedStorage');
+  check('Task35: shared storage panel renders', wrap.children.length === win.RESOURCES.length);
+  check('Task35: iron is shown in shared storage', wrap.querySelector('[data-shared-amt="iron"]').textContent === '12');
+  check('Task35: coal is shown in shared storage', wrap.querySelector('[data-shared-amt="coal"]').textContent === '4.5');
+  win.state.resources.iron = 20;
+  win.updateNumbers();
+  check('Task35: shared storage amount refreshes from state.resources', wrap.querySelector('[data-shared-amt="iron"]').textContent === '20');
+  check('Task35: world mining uses the same shared storage value', (() => {
+    const mine = win.state.world.mines.find(m => m.resource === 'iron');
+    const before = win.state.resources.iron;
+    win.secureMine(mine.id);
+    win.mineMine(mine.id);
+    return win.state.resources.iron === before + mine.miningPower &&
+      wrap.querySelector('[data-shared-amt="iron"]').textContent === String(before + mine.miningPower);
+  })());
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================

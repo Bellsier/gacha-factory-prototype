@@ -30,6 +30,19 @@ function renderCurrencies(){
   document.getElementById('runNum').textContent = permanent.runCount;
 }
 
+// Task 35: Shared storage UI. The game's existing state.resources object is
+// the single common resource pool used by world mines and crafting.
+function renderSharedStorage(){
+  const wrap = document.getElementById('sharedStorage');
+  if(!wrap) return;
+  wrap.innerHTML = RESOURCES.map(r =>
+    '<div class="line shared-storage-item">' +
+      '<div class="res-name">' + r.name + '</div>' +
+      '<div class="res-amt" data-shared-amt="' + r.key + '">' + fmt(state.resources[r.key]) + '</div>' +
+    '</div>'
+  ).join('');
+}
+
 // Task 33: Minimal base information UI.
 function renderBaseInfo(){
   const wrap = document.getElementById('baseInfo');
@@ -333,6 +346,8 @@ function updateNumbers(){
     : `첫 골드 ${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G를 모으면 첫 가챠권을 드려요 (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   document.getElementById('gachaTicketBtn').disabled = permanent.tickets < BALANCE.gacha.PULL_COST_TICKET;
   RESOURCES.forEach(r=>{
+    const sharedEl = document.querySelector(`[data-shared-amt="${r.key}"]`);
+    if(sharedEl) sharedEl.textContent = fmt(state.resources[r.key]);
     const el = document.querySelector(`[data-amt="${r.key}"]`);
     if(el) el.textContent = fmt(state.resources[r.key]);
     const trainBtn = document.querySelector(`[data-train="${r.key}"]`);
@@ -394,6 +409,7 @@ function updateNumbers(){
 function renderAll(){
   renderCurrencies();
   renderBaseInfo();
+  renderSharedStorage();
   buildMines();
   buildLines();
   buildRecipes();
