@@ -140,3 +140,7 @@
   }
 
 .world-mine{display:flex; flex-direction:column; gap:4px; margin-bottom:10px;}
+
+
+/* Batch 40-54: calm visual anchor for the small base. */
+.ambience{min-height:48px; background:linear-gradient(180deg, rgba(255,255,255,.025), transparent);}
