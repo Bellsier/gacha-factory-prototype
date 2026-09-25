@@ -83,7 +83,7 @@ function buildMines(){
       '<button data-mine-mine="' + mine.id + '" ' + (mine.developmentState !== 'secured' ? 'disabled' : '') + '>채굴하기 (+' + mine.miningPower + ')</button>';
     wrap.appendChild(card);
   });
-  wrap.querySelectorAll('[data-secure-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!secureMine(btn.dataset.secureMine)) return; buildMines(); }; });
+  wrap.querySelectorAll('[data-secure-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!secureMine(btn.dataset.secureMine)) return; buildMines(); updateNumbers(); }; });
   wrap.querySelectorAll('[data-mine-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!mineMine(btn.dataset.mineMine)) return; updateNumbers(); }; });
 }
 // tab switching
@@ -146,10 +146,7 @@ function buildLines(){
   wrap.querySelectorAll('[data-unlocksite]').forEach(btn=>{
     btn.onclick = ()=>{
       if(!unlockSite(btn.dataset.unlocksite)) return;
-      buildLines();
-      buildRecipes();
-      buildWorkers();
-      renderCurrencies();
+      renderAll();
     };
   });
   wrap.querySelectorAll('[data-mine]').forEach(btn=>{
@@ -175,6 +172,17 @@ function buildLines(){
 // Task 38: Minimal workshop UI. Workshops are displayed as world/base
 // facilities; recipe assignment and production behavior are intentionally
 // deferred to later Tasks.
+function recipeNeedsLockedResource(recipe){
+  return Object.keys(recipe.need).some(k=>{
+    const res = RESOURCES.find(x=>x.key===k);
+    return res && !isUnlocked(k);
+  });
+}
+function workshopProgressLabel(workshop, recipe){
+  if(workshop.progress !== null && recipe) return '제작 중... ' + workshop.progress.toFixed(1) + '초';
+  if(recipe) return workshop.auto ? '자동 제작 중' : '대기 중';
+  return '레시피를 선택하세요';
+}
 function renderWorkshops(){
   const wrap = document.getElementById('workshops');
   if(!wrap) return;
@@ -187,16 +195,16 @@ function renderWorkshops(){
     const card = document.createElement('div');
     card.className = 'line';
     const options = '<option value="">레시피 없음</option>' +
-      RECIPES.map(recipe => '<option value="' + recipe.key + '"' + (recipe.key === workshop.recipeKey ? ' selected' : '') + '>' + recipe.name + '</option>').join('');
+      RECIPES.filter(recipe => recipe.key === workshop.recipeKey || !recipeNeedsLockedResource(recipe)).map(recipe =>
+        '<option value="' + recipe.key + '"' + (recipe.key === workshop.recipeKey ? ' selected' : '') + '>' + recipe.name + '</option>'
+      ).join('');
     const recipe = workshopRecipe(workshop.id);
-    const progress = workshop.progress !== null && recipe
-      ? '제작 중... ' + workshop.progress.toFixed(1) + '초'
-      : (recipe ? '대기 중' : '레시피를 선택하세요');
+    const progress = workshopProgressLabel(workshop, recipe);
     card.innerHTML =
       '<div class="res-name">제작소 Lv.' + workshop.level + '</div>' +
-      '<div class="rate">위치 (' + workshop.x + ', ' + workshop.y + ') · ' + progress + '</div>' +
+      '<div class="rate">위치 (' + workshop.x + ', ' + workshop.y + ') · <span data-workshop-progress="' + workshop.id + '">' + progress + '</span></div>' +
       '<div class="row">' +
-        '<select data-workshop-recipe="' + workshop.id + '">' + options + '</select>' +
+        '<select data-workshop-recipe="' + workshop.id + '"' + dis(workshop.progress !== null) + '>' + options + '</select>' +
         '<button data-workshop-craft="' + workshop.id + '" ' + dis(!recipe || workshop.progress !== null || !canCraft(recipe)) + '>제작</button>' +
       '</div>' +
       '<label class="toggle-auto">' +
@@ -220,7 +228,10 @@ function renderWorkshops(){
   wrap.querySelectorAll('[data-workshop-auto]').forEach(chk=>{
     chk.onchange = ()=>{
       const workshop = state.world.workshops.find(item => item.id === chk.dataset.workshopAuto);
-      if(workshop) workshop.auto = chk.checked;
+      if(!workshop) return;
+      workshop.auto = chk.checked;
+      if(workshop.auto) craftWorkshop(workshop.id);
+      updateNumbers();
     };
   });
 }
@@ -233,10 +244,7 @@ function buildRecipes(){
   const autoUnlocked = state.characters.length >= BALANCE.worker.MIN_REQUIRED;
   RECIPES.forEach(r=>{
     // Hide recipes whose raw resource inputs aren't unlocked yet, to avoid clutter.
-    const needsLockedResource = Object.keys(r.need).some(k=>{
-      const res = RESOURCES.find(x=>x.key===k);
-      return res && !isUnlocked(k);
-    });
+    const needsLockedResource = recipeNeedsLockedResource(r);
     if(needsLockedResource) return;
     const needText = Object.entries(r.need).map(([k,v])=>{
       const name = RESOURCES.find(x=>x.key===k)?.name || RECIPES.find(x=>x.key===k)?.name || k;
@@ -451,14 +459,18 @@ function updateNumbers(){
     if(buyAutoSellBtn) buyAutoSellBtn.disabled = state.gold < autoSellCost(r);
   });
   state.world.workshops.forEach(workshop=>{
+    const recipe = workshopRecipe(workshop.id);
     const btn = document.querySelector('[data-workshop-craft="' + workshop.id + '"]');
     if(btn){
-      const recipe = workshopRecipe(workshop.id);
       btn.disabled = !recipe || workshop.progress !== null || !canCraft(recipe);
       btn.textContent = workshop.progress !== null ? '제작 중...' : '제작';
     }
     const chk = document.querySelector('[data-workshop-auto="' + workshop.id + '"]');
     if(chk) chk.disabled = !workshop.recipeKey;
+    const select = document.querySelector('[data-workshop-recipe="' + workshop.id + '"]');
+    if(select) select.disabled = workshop.progress !== null;
+    const progressEl = document.querySelector('[data-workshop-progress="' + workshop.id + '"]');
+    if(progressEl) progressEl.textContent = workshopProgressLabel(workshop, recipe);
   });
   const expandBtn = document.querySelector('[data-expand-base]');
   if(expandBtn){
