@@ -47,7 +47,24 @@ function renderSharedStorage(){
 function renderBaseInfo(){
   const wrap = document.getElementById('baseInfo');
   if(!wrap) return;
-  wrap.innerHTML = '<div class="line base-info"><div class="res-name">거점 Lv.' + state.world.base.level + '</div><div class="rate">위치 (' + state.world.base.x + ', ' + state.world.base.y + ')</div></div>';
+  const nextKey = BALANCE.world.EXPANSION_SITE_ORDER.find(key => !state.unlockedSites[key]);
+  const nextSite = nextKey ? SITES.find(site => site.key === nextKey) : null;
+  wrap.innerHTML =
+    '<div class="line base-info">' +
+      '<div class="res-name">거점 Lv.' + state.world.base.level + '</div>' +
+      '<div class="rate">위치 (' + state.world.base.x + ', ' + state.world.base.y + ')</div>' +
+      (nextSite
+        ? '<button class="ghost" data-expand-base>다음 지역 확장 (' + nextSite.unlockCost + 'G)</button>'
+        : '<div class="rate">모든 지역을 개척했습니다.</div>') +
+    '</div>';
+  const btn = wrap.querySelector('[data-expand-base]');
+  if(btn){
+    btn.disabled = state.gold < nextSite.unlockCost;
+    btn.onclick = ()=>{
+      if(!expandBase()) return;
+      renderAll();
+    };
+  }
 }
 // Task 32: Minimal world mine UI.
 function buildMines(){
@@ -169,10 +186,42 @@ function renderWorkshops(){
   state.world.workshops.forEach(workshop=>{
     const card = document.createElement('div');
     card.className = 'line';
+    const options = '<option value="">레시피 없음</option>' +
+      RECIPES.map(recipe => '<option value="' + recipe.key + '"' + (recipe.key === workshop.recipeKey ? ' selected' : '') + '>' + recipe.name + '</option>').join('');
+    const recipe = workshopRecipe(workshop.id);
+    const progress = workshop.progress !== null && recipe
+      ? '제작 중... ' + workshop.progress.toFixed(1) + '초'
+      : (recipe ? '대기 중' : '레시피를 선택하세요');
     card.innerHTML =
       '<div class="res-name">제작소 Lv.' + workshop.level + '</div>' +
-      '<div class="rate">위치 (' + workshop.x + ', ' + workshop.y + ')</div>';
+      '<div class="rate">위치 (' + workshop.x + ', ' + workshop.y + ') · ' + progress + '</div>' +
+      '<div class="row">' +
+        '<select data-workshop-recipe="' + workshop.id + '">' + options + '</select>' +
+        '<button data-workshop-craft="' + workshop.id + '" ' + dis(!recipe || workshop.progress !== null || !canCraft(recipe)) + '>제작</button>' +
+      '</div>' +
+      '<label class="toggle-auto">' +
+        '<input type="checkbox" data-workshop-auto="' + workshop.id + '"' + (workshop.auto ? ' checked' : '') + ' ' + dis(!recipe) + '>자동 제작' +
+      '</label>';
     wrap.appendChild(card);
+  });
+  wrap.querySelectorAll('[data-workshop-recipe]').forEach(select=>{
+    select.onchange = ()=>{
+      setWorkshopRecipe(select.dataset.workshopRecipe, select.value || null);
+      renderWorkshops();
+    };
+  });
+  wrap.querySelectorAll('[data-workshop-craft]').forEach(btn=>{
+    btn.onclick = ()=>{
+      if(!craftWorkshop(btn.dataset.workshopCraft)) return;
+      updateNumbers();
+      renderWorkshops();
+    };
+  });
+  wrap.querySelectorAll('[data-workshop-auto]').forEach(chk=>{
+    chk.onchange = ()=>{
+      const workshop = state.world.workshops.find(item => item.id === chk.dataset.workshopAuto);
+      if(workshop) workshop.auto = chk.checked;
+    };
   });
 }
 
@@ -401,6 +450,22 @@ function updateNumbers(){
     const buyAutoSellBtn = document.querySelector(`[data-buyautosell="${r.key}"]`);
     if(buyAutoSellBtn) buyAutoSellBtn.disabled = state.gold < autoSellCost(r);
   });
+  state.world.workshops.forEach(workshop=>{
+    const btn = document.querySelector('[data-workshop-craft="' + workshop.id + '"]');
+    if(btn){
+      const recipe = workshopRecipe(workshop.id);
+      btn.disabled = !recipe || workshop.progress !== null || !canCraft(recipe);
+      btn.textContent = workshop.progress !== null ? '제작 중...' : '제작';
+    }
+    const chk = document.querySelector('[data-workshop-auto="' + workshop.id + '"]');
+    if(chk) chk.disabled = !workshop.recipeKey;
+  });
+  const expandBtn = document.querySelector('[data-expand-base]');
+  if(expandBtn){
+    const nextKey = BALANCE.world.EXPANSION_SITE_ORDER.find(key => !state.unlockedSites[key]);
+    const nextSite = nextKey ? SITES.find(site => site.key === nextKey) : null;
+    expandBtn.disabled = !nextSite || state.gold < nextSite.unlockCost;
+  }
   document.querySelectorAll('[data-upstat]').forEach(btn=>{
     const workerId = btn.dataset.workerId;
     const stat = btn.dataset.upstat;
