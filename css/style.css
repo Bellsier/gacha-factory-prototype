@@ -138,3 +138,5 @@
     color:var(--text); font-size:0.78rem; line-height:1.55;
     padding:10px 14px; border-radius:6px; margin-bottom:14px;
   }
+
+.world-mine{display:flex; flex-direction:column; gap:4px; margin-bottom:10px;}

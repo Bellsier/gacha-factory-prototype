@@ -30,6 +30,26 @@ function renderCurrencies(){
   document.getElementById('runNum').textContent = permanent.runCount;
 }
 
+// Task 32: Minimal world mine UI.
+function buildMines(){
+  const wrap = document.getElementById('worldMines');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  if(state.world.mines.length === 0){ wrap.innerHTML = '<div class="rate">아직 발견된 광맥이 없습니다.</div>'; return; }
+  state.world.mines.forEach(mine=>{
+    const resource = RESOURCES.find(r=>r.key===mine.resource);
+    const card = document.createElement('div');
+    card.className = 'line world-mine';
+    card.innerHTML = '<div class="res-name">' + (resource ? resource.name : mine.resource) + '</div>' +
+      '<div class="rate">위치 (' + mine.x + ', ' + mine.y + ') · 등급 ' + mine.grade + ' · 채굴력 ' + mine.miningPower + '</div>' +
+      '<div class="rate">' + (mine.developmentState === 'secured' ? '확보 완료' : '미확보') + '</div>' +
+      '<button data-secure-mine="' + mine.id + '" ' + (mine.developmentState === 'secured' ? 'disabled' : '') + '>' + (mine.developmentState === 'secured' ? '확보됨' : '광맥 확보') + '</button>' +
+      '<button data-mine-mine="' + mine.id + '" ' + (mine.developmentState !== 'secured' ? 'disabled' : '') + '>채굴하기 (+' + mine.miningPower + ')</button>';
+    wrap.appendChild(card);
+  });
+  wrap.querySelectorAll('[data-secure-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!secureMine(btn.dataset.secureMine)) return; buildMines(); }; });
+  wrap.querySelectorAll('[data-mine-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!mineMine(btn.dataset.mineMine)) return; updateNumbers(); }; });
+}
 // tab switching
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.onclick = ()=>{
@@ -367,6 +387,7 @@ function updateNumbers(){
 // UI code/design is unchanged here.
 function renderAll(){
   renderCurrencies();
+  buildMines();
   buildLines();
   buildRecipes();
   buildWorkers();

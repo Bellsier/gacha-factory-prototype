@@ -2165,6 +2165,20 @@ function gridNode(x, y, width, height, id) {
   check('Task31: invalid mine id does not mutate storage', win.mineMine('missing') === false && win.state.resources.iron === 5);
 })();
 // =============================================================================
+// TASK 32 — World mine UI.
+// =============================================================================
+(function test_T32_buildMinesUI() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.world.mines.push({ id:'mine_ui', x:8, y:4, resource:'iron', grade:2, miningPower:3, developmentState:'unsecured' });
+  win.buildMines();
+  const wrap = win.document.getElementById('worldMines');
+  check('Task32: world mine panel renders a registered mine', wrap.children.length === 1);
+  check('Task32: unsecured mine shows secure action', !!wrap.querySelector('[data-secure-mine="mine_ui"]'));
+  check('Task32: unsecured mine disables mining action', wrap.querySelector('[data-mine-mine="mine_ui"]').disabled === true);
+  win.secureMine('mine_ui'); win.buildMines();
+  check('Task32: secured mine enables mining action', wrap.querySelector('[data-mine-mine="mine_ui"]').disabled === false);
+})();
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
