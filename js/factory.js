@@ -206,7 +206,7 @@ function isWorkshopValid(workshop, existingWorkshops){
   if(!isValidGridCoord(workshop.x) || !isValidGridCoord(workshop.y)) return false;
   if(!isNonNegativeInt(workshop.level) || workshop.level < 1) return false;
   if(!isWorkshopRecipeValid(workshop.recipeKey)) return false;
-  if(!(workshop.progress === null || isNonNegativeFinite(workshop.progress))) return false;
+  if(!(workshop.progress === null || (isNonNegativeFinite(workshop.progress) && workshop.progress > 0))) return false;
   if(!Array.isArray(existingWorkshops)) return false;
   return !existingWorkshops.some(existing => existing && existing.x === workshop.x && existing.y === workshop.y);
 }
@@ -292,6 +292,7 @@ function setWorkshopRecipe(workshopId, recipeKey){
   if(!isWorkshopRecipeValid(recipeKey)) return false;
   const workshop = state.world.workshops.find(item => item && item.id === workshopId);
   if(!workshop) return false;
+  if(workshop.progress !== null) return false;
   if(workshop.recipeKey === recipeKey) return false;
   workshop.recipeKey = recipeKey;
   return true;
