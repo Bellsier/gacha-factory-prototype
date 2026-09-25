@@ -13,6 +13,15 @@ const FACTORY_NODE_MIN_SIZE = 1;
 const FACTORY_NODE_MAX_SIZE = 3; // per the design blueprint: facilities are 1x1..3x3
 const FACTORY_NODE_TYPES = ['production', 'storage']; // splitter/merger are NOT nodes (they're belt-attached modules per the blueprint) — not added here
 
+const MINE_DEVELOPMENT_STATES = ['unsecured', 'secured'];
+
+function freshWorldState(){
+  return {
+    base: { x: 0, y: 0, level: 1 },
+    mines: [],
+  };
+}
+
 function freshFactoryState(){
   return {
     grid: { width: FACTORY_GRID_WIDTH, height: FACTORY_GRID_HEIGHT },
@@ -62,6 +71,7 @@ function freshRunState(){
     craftFacility:1, // gold-funded run-scoped timed-craft speed level (1 = current craft times)
     autoLineLogged:false, // Task 6: has the one-time "both iron+coal automated" log fired this run?
     factory: freshFactoryState(), // Task 21: data-only Factory skeleton (grid/nodes/links); unused by tick/UI/logic so far
+    world: freshWorldState(), // Task 27: base + world mine data skeleton; no mining behavior yet
   };
 }
 
@@ -217,6 +227,44 @@ function sanitizeFactoryGrid(raw){
 // No `factory` field at all (every pre-Task-21 save) is exactly the
 // legacy-save case: falls straight to freshFactoryState(), same as any other
 // additive field defaulting when missing.
+function sanitizeMine(m){
+  if(!isPlainObject(m)) return null;
+  const result = {
+    x: isValidGridCoord(m.x) ? m.x : 0,
+    y: isValidGridCoord(m.y) ? m.y : 0,
+    resource: RESOURCES.some(r => r.key === m.resource) ? m.resource : RESOURCES[0].key,
+    grade: isNonNegativeInt(m.grade) && m.grade >= 1 ? m.grade : 1,
+    miningPower: isNonNegativeFinite(m.miningPower) ? m.miningPower : 1,
+    developmentState: MINE_DEVELOPMENT_STATES.includes(m.developmentState) ? m.developmentState : 'unsecured',
+  };
+  if(typeof m.id === 'string' && m.id.length > 0) result.id = m.id;
+  return result;
+}
+function sanitizeMines(raw){
+  if(!Array.isArray(raw)) return [];
+  const mines = raw.map(sanitizeMine).filter(m => m !== null);
+  const seenIds = new Set();
+  mines.forEach(m => {
+    if(typeof m.id !== 'string' || m.id.length === 0 || seenIds.has(m.id)){
+      m.id = makeEntityId('mine_', seenIds);
+    }
+    seenIds.add(m.id);
+  });
+  return mines;
+}
+function sanitizeWorldState(raw){
+  if(!isPlainObject(raw)) return freshWorldState();
+  const baseRaw = isPlainObject(raw.base) ? raw.base : {};
+  return {
+    base: {
+      x: isValidGridCoord(baseRaw.x) ? baseRaw.x : 0,
+      y: isValidGridCoord(baseRaw.y) ? baseRaw.y : 0,
+      level: isNonNegativeInt(baseRaw.level) && baseRaw.level >= 1 ? baseRaw.level : 1,
+    },
+    mines: sanitizeMines(raw.mines),
+  };
+}
+
 function sanitizeFactoryState(raw){
   if(!isPlainObject(raw)) return freshFactoryState();
   return {
@@ -252,6 +300,7 @@ function sanitizeRunState(raw){
     craftFacility: (isNonNegativeInt(raw.craftFacility) && raw.craftFacility >= 1) ? raw.craftFacility : 1, // Task 16: additive field, missing/invalid → default 1 (preserves current craft times)
     autoLineLogged: typeof raw.autoLineLogged === 'boolean' ? raw.autoLineLogged : false, // Task 6: additive field, no saveVersion bump needed
     factory: sanitizeFactoryState(raw.factory), // Task 21: additive field; missing (legacy save) → fresh default Factory state
+    world: sanitizeWorldState(raw.world), // Task 27: additive field; missing (legacy save) -> fresh world state
   };
 }
 function sanitizePermanent(raw){
