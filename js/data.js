@@ -25,6 +25,20 @@ const RECIPES = [
   {key:'quantumCore', name:'퀀텀 코어', need:{precisionPart:2, cosmicShard:1}, out:1, sell:400, craftTime:15},
   {key:'plasmaCore', name:'플라즈마 코어', need:{precisionPart:2, plasma:1}, out:1, sell:420, craftTime:15},
 ];
+const WORLD_MINE_SEEDS = {
+  manaVein: [
+    {x:4, y:0, resource:'mana', grade:2, miningPower:1},
+    {x:0, y:4, resource:'crystal', grade:2, miningPower:1},
+  ],
+  ruins: [
+    {x:6, y:0, resource:'rareMetal', grade:3, miningPower:1},
+    {x:0, y:6, resource:'relic', grade:3, miningPower:1},
+  ],
+  spaceStation: [
+    {x:8, y:0, resource:'cosmicShard', grade:4, miningPower:1},
+    {x:0, y:8, resource:'plasma', grade:4, miningPower:1},
+  ],
+};
 const RARITY = [
   {key:'common', label:'일반', chance:60, mining:1, carry:2, move:1, cls:'common'},
   {key:'rare',   label:'희귀', chance:25, mining:2, carry:3, move:2, cls:'rare'},
