@@ -2405,6 +2405,167 @@ function gridNode(x, y, width, height, id) {
 })();
 
 // =============================================================================
+// TASK 40-54 — Workshop loop, expansion, and calm presentation.
+// =============================================================================
+(function test_T40_workshopManualCraft() {
+  const win = newDom(makeMemoryStorage()).window;
+  const workshop = win.addWorkshop({ id:'workshop_manual', x:1, y:1, level:1, recipeKey:'steel' });
+  win.state.resources.iron = 2;
+  win.state.resources.coal = 1;
+  check('Task40: workshop manual craft succeeds', win.craftWorkshop(workshop.id) === true);
+  check('Task40: workshop consumes shared iron', win.state.resources.iron === 0);
+  check('Task40: workshop consumes shared coal', win.state.resources.coal === 0);
+  check('Task40: workshop creates product', win.state.products.steel === 1);
+})();
+
+(function test_T41_workshopTimedCraft() {
+  const win = newDom(makeMemoryStorage()).window;
+  const workshop = win.addWorkshop({ id:'workshop_timed', x:1, y:2, level:1, recipeKey:'crystalAlloy' });
+  win.state.resources.steel = 2;
+  win.state.resources.crystal = 1;
+  check('Task41: timed workshop craft starts', win.craftWorkshop(workshop.id) === true);
+  check('Task41: timed workshop has progress', win.state.world.workshops[0].progress > 0);
+  check('Task41: timed workshop does not output early', win.state.products.crystalAlloy === 0);
+  for(let i=0;i<40;i++) win.tickWorkshops();
+  check('Task41: timed workshop eventually outputs product', win.state.products.crystalAlloy === 1);
+  check('Task41: timed workshop clears progress after completion', win.state.world.workshops[0].progress === null);
+})();
+
+(function test_T42_workshopTickAndLevelSpeed() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = win.addWorkshop({ id:'workshop_speed_1', x:2, y:2, level:1, recipeKey:'crystalAlloy' });
+  const upgraded = win.addWorkshop({ id:'workshop_speed_2', x:3, y:2, level:2, recipeKey:'crystalAlloy' });
+  win.state.resources.steel = 4;
+  win.state.resources.crystal = 2;
+  check('Task42: level 1 craft starts', win.craftWorkshop(base.id) === true);
+  check('Task42: level 2 craft starts', win.craftWorkshop(upgraded.id) === true);
+  check('Task42: higher workshop level shortens timed craft', win.state.world.workshops[1].progress < win.state.world.workshops[0].progress);
+})();
+
+(function test_T43_workshopAutoCraft() {
+  const win = newDom(makeMemoryStorage()).window;
+  const workshop = win.addWorkshop({ id:'workshop_auto', x:4, y:2, level:1, recipeKey:'steel', auto:true });
+  win.state.resources.iron = 2;
+  win.state.resources.coal = 1;
+  win.tickWorkshops();
+  check('Task43: auto workshop starts/finishes instant recipe', win.state.products.steel === 1);
+  check('Task43: auto workshop consumes inputs', win.state.resources.iron === 0 && win.state.resources.coal === 0);
+})();
+
+(function test_T44_workshopUIControls() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.addWorkshop({ id:'workshop_ui_loop', x:5, y:5, level:1, recipeKey:'steel' });
+  win.renderWorkshops();
+  const wrap = win.document.getElementById('workshops');
+  check('Task44: workshop UI has recipe selector', !!wrap.querySelector('[data-workshop-recipe="workshop_ui_loop"]'));
+  check('Task44: workshop UI has craft button', !!wrap.querySelector('[data-workshop-craft="workshop_ui_loop"]'));
+  check('Task44: workshop UI has auto toggle', !!wrap.querySelector('[data-workshop-auto="workshop_ui_loop"]'));
+})();
+
+(function test_T45_workshopUIRefresh() {
+  const win = newDom(makeMemoryStorage()).window;
+  const workshop = win.addWorkshop({ id:'workshop_refresh', x:6, y:5, level:1, recipeKey:'steel' });
+  win.renderWorkshops();
+  win.state.resources.iron = 2;
+  win.state.resources.coal = 1;
+  win.craftWorkshop(workshop.id);
+  win.renderWorkshops();
+  check('Task45: workshop UI shows completed instant craft state', win.document.getElementById('workshops').textContent.includes('대기 중'));
+})();
+
+(function test_T46_workshopSaveLoadState() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  win.state.world.workshops = [{ id:'workshop_save_loop', x:2, y:4, level:2, recipeKey:'crystalAlloy', auto:true, progress:1.25 }];
+  check('Task46: workshop production state saves', win.saveGame() === true);
+  const loaded = win.loadGame();
+  const w = loaded.run.world.workshops[0];
+  check('Task46: workshop recipe survives save/load', w.recipeKey === 'crystalAlloy');
+  check('Task46: workshop auto state survives save/load', w.auto === true);
+  check('Task46: workshop progress survives save/load', w.progress === 1.25);
+})();
+
+(function test_T47_expandBaseUnlocksNextRegion() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.gold = 700;
+  const beforeLevel = win.state.world.base.level;
+  check('Task47: base expansion succeeds with next region cost', win.expandBase() === true);
+  check('Task47: base level increases', win.state.world.base.level === beforeLevel + 1);
+  check('Task47: next region becomes unlocked', win.state.unlockedSites.manaVein === true);
+  check('Task47: expansion consumes region cost', win.state.gold === 0);
+})();
+
+(function test_T48_expansionSeedsWorldMines() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.gold = 700;
+  check('Task48: expansion seeds new world mines', win.expandBase() === true && win.state.world.mines.length === 4);
+  const manaMines = win.state.world.mines.filter(m => m.resource === 'mana' || m.resource === 'crystal');
+  check('Task48: seeded mines use expanded region resources', manaMines.length === 2);
+  check('Task48: seeded mines start unsecured', manaMines.every(m => m.developmentState === 'unsecured'));
+})();
+
+(function test_T49_expansionDoesNotDuplicateMines() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.gold = 700;
+  check('Task49: first expansion succeeds', win.expandBase() === true);
+  win.state.gold = 700;
+  check('Task49: repeated same-region expansion is rejected', win.expandBase() === false);
+  check('Task49: repeated expansion does not duplicate seeded mines', win.state.world.mines.length === 4);
+})();
+
+(function test_T50_expansionUI() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.gold = 700;
+  win.renderBaseInfo();
+  const btn = win.document.querySelector('[data-expand-base]');
+  check('Task50: base panel shows next-region expansion button', !!btn);
+  check('Task50: expansion button shows cost', btn && btn.textContent.includes('700G'));
+})();
+
+(function test_T51_calmPresentationPanel() {
+  const win = newDom(makeMemoryStorage()).window;
+  const panel = win.document.querySelector('.ambience');
+  check('Task51: calm workshop ambience panel exists', !!panel);
+  check('Task51: ambience panel contains calm copy', panel && panel.textContent.includes('조용히 공방'));
+})();
+
+(function test_T52_workshopBalanceConstant() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task52: workshop level speed tuning is positive', win.BALANCE.crafting.WORKSHOP_LEVEL_SPEED_PER_LEVEL > 0);
+  check('Task52: workshop level 2 is faster than level 1', (() => {
+    const a = win.addWorkshop({id:'balance_a',x:7,y:1,level:1,recipeKey:'crystalAlloy'});
+    const b = win.addWorkshop({id:'balance_b',x:8,y:1,level:2,recipeKey:'crystalAlloy'});
+    return win.workshopCraftTime(b, win.RECIPES.find(r=>r.key==='crystalAlloy')) <
+      win.workshopCraftTime(a, win.RECIPES.find(r=>r.key==='crystalAlloy'));
+  })());
+})();
+
+(function test_T53_fullLoopMineToWorkshop() {
+  const win = newDom(makeMemoryStorage()).window;
+  const mine = win.state.world.mines.find(m => m.resource === 'iron');
+  win.secureMine(mine.id);
+  win.mineMine(mine.id);
+  win.state.resources.iron += 1;
+  win.state.resources.coal = 1;
+  const workshop = win.addWorkshop({id:'loop_workshop',x:9,y:1,level:1,recipeKey:'steel'});
+  check('Task53: mine-to-workshop loop has required inputs', win.state.resources.iron >= 2 && win.state.resources.coal >= 1);
+  check('Task53: mine-to-workshop craft completes', win.craftWorkshop(workshop.id) === true && win.state.products.steel === 1);
+})();
+
+(function test_T54_fullLoopSaveLoad() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  win.state.resources.iron = 2;
+  win.state.resources.coal = 1;
+  const workshop = win.addWorkshop({id:'loop_save',x:10,y:1,level:1,recipeKey:'steel',auto:true});
+  win.tickWorkshops();
+  check('Task54: full loop state saves', win.saveGame() === true);
+  const loaded = win.loadGame();
+  check('Task54: saved workshop remains available', loaded.ok === true && loaded.run.world.workshops[0].id === workshop.id);
+  check('Task54: saved produced product remains available', loaded.run.products.steel === 1);
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 
