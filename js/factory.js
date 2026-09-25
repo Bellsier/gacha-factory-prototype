@@ -242,7 +242,7 @@ function workshopRecipe(workshopId){
 function workshopCraftTime(workshop, recipe){
   if(!workshop || !recipe) return 0;
   if(recipe.craftTime <= 0) return 0;
-  const speed = 1 + Math.max(0, workshop.level - 1) * 0.25;
+  const speed = 1 + Math.max(0, workshop.level - 1) * BALANCE.crafting.WORKSHOP_LEVEL_SPEED_PER_LEVEL;
   return recipe.craftTime / speed;
 }
 
