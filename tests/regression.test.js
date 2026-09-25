@@ -2179,6 +2179,18 @@ function gridNode(x, y, width, height, id) {
   check('Task32: secured mine enables mining action', wrap.querySelector('[data-mine-mine="mine_ui"]').disabled === false);
 })();
 // =============================================================================
+// TASK 33 — Base UI.
+// =============================================================================
+(function test_T33_renderBaseInfo() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.world.base = { x:12, y:7, level:3 };
+  win.renderBaseInfo();
+  const wrap = win.document.getElementById('baseInfo');
+  check('Task33: base panel renders', wrap.children.length === 1);
+  check('Task33: base level is rendered', wrap.textContent.includes('거점 Lv.3'));
+  check('Task33: base coordinates are rendered', wrap.textContent.includes('위치 (12, 7)'));
+})();
+// =============================================================================
 // SUMMARY
 // =============================================================================
 

@@ -30,6 +30,12 @@ function renderCurrencies(){
   document.getElementById('runNum').textContent = permanent.runCount;
 }
 
+// Task 33: Minimal base information UI.
+function renderBaseInfo(){
+  const wrap = document.getElementById('baseInfo');
+  if(!wrap) return;
+  wrap.innerHTML = '<div class="line base-info"><div class="res-name">거점 Lv.' + state.world.base.level + '</div><div class="rate">위치 (' + state.world.base.x + ', ' + state.world.base.y + ')</div></div>';
+}
 // Task 32: Minimal world mine UI.
 function buildMines(){
   const wrap = document.getElementById('worldMines');
@@ -387,6 +393,7 @@ function updateNumbers(){
 // UI code/design is unchanged here.
 function renderAll(){
   renderCurrencies();
+  renderBaseInfo();
   buildMines();
   buildLines();
   buildRecipes();
