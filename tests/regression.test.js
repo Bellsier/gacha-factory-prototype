@@ -2330,6 +2330,28 @@ function gridNode(x, y, width, height, id) {
   check('Task37: colliding workshop id is replaced', second && second.id !== 'workshop_same');
 })();
 
+
+// =============================================================================
+// TASK 38 — Workshop UI.
+// =============================================================================
+(function test_T38_workshopUI() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.renderWorkshops();
+  const wrap = win.document.getElementById('workshops');
+  check('Task38: workshop panel renders', !!wrap);
+  check('Task38: empty workshop panel has a clear empty state', wrap.textContent.includes('아직 설치된 제작소가 없습니다.'));
+
+  win.addWorkshop({ id: 'workshop_ui', x: 5, y: 4, level: 2 });
+  win.renderWorkshops();
+  check('Task38: registered workshop renders as a card', wrap.children.length === 1);
+  check('Task38: workshop level is shown', wrap.textContent.includes('제작소 Lv.2'));
+  check('Task38: workshop coordinates are shown', wrap.textContent.includes('위치 (5, 4)'));
+
+  win.state.world.workshops[0].level = 3;
+  win.renderAll();
+  check('Task38: workshop UI refreshes after renderAll', wrap.textContent.includes('제작소 Lv.3'));
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================
