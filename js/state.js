@@ -263,6 +263,8 @@ function sanitizeWorkshop(w){
     y: isValidGridCoord(w.y) ? w.y : 0,
     level: isNonNegativeInt(w.level) && w.level >= 1 ? w.level : 1,
     recipeKey: typeof w.recipeKey === 'string' && RECIPES.some(r => r.key === w.recipeKey) ? w.recipeKey : null,
+    auto: typeof w.auto === 'boolean' ? w.auto : false,
+    progress: isNonNegativeFinite(w.progress) ? w.progress : null,
   };
   if(typeof w.id === 'string' && w.id.length > 0) result.id = w.id;
   return result;
