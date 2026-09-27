@@ -15,6 +15,13 @@ const FACTORY_NODE_TYPES = ['production', 'storage']; // splitter/merger are NOT
 
 const MINE_DEVELOPMENT_STATES = ['unsecured', 'secured'];
 
+const PLAYER_FACINGS = ['up', 'down', 'left', 'right'];
+const PLAYER_POSES = ['idle', 'walk'];
+
+function freshPlayerState(){
+  return { x: 0, y: 0, facing: 'down', pose: 'idle' };
+}
+
 function freshWorldState(){
   return {
     base: { x: 0, y: 0, level: 1 },
@@ -23,6 +30,7 @@ function freshWorldState(){
       { id: 'mine_start_coal', x: 0, y: 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
     ],
     workshops: [],
+    player: freshPlayerState(),
   };
 }
 
@@ -86,7 +94,7 @@ function freshRunState(){
 // ---------------------------------------------------------------------------
 const SAVE_KEY = 'gachaFactorySave';
 const CURRENT_SAVE_VERSION = 1;
-let saveBlocked = false;    // true once a future-version save is detected, so we never overwrite it
+let saveBlocked = false;    // true once a future-version save exists on disk, so we never overwrite it
 let saveFailLogged = false; // avoid spamming the log every 10s while storage stays unavailable
 
 function isFiniteNumber(v){ return typeof v === 'number' && Number.isFinite(v); }
@@ -283,6 +291,24 @@ function sanitizeWorkshops(raw){
   return workshops;
 }
 
+function clampPlayerAxis(v, min, max){
+  if(!isFiniteNumber(v)) return min;
+  if(v < min) return min;
+  if(v > max) return max;
+  return v;
+}
+
+function sanitizePlayer(raw){
+  const fresh = freshPlayerState();
+  if(!isPlainObject(raw)) return fresh;
+  return {
+    x: clampPlayerAxis(raw.x, BALANCE.world.BOUNDS_MIN_X, BALANCE.world.BOUNDS_MAX_X),
+    y: clampPlayerAxis(raw.y, BALANCE.world.BOUNDS_MIN_Y, BALANCE.world.BOUNDS_MAX_Y),
+    facing: PLAYER_FACINGS.includes(raw.facing) ? raw.facing : fresh.facing,
+    pose: 'idle',
+  };
+}
+
 function sanitizeWorldState(raw){
   if(!isPlainObject(raw)) return freshWorldState();
   const baseRaw = isPlainObject(raw.base) ? raw.base : {};
@@ -294,6 +320,7 @@ function sanitizeWorldState(raw){
     },
     mines: sanitizeMines(raw.mines),
     workshops: sanitizeWorkshops(raw.workshops),
+    player: sanitizePlayer(raw.player),
   };
 }
 
