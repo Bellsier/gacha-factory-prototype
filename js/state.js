@@ -94,7 +94,7 @@ function freshRunState(){
 // ---------------------------------------------------------------------------
 const SAVE_KEY = 'gachaFactorySave';
 const CURRENT_SAVE_VERSION = 1;
-let saveBlocked = false;    // true once a future-version save exists on disk, so we never overwrite it
+let saveBlocked = false;    // true once a future-version save is detected, so we never overwrite it
 let saveFailLogged = false; // avoid spamming the log every 10s while storage stays unavailable
 
 function isFiniteNumber(v){ return typeof v === 'number' && Number.isFinite(v); }
