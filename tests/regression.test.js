@@ -19,7 +19,7 @@ if (files.length === 0) {
   process.exit(2);
 }
 const src = files.map((f) => fs.readFileSync(path.join(chunkDir, f), 'utf8')).join('');
-const code = src.replace(/^![^\n]*\n/, '');
+const code = src.replace(/^#![\u005e\n]*\n/, '');
 new Function(
   'require',
   'module',
