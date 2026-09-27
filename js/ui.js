@@ -83,7 +83,7 @@ function buildMines(){
       '<button data-mine-mine="' + mine.id + '" ' + (mine.developmentState !== 'secured' ? 'disabled' : '') + '>채굴하기 (+' + mine.miningPower + ')</button>';
     wrap.appendChild(card);
   });
-  wrap.querySelectorAll('[data-secure-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!secureMine(btn.dataset.secureMine)) return; buildMines(); updateNumbers(); }; });
+  wrap.querySelectorAll('[data-secure-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!secureMine(btn.dataset.secureMine)) return; buildMines(); renderWorldObjects(); updateNumbers(); }; });
   wrap.querySelectorAll('[data-mine-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!mineMine(btn.dataset.mineMine)) return; updateNumbers(); }; });
 }
 // tab switching
@@ -507,6 +507,7 @@ function renderAll(){
   buildWorkers();
   renderLastPull();
   updateNumbers();
+  renderWorldObjects();
   updatePlayerSprite();
 }
 
@@ -528,26 +529,75 @@ document.addEventListener('keydown', (e)=> onPlayerKey(e, true));
 document.addEventListener('keyup', (e)=> onPlayerKey(e, false));
 window.addEventListener('blur', ()=> clearPlayerHeld());
 
+// ---------------------------------------------------------------------------
+// Task 57: one world -> screen conversion shared by the player, the base and
+// the world mines, so everything on #worldStage uses the same world units.
+// World bounds (BALANCE.world) are unchanged; the stage just keeps a small
+// visual margin so objects sitting on the bound edges (e.g. the base at 0,0)
+// are drawn fully inside the stage instead of clipped at its corner.
+// Pure presentation — no camera, no scrolling.
+// ---------------------------------------------------------------------------
+const WORLD_STAGE_MARGIN = { left: 12, right: 10, top: 32, bottom: 12 }; // % of the stage
+
+function worldToStagePercent(x, y){
+  const b = BALANCE.world;
+  const m = WORLD_STAGE_MARGIN;
+  const spanX = b.BOUNDS_MAX_X - b.BOUNDS_MIN_X;
+  const spanY = b.BOUNDS_MAX_Y - b.BOUNDS_MIN_Y;
+  const fx = spanX === 0 ? 0 : (x - b.BOUNDS_MIN_X) / spanX;
+  const fy = spanY === 0 ? 0 : (y - b.BOUNDS_MIN_Y) / spanY;
+  return {
+    left: m.left + fx * (100 - m.left - m.right),
+    top: m.top + fy * (100 - m.top - m.bottom),
+  };
+}
+
+function placeOnStage(el, x, y){
+  const pos = worldToStagePercent(x, y);
+  el.style.left = pos.left + '%';
+  el.style.top = pos.top + '%';
+}
+
+// Task 57: draws the base and every mine in state.world.mines onto the
+// stage. Structural — called from renderAll() (and after securing a mine),
+// never from the tick loop. The mine list (#worldMines) and this layer both
+// read the same state.world.mines array; no positions live in the HTML.
+function renderWorldObjects(){
+  const marker = document.querySelector('.world-base-marker');
+  if(marker){
+    placeOnStage(marker, state.world.base.x, state.world.base.y);
+    marker.title = '거점 Lv.' + state.world.base.level + ' (' + state.world.base.x + ', ' + state.world.base.y + ')';
+  }
+  const layer = document.getElementById('worldMineLayer');
+  if(!layer) return;
+  layer.innerHTML = '';
+  state.world.mines.forEach(mine=>{
+    if(!mine) return;
+    const resource = RESOURCES.find(r=>r.key===mine.resource);
+    const name = resource ? resource.name : mine.resource;
+    const secured = mine.developmentState === 'secured';
+    const node = document.createElement('div');
+    node.className = 'world-mine-node res-' + mine.resource + (secured ? ' is-secured' : ' is-unsecured');
+    node.setAttribute('data-world-mine', mine.id);
+    node.setAttribute('data-resource', mine.resource);
+    node.setAttribute('data-development-state', mine.developmentState);
+    node.title = name + ' 광맥 · ' + (secured ? '확보 완료' : '미확보') + ' (' + mine.x + ', ' + mine.y + ')';
+    const label = document.createElement('span');
+    label.className = 'world-mine-label';
+    label.textContent = name;
+    node.appendChild(label);
+    placeOnStage(node, mine.x, mine.y);
+    layer.appendChild(node);
+  });
+}
+
 function updatePlayerSprite(){
   const el = document.getElementById('playerChar');
   if(!el || !state.world.player) return;
   const p = state.world.player;
-  const b = BALANCE.world;
-  const spanX = b.BOUNDS_MAX_X - b.BOUNDS_MIN_X;
-  const spanY = b.BOUNDS_MAX_Y - b.BOUNDS_MIN_Y;
-  const left = spanX === 0 ? 0 : ((p.x - b.BOUNDS_MIN_X) / spanX) * 100;
-  const top = spanY === 0 ? 0 : ((p.y - b.BOUNDS_MIN_Y) / spanY) * 100;
-  el.style.left = left + '%';
-  el.style.top = top + '%';
+  placeOnStage(el, p.x, p.y);
   el.className = 'player-char pose-' + p.pose + ' facing-' + p.facing;
   el.setAttribute('data-player-pose', p.pose);
   el.setAttribute('data-player-facing', p.facing);
-  const marker = document.querySelector('.world-base-marker');
-  if(marker){
-    const bx = spanX === 0 ? 0 : ((state.world.base.x - b.BOUNDS_MIN_X) / spanX) * 100;
-    const by = spanY === 0 ? 0 : ((state.world.base.y - b.BOUNDS_MIN_Y) / spanY) * 100;
-    marker.style.left = bx + '%';
-    marker.style.top = by + '%';
-  }
 }
 

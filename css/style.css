@@ -168,6 +168,30 @@
     transform:translate(-50%, -70%);
     opacity:0.85;
   }
+  /* Task 57: world mines drawn from state.world.mines (no click, no animation). */
+  .world-mine-layer{position:absolute; inset:0; pointer-events:none; z-index:1;}
+  .world-mine-node{
+    --ore:#8b98a1;
+    position:absolute; width:18px; height:12px;
+    background:linear-gradient(160deg, rgba(255,255,255,0.28) 0 30%, transparent 30%), var(--ore);
+    border-radius:7px 9px 3px 3px;
+    box-shadow:0 3px 0 rgba(0,0,0,0.4);
+    transform:translate(-50%, -70%);
+  }
+  .world-mine-node.is-unsecured{opacity:0.6; outline:1px dashed rgba(231,236,239,0.35); outline-offset:2px;}
+  .world-mine-node.is-secured{opacity:1; box-shadow:0 3px 0 rgba(0,0,0,0.4), 0 5px 0 -1px var(--teal);}
+  .world-mine-label{
+    position:absolute; left:100%; top:50%; margin-left:6px; transform:translateY(-50%);
+    font-size:0.55rem; line-height:1; color:var(--dim); white-space:nowrap;
+  }
+  .world-mine-node.res-iron{--ore:#a0624a;}
+  .world-mine-node.res-coal{--ore:#50555b;}
+  .world-mine-node.res-mana{--ore:#8a5cd6;}
+  .world-mine-node.res-crystal{--ore:#5fd0e6;}
+  .world-mine-node.res-rareMetal{--ore:#c3ccd4;}
+  .world-mine-node.res-relic{--ore:#c9a24a;}
+  .world-mine-node.res-cosmicShard{--ore:#e06fa8;}
+  .world-mine-node.res-plasma{--ore:#ff5ad2;}
   .player-char{
     position:absolute; width:16px; height:26px;
     background:linear-gradient(180deg, #efc27a 0 8px, var(--amber) 8px 100%);

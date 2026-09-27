@@ -208,6 +208,90 @@
   check('Task56: player movement does not consume resources', win.state.resources.iron === 0);
 })();
 
+(function test_T57_worldObjectsFromState() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  check('Task57: world mine layer exists inside worldStage', !!stage && !!stage.querySelector('#worldMineLayer'));
+  const html = doc.getElementById('worldMineLayer').outerHTML;
+  const nodes = [...stage.querySelectorAll('[data-world-mine]')];
+  check('Task57: one stage node per state.world.mines entry', nodes.length === win.state.world.mines.length && nodes.length === 2);
+  const ironNode = stage.querySelector('[data-world-mine="mine_start_iron"]');
+  const coalNode = stage.querySelector('[data-world-mine="mine_start_coal"]');
+  check('Task57: starting iron mine is drawn', !!ironNode && ironNode.getAttribute('data-resource') === 'iron');
+  check('Task57: starting coal mine is drawn', !!coalNode && coalNode.getAttribute('data-resource') === 'coal');
+  check('Task57: resource type has its own visual class', ironNode.classList.contains('res-iron') && coalNode.classList.contains('res-coal'));
+  check('Task57: unsecured state is visible on stage', ironNode.classList.contains('is-unsecured') && ironNode.getAttribute('data-development-state') === 'unsecured');
+  const ironPos = win.worldToStagePercent(2, 0);
+  const coalPos = win.worldToStagePercent(0, 2);
+  check('Task57: iron mine position comes from mine.x/mine.y', ironNode.style.left === ironPos.left + '%' && ironNode.style.top === ironPos.top + '%');
+  check('Task57: coal mine position comes from mine.x/mine.y', coalNode.style.left === coalPos.left + '%' && coalNode.style.top === coalPos.top + '%');
+  const base = stage.querySelector('.world-base-marker');
+  const basePos = win.worldToStagePercent(win.state.world.base.x, win.state.world.base.y);
+  check('Task57: exactly one base object on stage', stage.querySelectorAll('.world-base-marker').length === 1);
+  check('Task57: base position comes from state.world.base', base.style.left === basePos.left + '%' && base.style.top === basePos.top + '%');
+  // Same conversion as the player.
+  const p = win.state.world.player;
+  win.updatePlayerSprite();
+  const playerPos = win.worldToStagePercent(p.x, p.y);
+  const playerEl = doc.getElementById('playerChar');
+  check('Task57: player uses the same world->stage conversion', playerEl.style.left === playerPos.left + '%' && playerEl.style.top === playerPos.top + '%');
+  check('Task57: player on base spot shares base screen position', playerEl.style.left === base.style.left && playerEl.style.top === base.style.top);
+  // Conversion stays inside the stage for every in-bounds coordinate.
+  // World bounds are the Task 56 reference values (0..10 on both axes).
+  const corners = [[0,0],[10,10],[0,10],[10,0]];
+  check('Task57: world bounds map inside the stage', corners.every(([x,y])=>{ const q = win.worldToStagePercent(x,y); return q.left > 0 && q.left < 100 && q.top > 0 && q.top < 100; }));
+  check('Task57: conversion is monotonic', win.worldToStagePercent(3,0).left > win.worldToStagePercent(2,0).left && win.worldToStagePercent(0,3).top > win.worldToStagePercent(0,2).top);
+  const clampedMax = win.clampPlayerPosition(99, 99);
+  const clampedMin = win.clampPlayerPosition(-5, -5);
+  check('Task57: world bounds unchanged', clampedMax.x === 10 && clampedMax.y === 10 && clampedMin.x === 0 && clampedMin.y === 0);
+  // No positions hard-coded in markup.
+  const rawHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  check('Task57: index.html has no hard-coded mine nodes', !/data-world-mine=/.test(rawHtml) && !/world-mine-node/.test(rawHtml));
+  check('Task57: mine layer starts empty in markup', /<div id="worldMineLayer" class="world-mine-layer"><\/div>/.test(rawHtml) && typeof html === 'string');
+})();
+
+(function test_T57_worldObjectsFollowData() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  // Securing via the existing list button also updates the stage node.
+  doc.querySelector('[data-secure-mine="mine_start_iron"]').click();
+  const ironNode = doc.querySelector('#worldStage [data-world-mine="mine_start_iron"]');
+  check('Task57: securing from the mine list marks stage node secured', !!ironNode && ironNode.classList.contains('is-secured') && ironNode.getAttribute('data-development-state') === 'secured');
+  // Stage and the "월드 광맥" list read the same data.
+  const listIds = [...doc.querySelectorAll('#worldMines [data-secure-mine]')].map(e=>e.getAttribute('data-secure-mine')).sort().join(',');
+  const stageIds = [...doc.querySelectorAll('#worldStage [data-world-mine]')].map(e=>e.getAttribute('data-world-mine')).sort().join(',');
+  check('Task57: stage mines match world mine list', listIds === stageIds && stageIds.length > 0);
+  // Expansion adds mines to both views through renderAll().
+  win.state.gold = 700;
+  check('Task57: expansion succeeds', win.expandBase() === true);
+  win.renderAll();
+  const nodes = doc.querySelectorAll('#worldStage [data-world-mine]');
+  check('Task57: expanded mines appear on stage', nodes.length === win.state.world.mines.length && nodes.length === 4);
+  check('Task57: expanded list and stage still agree', doc.querySelectorAll('#worldMines [data-secure-mine]').length === nodes.length);
+  const mana = doc.querySelector('#worldStage [data-resource="mana"]');
+  const manaPos = win.worldToStagePercent(4, 0);
+  check('Task57: new mine drawn at its seeded coordinates', !!mana && mana.style.left === manaPos.left + '%' && mana.style.top === manaPos.top + '%');
+  // Re-rendering does not duplicate objects.
+  win.renderAll();
+  win.renderWorldObjects();
+  check('Task57: re-render does not duplicate mine nodes', doc.querySelectorAll('#worldStage [data-world-mine]').length === 4);
+  check('Task57: re-render keeps a single base marker', doc.querySelectorAll('#worldStage .world-base-marker').length === 1);
+  // Player movement still works with objects drawn and does not touch mines.
+  const before = JSON.stringify(win.state.world.mines);
+  win.setPlayerHeld('right', true);
+  for(let i=0;i<10;i++) win.tickLoop();
+  win.clearPlayerHeld();
+  win.tickLoop();
+  check('Task57: player still moves with world objects present', win.state.world.player.x > 0 && win.state.world.player.pose === 'idle');
+  check('Task57: walking does not change mine data', JSON.stringify(win.state.world.mines) === before);
+  check('Task57: tick does not rebuild mine nodes', doc.querySelectorAll('#worldStage [data-world-mine]').length === 4);
+  // Prestige reset returns the stage to the two starting mines.
+  win.state.world.mines.length = 0;
+  win.renderWorldObjects();
+  check('Task57: empty mine data draws no mine nodes', doc.querySelectorAll('#worldStage [data-world-mine]').length === 0);
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================
