@@ -147,7 +147,45 @@
     padding:6px; font-family:'IBM Plex Mono'; font-size:0.75rem;
   }
   .line .row button{width:auto; flex:1; min-width:88px; margin-top:0;}
-  .ambience{min-height:48px; background:linear-gradient(180deg, rgba(255,255,255,.025), transparent);}
+  .world-stage{
+    position:relative; height:220px; overflow:hidden;
+    background:linear-gradient(180deg, #243038 0%, #1a2228 55%, #151b20 100%);
+    border:1px solid var(--line); border-radius:8px;
+  }
+  .world-ground{
+    position:absolute; inset:18% 8% 10%;
+    background:
+      radial-gradient(ellipse at 50% 100%, rgba(63,201,176,0.12), transparent 55%),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 12px, transparent 12px 24px);
+    border-radius:8px 8px 4px 4px;
+    transform:perspective(240px) rotateX(12deg);
+    transform-origin:center bottom;
+  }
+  .world-base-marker{
+    position:absolute; left:0; top:0; width:14px; height:10px;
+    background:var(--teal); border-radius:2px 2px 1px 1px;
+    box-shadow:0 3px 0 rgba(0,0,0,0.35);
+    transform:translate(-50%, -70%);
+    opacity:0.85;
+  }
+  .player-char{
+    position:absolute; width:16px; height:26px;
+    background:linear-gradient(180deg, #efc27a 0 8px, var(--amber) 8px 100%);
+    border:1px solid var(--amber); border-radius:8px 8px 5px 5px;
+    box-shadow:0 6px 0 rgba(0,0,0,0.35);
+    transform:translate(-50%, -85%);
+    z-index:2;
+  }
+  .player-char.pose-walk{
+    animation:player-walk 0.28s steps(2, end) infinite;
+  }
+  .player-char.facing-left{ transform:translate(-50%, -85%) scaleX(-1); }
+  .player-char.facing-right{ transform:translate(-50%, -85%); }
+  .player-char.facing-up{ filter:brightness(0.86); }
+  @keyframes player-walk{
+    from{ margin-top:0; }
+    to{ margin-top:-3px; }
+  }
   @media (max-width: 520px){
     body{padding:12px 10px 48px;}
     header h1{font-size:1.2rem;}
