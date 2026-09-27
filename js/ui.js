@@ -589,7 +589,85 @@ function renderWorldObjects(){
     placeOnStage(node, mine.x, mine.y);
     layer.appendChild(node);
   });
+  applyWorldSelection();
 }
+
+// ---------------------------------------------------------------------------
+// Task 58: world object selection (base or one mine), foundation only — no
+// info panel, no actions. The selection is UI-only session state: it lives
+// in this module variable, never in `state`, so it is never saved and a
+// reload / new game always starts with nothing selected.
+//   null                      -> nothing selected
+//   { type: 'base' }          -> the base
+//   { type: 'mine', id }      -> the mine with that id in state.world.mines
+// ---------------------------------------------------------------------------
+let worldSelection = null;
+
+function getWorldSelection(){
+  return worldSelection ? { ...worldSelection } : null;
+}
+
+function isWorldSelectionValid(sel){
+  if(!sel) return true;
+  if(sel.type === 'base') return true;
+  if(sel.type === 'mine') return state.world.mines.some(m => m && m.id === sel.id);
+  return false;
+}
+
+function selectWorldObject(type, id){
+  let next = null;
+  if(type === 'base') next = { type: 'base' };
+  else if(type === 'mine' && typeof id === 'string') next = { type: 'mine', id };
+  if(!next || !isWorldSelectionValid(next)) return false;
+  worldSelection = next;
+  applyWorldSelection();
+  return true;
+}
+
+function clearWorldSelection(){
+  worldSelection = null;
+  applyWorldSelection();
+}
+
+// Reflects worldSelection onto the stage DOM (one .is-selected at most).
+// Drops a selection whose mine no longer exists (e.g. after prestige).
+function applyWorldSelection(){
+  if(!isWorldSelectionValid(worldSelection)) worldSelection = null;
+  const stage = document.getElementById('worldStage');
+  if(!stage) return;
+  const sel = worldSelection;
+  stage.setAttribute('data-world-selected', sel ? (sel.type === 'mine' ? 'mine:' + sel.id : 'base') : '');
+  const marker = stage.querySelector('.world-base-marker');
+  if(marker) marker.classList.toggle('is-selected', !!sel && sel.type === 'base');
+  stage.querySelectorAll('[data-world-mine]').forEach(node=>{
+    node.classList.toggle('is-selected', !!sel && sel.type === 'mine' && node.getAttribute('data-world-mine') === sel.id);
+  });
+}
+
+// One delegated click handler on the stage: an object click selects it,
+// anything else inside the stage (ground, player) clears the selection.
+// Because both cases are decided here from the same event, the "empty
+// space clears" branch can never overwrite an object selection.
+function onWorldStageClick(e){
+  const stage = e.currentTarget;
+  const target = e.target && e.target.closest ? e.target : null;
+  const mineNode = target ? target.closest('[data-world-mine]') : null;
+  if(mineNode && stage.contains(mineNode)){
+    selectWorldObject('mine', mineNode.getAttribute('data-world-mine'));
+    return;
+  }
+  const baseNode = target ? target.closest('.world-base-marker') : null;
+  if(baseNode && stage.contains(baseNode)){
+    selectWorldObject('base');
+    return;
+  }
+  clearWorldSelection();
+}
+
+(function bindWorldStageClick(){
+  const stage = document.getElementById('worldStage');
+  if(stage) stage.addEventListener('click', onWorldStageClick);
+})();
 
 function updatePlayerSprite(){
   const el = document.getElementById('playerChar');
