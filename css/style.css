@@ -168,7 +168,7 @@
     transform:translate(-50%, -70%);
     opacity:0.85;
   }
-  /* Task 57: world mines drawn from state.world.mines (no click, no animation). */
+  /* Task 57: world mines drawn from state.world.mines (no animation). */
   .world-mine-layer{position:absolute; inset:0; pointer-events:none; z-index:1;}
   .world-mine-node{
     --ore:#8b98a1;
@@ -192,7 +192,19 @@
   .world-mine-node.res-relic{--ore:#c9a24a;}
   .world-mine-node.res-cosmicShard{--ore:#e06fa8;}
   .world-mine-node.res-plasma{--ore:#ff5ad2;}
+  /* Task 58: world object selection. The layer itself stays click-through;
+     only the base and mine nodes take clicks (with a slightly larger hit area).
+     The player sprite is not selectable and lets clicks pass to what's under it. */
+  .world-mine-node, .world-base-marker{pointer-events:auto; cursor:pointer;}
+  .world-mine-node::before, .world-base-marker::before{content:''; position:absolute; inset:-6px;}
+  .world-mine-node.is-selected, .world-base-marker.is-selected{
+    opacity:1;
+    outline:2px solid var(--legend); outline-offset:3px;
+    filter:drop-shadow(0 0 5px rgba(224,168,60,0.75));
+  }
+  .world-mine-node.is-selected .world-mine-label{color:var(--legend);}
   .player-char{
+    pointer-events:none;
     position:absolute; width:16px; height:26px;
     background:linear-gradient(180deg, #efc27a 0 8px, var(--amber) 8px 100%);
     border:1px solid var(--amber); border-radius:8px 8px 5px 5px;

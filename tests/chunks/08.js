@@ -292,6 +292,108 @@
   check('Task57: empty mine data draws no mine nodes', doc.querySelectorAll('#worldStage [data-world-mine]').length === 0);
 })();
 
+(function test_T58_worldSelectionClicks() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const base = () => stage.querySelector('.world-base-marker');
+  const mineNode = (id) => stage.querySelector('[data-world-mine="' + id + '"]');
+  const selectedCount = () => stage.querySelectorAll('.is-selected').length;
+  check('Task58: nothing selected on a new game', win.getWorldSelection() === null && selectedCount() === 0);
+  base().click();
+  check('Task58: clicking the base selects it', JSON.stringify(win.getWorldSelection()) === JSON.stringify({type:'base'}));
+  check('Task58: base shows selected mark', base().classList.contains('is-selected') && selectedCount() === 1);
+  mineNode('mine_start_iron').click();
+  const ironSel = win.getWorldSelection();
+  check('Task58: clicking iron mine selects it', ironSel && ironSel.type === 'mine' && ironSel.id === 'mine_start_iron');
+  check('Task58: selecting iron releases the base', !base().classList.contains('is-selected'));
+  check('Task58: only iron is marked selected', mineNode('mine_start_iron').classList.contains('is-selected') && selectedCount() === 1);
+  mineNode('mine_start_coal').click();
+  const coalSel = win.getWorldSelection();
+  check('Task58: iron -> coal switches selection', coalSel && coalSel.type === 'mine' && coalSel.id === 'mine_start_coal');
+  check('Task58: iron is no longer marked after switching', !mineNode('mine_start_iron').classList.contains('is-selected') && mineNode('mine_start_coal').classList.contains('is-selected') && selectedCount() === 1);
+  base().click();
+  check('Task58: selecting base while a mine is selected moves the selection', win.getWorldSelection().type === 'base' && selectedCount() === 1);
+  // Clicking a label (child of the mine node) still selects that mine.
+  mineNode('mine_start_coal').querySelector('.world-mine-label').click();
+  check('Task58: clicking a mine label selects its mine', win.getWorldSelection().id === 'mine_start_coal');
+  // Empty space inside the stage clears.
+  stage.querySelector('.world-ground').click();
+  check('Task58: clicking empty stage space clears the selection', win.getWorldSelection() === null && selectedCount() === 0);
+  mineNode('mine_start_iron').click();
+  stage.click();
+  check('Task58: clicking the stage itself clears the selection', win.getWorldSelection() === null);
+  // Player sprite is not selectable.
+  win.getWorldSelection();
+  doc.getElementById('playerChar').click();
+  check('Task58: player sprite is not a selection target', win.getWorldSelection() === null);
+  // Clicks outside the stage do nothing to the selection.
+  mineNode('mine_start_iron').click();
+  doc.querySelector('.ambience').click();
+  check('Task58: clicks outside the stage keep the selection', win.getWorldSelection() && win.getWorldSelection().id === 'mine_start_iron');
+  // Invalid selections are rejected.
+  check('Task58: unknown mine id is rejected', win.selectWorldObject('mine', 'no_such_mine') === false && win.getWorldSelection().id === 'mine_start_iron');
+  check('Task58: unknown type is rejected', win.selectWorldObject('player') === false);
+  // getWorldSelection returns a copy.
+  const copy = win.getWorldSelection();
+  copy.id = 'tampered';
+  check('Task58: selection cannot be mutated from outside', win.getWorldSelection().id === 'mine_start_iron');
+})();
+
+(function test_T58_selectionSurvivesSecureAndExpansion() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-secure-mine="mine_start_iron"]').click();
+  const iron = stage.querySelector('[data-world-mine="mine_start_iron"]');
+  check('Task58: securing still updates the stage state', iron.getAttribute('data-development-state') === 'secured' && iron.classList.contains('is-secured'));
+  check('Task58: selection is kept after securing', win.getWorldSelection().id === 'mine_start_iron' && iron.classList.contains('is-selected'));
+  stage.querySelector('[data-world-mine="mine_start_coal"]').click();
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  check('Task58: secured mine can be selected again', win.getWorldSelection().id === 'mine_start_iron');
+  win.state.gold = 700;
+  check('Task58: expansion succeeds', win.expandBase() === true);
+  win.renderAll();
+  check('Task58: selection kept across renderAll', stage.querySelector('[data-world-mine="mine_start_iron"]').classList.contains('is-selected'));
+  const mana = stage.querySelector('[data-resource="mana"]');
+  const crystal = stage.querySelector('[data-resource="crystal"]');
+  mana.click();
+  check('Task58: newly expanded mana mine is selectable', win.getWorldSelection().id === mana.getAttribute('data-world-mine'));
+  crystal.click();
+  check('Task58: newly expanded crystal mine is selectable', win.getWorldSelection().id === crystal.getAttribute('data-world-mine') && stage.querySelectorAll('.is-selected').length === 1);
+  // A selected mine that disappears drops the selection.
+  win.state.world.mines = win.state.world.mines.filter(m => m.resource !== 'crystal');
+  win.renderWorldObjects();
+  check('Task58: selection of a removed mine is dropped', win.getWorldSelection() === null && stage.querySelectorAll('.is-selected').length === 0);
+  // Movement keys still work with a selection active.
+  stage.querySelector('[data-world-mine="mine_start_coal"]').click();
+  const x0 = win.state.world.player.x;
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'd' }));
+  for(let i=0;i<5;i++) win.tickLoop();
+  doc.dispatchEvent(new win.KeyboardEvent('keyup', { key: 'd' }));
+  win.tickLoop();
+  check('Task58: WASD movement works while something is selected', win.state.world.player.x > x0 && win.state.world.player.pose === 'idle');
+  check('Task58: moving does not change the selection', win.getWorldSelection().id === 'mine_start_coal');
+})();
+
+(function test_T58_selectionNotSaved() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const stage = win.document.getElementById('worldStage');
+  const worldKeysBefore = Object.keys(win.state.world).sort().join(',');
+  stage.querySelector('[data-world-mine="mine_start_coal"]').click();
+  check('Task58: selection does not add fields to state.world', Object.keys(win.state.world).sort().join(',') === worldKeysBefore);
+  check('Task58: selection does not touch mine data', win.state.world.mines.every(m => !('selected' in m)));
+  check('Task58: save succeeds with a selection', win.saveGame() === true);
+  const raw = storage.getItem('gachaFactorySave');
+  check('Task58: save data has no selection', !/selected|selection/i.test(raw));
+  check('Task58: saveVersion stays 1', JSON.parse(raw).saveVersion === 1);
+  const win2 = newDom(storage).window;
+  check('Task58: reload starts with nothing selected', win2.getWorldSelection() === null && win2.document.querySelectorAll('#worldStage .is-selected').length === 0);
+  check('Task58: reload still restores the saved world', win2.state.world.mines.length === 2);
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================
