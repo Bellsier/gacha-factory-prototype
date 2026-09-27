@@ -128,6 +128,86 @@
   check('stabilize: saveVersion remains 1 after workshop auto save', JSON.parse(storage.getItem('gachaFactorySave')).saveVersion === 1);
 })();
 
+(function test_T56_freshPlayerOnWorldStage() {
+  const win = newDom(makeMemoryStorage()).window;
+  const player = win.state.world.player;
+  check('Task56: fresh world has a single player', !!player && typeof player.x === 'number');
+  check('Task56: player starts at the base origin', player.x === 0 && player.y === 0);
+  check('Task56: player starts idle', player.pose === 'idle');
+  check('Task56: player sprite is on the world stage', !!win.document.getElementById('playerChar'));
+  check('Task56: world stage shows idle pose', win.document.getElementById('playerChar').getAttribute('data-player-pose') === 'idle');
+})();
+
+(function test_T56_keyboardMovesAndReturnsToIdle() {
+  const win = newDom(makeMemoryStorage()).window;
+  const startX = win.state.world.player.x;
+  check('Task56: ArrowRight is accepted', win.setPlayerHeld('right', true) === true);
+  win.tickPlayer();
+  win.updatePlayerSprite();
+  check('Task56: holding right increases x', win.state.world.player.x > startX);
+  check('Task56: moving player faces right', win.state.world.player.facing === 'right');
+  check('Task56: moving player uses walk pose', win.state.world.player.pose === 'walk');
+  check('Task56: sprite walk class updates', win.document.getElementById('playerChar').className.includes('pose-walk'));
+  win.setPlayerHeld('right', false);
+  win.tickPlayer();
+  win.updatePlayerSprite();
+  check('Task56: releasing keys returns to idle', win.state.world.player.pose === 'idle');
+  check('Task56: WASD up is accepted', win.setPlayerHeld('up', true) === true);
+  win.state.world.player.y = 2;
+  const yBefore = win.state.world.player.y;
+  win.tickPlayer();
+  check('Task56: holding up decreases y', win.state.world.player.y < yBefore);
+  win.clearPlayerHeld();
+  win.tickPlayer();
+  check('Task56: unknown direction is rejected', win.setPlayerHeld('jump', true) === false);
+})();
+
+(function test_T56_worldBoundsAndSaveLoad() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  win.state.world.player.x = 40;
+  win.state.world.player.y = -8;
+  const clamped = win.clampPlayerPosition(win.state.world.player.x, win.state.world.player.y);
+  win.state.world.player.x = clamped.x;
+  win.state.world.player.y = clamped.y;
+  check('Task56: x is clamped to the world max', clamped.x === 10);
+  check('Task56: y is clamped to the world min', clamped.y === 0);
+  win.setPlayerHeld('right', true);
+  win.state.world.player.x = 10;
+  win.tickPlayer();
+  check('Task56: walking past the edge keeps the player inside', win.state.world.player.x === 10);
+  win.clearPlayerHeld();
+  win.state.world.player.facing = 'left';
+  win.state.world.player.x = 3.5;
+  win.state.world.player.y = 1.25;
+  check('Task56: player position saves', win.saveGame() === true);
+  const loaded = win.loadGame();
+  check('Task56: player x survives save/load', loaded.ok === true && loaded.run.world.player.x === 3.5);
+  check('Task56: player facing survives save/load', loaded.run.world.player.facing === 'left');
+  check('Task56: loaded player is idle', loaded.run.world.player.pose === 'idle');
+  check('Task56: saveVersion remains 1 after player save', JSON.parse(storage.getItem('gachaFactorySave')).saveVersion === 1);
+})();
+
+(function test_T56_legacySaveAndExistingLoop() {
+  const win = newDom(makeMemoryStorage()).window;
+  const world = win.sanitizeWorldState({
+    base: { x: 0, y: 0, level: 1 },
+    mines: [{ id: 'mine_start_iron', x: 2, y: 0, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' }],
+  });
+  check('Task56: legacy world without player still sanitizes', world.player.x === 0 && world.player.y === 0 && world.player.pose === 'idle');
+  const nanWorld = win.sanitizeWorldState({
+    base: { x: 0, y: 0, level: 1 },
+    mines: [],
+    workshops: [],
+    player: { x: Number.NaN, y: Number.POSITIVE_INFINITY, facing: 'sideways', pose: 'walk' },
+  });
+  check('Task56: invalid player coords fall back inside bounds', nanWorld.player.x === 0 && nanWorld.player.y === 0);
+  check('Task56: invalid facing falls back to down', nanWorld.player.facing === 'down');
+  const iron = win.state.world.mines.find(m => m.resource === 'iron');
+  check('Task56: existing starting mines remain', !!iron);
+  check('Task56: player movement does not consume resources', win.state.resources.iron === 0);
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================
