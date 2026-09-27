@@ -229,7 +229,7 @@ function checkFirstGachaMilestone(){
   if(state.gold < BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD) return;
   permanent.firstGachaGranted = true;
   permanent.tickets += 1;
-  log('🎟️ 첫 가챠권 획득! 이제 인부를 뽑을 수 있습니다.');
+  log('🎟️ 첫 가찼권 획득! 이제 인부를 뽑을 수 있습니다.');
 }
 
 function sellAll(recipe, silent){
@@ -358,7 +358,9 @@ function tickLoop(){
   tickCrafting();
   tickWorkshops();
   tickAutoSell();
+  tickPlayer();
   updateNumbers();
+  updatePlayerSprite();
 }
 
 // passive ticket trickle — only once the first (50G-earned) ticket has been
@@ -366,7 +368,7 @@ function tickLoop(){
 function ticketTrickle(){
   if(!permanent.firstGachaGranted) return;
   permanent.tickets += 1;
-  log('가챠권 +1 (자동 지급)');
+  log('가찼권 +1 (자동 지급)');
   renderCurrencies();
 }
 
