@@ -27,6 +27,8 @@ npm install
 npm test
 ```
 
+`npm test`는 `tests/regression.test.js`가 `tests/chunks/00.js`부터 번호 순으로 불러 한 번에 실행합니다. 청크를 합친 내용이 전체 회귀 스위트입니다.
+
 ## 진행
 
 1. **채굴** 탭에서 월드 광맥을 확보한 뒤 캔다. 캔 광석은 공용 저장소로 들어간다.

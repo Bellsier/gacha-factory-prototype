@@ -3,10 +3,9 @@
 /**
  * Regression test suite for 채굴 공방 (gacha-factory-prototype).
  *
- * The suite is split into tests/chunks/*.js so GitHub file writes stay
- * within MCP size limits. Concatenating those chunks in order recreates
- * the original single-file suite. This loader evaluates that source with
- * __dirname set to tests/, matching the previous harness paths.
+ * The suite lives in tests/chunks/*.js (00.js, 01.js, …) and this file is
+ * the npm test entry. Chunks are concatenated in filename order and run
+ * with __dirname set to tests/.
  *
  * Run: npm test   (or)   node tests/regression.test.js
  */

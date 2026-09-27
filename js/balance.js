@@ -45,8 +45,8 @@ const BALANCE = {
     FACILITY_SPEED_PER_LEVEL: 0.1,    // craftSpeed(): +10% timed-craft speed per level above 1
   },
   world: {
+    // expandBase/unlockSite spend SITES[key].unlockCost, not a separate world cost.
     EXPANSION_SITE_ORDER: ['abandonedMine','manaVein','ruins','spaceStation'],
-    BASE_EXPANSION_COST: 250,
   },
   gacha: {
     FIRST_TICKET_GOLD_THRESHOLD: 50, // one-time gold milestone that grants the first ticket

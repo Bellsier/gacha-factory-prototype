@@ -16,8 +16,7 @@ function makeEntityId(prefix, existingIds){
 // Task 21 sanitize helpers above: sanitizeFactoryNode() takes possibly-
 // malformed SAVE DATA and coerces it into a safe default value; the
 // functions below never coerce anything and never touch state — they just
-// check. Nothing calls these yet: there is no addFactoryNode() and no
-// Factory UI wired up this task.
+// check. addFactoryNode() lives below; there is still no Factory UI.
 //
 // A Node occupies the half-open rectangle x <= cell.x < x+width,
 // y <= cell.y < y+height, so two Nodes that only share an edge or a corner
@@ -196,7 +195,8 @@ function addMine(rawMine){
 // Task 37: Workshop registration.
 // A Workshop is a world/base facility, separate from the legacy Factory Node
 // data model. Placement is currently only unique within the workshop
-// collection; build costs and recipe assignment are deferred to later Tasks.
+// collection. Construction cost UI is not in this prototype; recipe
+// assignment uses setWorkshopRecipe().
 function isWorkshopRecipeValid(recipeKey){
   return recipeKey === null || (typeof recipeKey === 'string' && RECIPES.some(recipe => recipe.key === recipeKey));
 }
