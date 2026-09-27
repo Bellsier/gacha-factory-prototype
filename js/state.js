@@ -74,8 +74,8 @@ function freshRunState(){
     hqLevel:0,  // gold-funded run-scoped multiplier
     craftFacility:1, // gold-funded run-scoped timed-craft speed level (1 = current craft times)
     autoLineLogged:false, // Task 6: has the one-time "both iron+coal automated" log fired this run?
-    factory: freshFactoryState(), // Task 21: data-only Factory skeleton (grid/nodes/links); unused by tick/UI/logic so far
-    world: freshWorldState(), // Task 27: base + world mine data skeleton; no mining behavior yet
+    factory: freshFactoryState(), // Task 21–26: Factory Node/Link data kept for Blueprint V3; no Factory UI yet
+    world: freshWorldState(), // Task 27+: base, world mines, workshops
   };
 }
 
