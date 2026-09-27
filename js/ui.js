@@ -169,9 +169,8 @@ function buildLines(){
   });
 }
 
-// Task 38: Minimal workshop UI. Workshops are displayed as world/base
-// facilities; recipe assignment and production behavior are intentionally
-// deferred to later Tasks.
+// Task 38/44: Workshop cards live in the 개발 tab. Recipe select, manual
+// craft, and auto-craft controls call factory.js actions then re-render.
 function recipeNeedsLockedResource(recipe){
   return Object.keys(recipe.need).some(k=>{
     const res = RESOURCES.find(x=>x.key===k);
@@ -496,14 +495,7 @@ function updateNumbers(){
   renderCurrencies();
 }
 
-// through a named action function (unlockSite/mineResource/upgradeFacility/
-// startCraft/pullGacha/upgradeCraftFacility/etc., Task 13's pattern) that
-// returns before any DOM call, while buildLines()/buildRecipes()/buildWorkers()/
-// updateNumbers()/renderAll() only ever read `state` to rebuild or refresh
-// the DOM — they never mutate it. A future Factory UI panel should follow
-// the same shape (its own thin onclick -> action function -> re-render
-// calls) rather than mixing state writes into a render function. Existing
-// UI code/design is unchanged here.
+// Structural rebuild after state changes. Render helpers only read `state`.
 function renderAll(){
   renderCurrencies();
   renderBaseInfo();
