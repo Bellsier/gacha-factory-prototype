@@ -46,6 +46,15 @@
       </div>
     </section>
     <section>
+      <h2>탐색</h2>
+      <div id="worldStage" class="world-stage" aria-label="플레이어 캐릭터">
+        <div class="world-ground"></div>
+        <div class="world-base-marker" title="거점"></div>
+        <div id="playerChar" class="player-char pose-idle facing-down" data-player-pose="idle" data-player-facing="down"></div>
+      </div>
+      <p class="rate" style="margin:8px 0 0;">WASD 또는 방향키로 거점 주변을 걸어 보세요.</p>
+    </section>
+    <section>
       <h2>월드 광맥</h2>
       <div id="worldMines"></div>
     </section>
@@ -131,6 +140,7 @@
 <script src="js/state.js"></script>
 <script src="js/systems.js"></script>
 <script src="js/factory.js"></script>
+<script src="js/player.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 </body>
