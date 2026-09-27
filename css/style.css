@@ -203,6 +203,21 @@
     filter:drop-shadow(0 0 5px rgba(224,168,60,0.75));
   }
   .world-mine-node.is-selected .world-mine-label{color:var(--legend);}
+  /* Task 59: selected-object info box (bottom-right of the stage). Clicks pass
+     through to the world under it, so it never blocks selecting/deselecting. */
+  .world-info{
+    position:absolute; right:10px; bottom:10px; z-index:3;
+    min-width:96px; max-width:45%;
+    padding:6px 10px;
+    background:rgba(20,24,28,0.86); border:1px solid var(--amber-dim); border-radius:6px;
+    font-size:0.68rem; line-height:1.5; color:var(--text);
+    pointer-events:none;
+  }
+  .world-info[hidden]{display:none;}
+  .world-info .world-info-title{font-family:'Space Grotesk', sans-serif; font-weight:700; color:var(--legend); font-size:0.75rem;}
+  .world-info .world-info-level, .world-info .world-info-position,
+  .world-info .world-info-resource, .world-info .world-info-grade{color:var(--dim);}
+  .world-info .world-info-state{color:var(--text); font-weight:600;}
   .player-char{
     pointer-events:none;
     position:absolute; width:16px; height:26px;

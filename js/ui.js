@@ -642,6 +642,60 @@ function applyWorldSelection(){
   stage.querySelectorAll('[data-world-mine]').forEach(node=>{
     node.classList.toggle('is-selected', !!sel && sel.type === 'mine' && node.getAttribute('data-world-mine') === sel.id);
   });
+  renderWorldInfo();
+}
+
+// ---------------------------------------------------------------------------
+// Task 59: small read-only info box for the selected world object.
+// Every line is read from state.world at render time (no copied state), and
+// it re-renders whenever the selection is re-applied — i.e. on select/clear
+// and at the end of renderWorldObjects(), which already runs after securing
+// a mine, expanding, loading, etc. Hidden when nothing is selected.
+// ---------------------------------------------------------------------------
+function worldInfoLines(sel){
+  if(!sel) return null;
+  if(sel.type === 'base'){
+    const base = state.world.base;
+    return [
+      { key: 'title', text: '거점' },
+      { key: 'level', text: '레벨 ' + base.level },
+      { key: 'position', text: '위치 (' + base.x + ', ' + base.y + ')' },
+    ];
+  }
+  if(sel.type === 'mine'){
+    const mine = state.world.mines.find(m => m && m.id === sel.id);
+    if(!mine) return null;
+    const resource = RESOURCES.find(r => r.key === mine.resource);
+    const name = resource ? resource.name : mine.resource;
+    return [
+      { key: 'title', text: name + ' 광맥' },
+      { key: 'resource', text: name },
+      { key: 'grade', text: '등급 ' + mine.grade },
+      { key: 'state', text: mine.developmentState === 'secured' ? '확보됨' : '미확보' },
+    ];
+  }
+  return null;
+}
+
+function renderWorldInfo(){
+  const box = document.getElementById('worldInfo');
+  if(!box) return;
+  const lines = worldInfoLines(worldSelection);
+  box.innerHTML = '';
+  if(!lines){
+    box.hidden = true;
+    box.removeAttribute('data-world-info-type');
+    return;
+  }
+  lines.forEach(line=>{
+    const row = document.createElement('div');
+    row.className = 'world-info-' + line.key;
+    row.setAttribute('data-world-info', line.key);
+    row.textContent = line.text;
+    box.appendChild(row);
+  });
+  box.setAttribute('data-world-info-type', worldSelection.type);
+  box.hidden = false;
 }
 
 // One delegated click handler on the stage: an object click selects it,

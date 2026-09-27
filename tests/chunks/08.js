@@ -394,6 +394,102 @@
   check('Task58: reload still restores the saved world', win2.state.world.mines.length === 2);
 })();
 
+(function test_T59_worldInfoPanel() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const box = doc.getElementById('worldInfo');
+  const line = (k) => { const el = box.querySelector('[data-world-info="' + k + '"]'); return el ? el.textContent : null; };
+  const lines = () => [...box.querySelectorAll('[data-world-info]')].map(e => e.textContent);
+  const mineNode = (id) => stage.querySelector('[data-world-mine="' + id + '"]');
+  check('Task59: info box lives inside worldStage', !!box && stage.contains(box));
+  check('Task59: info box hidden with nothing selected', box.hidden === true && lines().length === 0);
+  stage.querySelector('.world-base-marker').click();
+  check('Task59: base selection shows the info box', box.hidden === false && box.getAttribute('data-world-info-type') === 'base');
+  check('Task59: base info title', line('title') === '거점');
+  check('Task59: base info level from state', line('level') === '레벨 ' + win.state.world.base.level && line('level') === '레벨 1');
+  check('Task59: base info position from state', line('position') === '위치 (0, 0)');
+  mineNode('mine_start_iron').click();
+  check('Task59: iron info lines', JSON.stringify(lines()) === JSON.stringify(['철광석 광맥', '철광석', '등급 1', '미확보']));
+  check('Task59: info type switches to mine', box.getAttribute('data-world-info-type') === 'mine');
+  mineNode('mine_start_coal').click();
+  check('Task59: iron -> coal switches info', JSON.stringify(lines()) === JSON.stringify(['석탄 광맥', '석탄', '등급 1', '미확보']));
+  check('Task59: only one info block is shown', box.querySelectorAll('[data-world-info="title"]').length === 1);
+  stage.querySelector('.world-ground').click();
+  check('Task59: empty space click hides the info box', box.hidden === true && lines().length === 0);
+  // Securing the selected mine updates the info immediately.
+  mineNode('mine_start_iron').click();
+  doc.querySelector('[data-secure-mine="mine_start_iron"]').click();
+  check('Task59: securing flips info to 확보됨', line('state') === '확보됨' && box.hidden === false);
+  check('Task59: secured info still names iron', line('title') === '철광석 광맥');
+  // Info is kept after renderWorldObjects / renderAll.
+  win.renderWorldObjects();
+  check('Task59: info kept after renderWorldObjects', box.hidden === false && line('title') === '철광석 광맥' && line('state') === '확보됨');
+  win.renderAll();
+  check('Task59: info kept after renderAll', box.hidden === false && line('title') === '철광석 광맥');
+  // Info reads live state, not a copy.
+  win.state.world.base.level = 3;
+  stage.querySelector('.world-base-marker').click();
+  check('Task59: base level reads current state', line('level') === '레벨 3');
+  win.state.world.base.level = 1;
+  // Expansion: new mine info.
+  win.state.gold = 700;
+  check('Task59: expansion succeeds', win.expandBase() === true);
+  win.renderAll();
+  check('Task59: base info after expansion shows new level', line('level') === '레벨 2');
+  stage.querySelector('[data-resource="mana"]').click();
+  check('Task59: new mana mine info', JSON.stringify(lines()) === JSON.stringify(['마정석 광맥', '마정석', '등급 2', '미확보']));
+  stage.querySelector('[data-resource="crystal"]').click();
+  check('Task59: new crystal mine info', line('title') === '결정 광맥' && line('grade') === '등급 2');
+  // Selected mine removed -> info hidden.
+  win.state.world.mines = win.state.world.mines.filter(m => m.resource !== 'crystal');
+  win.renderWorldObjects();
+  check('Task59: removed selected mine hides info', box.hidden === true && lines().length === 0 && win.getWorldSelection() === null);
+  // Clicking on the info box area never selects anything by itself.
+  stage.querySelector('[data-world-mine="mine_start_coal"]').click();
+  check('Task59: info box is click-through (pointer-events none in CSS)', /\.world-info\{[^}]*pointer-events:none/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8')));
+  // Movement is unaffected while info is shown.
+  const x0 = win.state.world.player.x;
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight' }));
+  for(let i=0;i<5;i++) win.tickLoop();
+  doc.dispatchEvent(new win.KeyboardEvent('keyup', { key: 'ArrowRight' }));
+  win.tickLoop();
+  check('Task59: movement still works with info shown', win.state.world.player.x > x0);
+  check('Task59: movement leaves info as is', line('title') === '석탄 광맥');
+})();
+
+(function test_T59_infoNotSaved() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const stage = win.document.getElementById('worldStage');
+  const worldKeys = Object.keys(win.state.world).sort().join(',');
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  check('Task59: info render adds no fields to state.world', Object.keys(win.state.world).sort().join(',') === worldKeys);
+  check('Task59: info render leaves mine objects unchanged', JSON.stringify(Object.keys(win.state.world.mines[0]).sort()) === JSON.stringify(['developmentState','grade','id','miningPower','resource','x','y']));
+  check('Task59: save succeeds with info shown', win.saveGame() === true);
+  const raw = storage.getItem('gachaFactorySave');
+  check('Task59: save data has no selection/info', !/selected|selection|worldInfo|world-info/i.test(raw));
+  const win2 = newDom(storage).window;
+  const box2 = win2.document.getElementById('worldInfo');
+  check('Task59: reload hides the info box', box2.hidden === true && box2.children.length === 0 && win2.getWorldSelection() === null);
+})();
+
+(function test_T59_coreLoopRegression() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  doc.querySelector('#worldStage [data-world-mine="mine_start_iron"]').click();
+  ['mine_start_iron','mine_start_coal'].forEach(id => doc.querySelector('[data-secure-mine="' + id + '"]').click());
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_coal"]').click();
+  check('Task59: mining still works', win.state.resources.iron === 2 && win.state.resources.coal === 1);
+  doc.querySelector('[data-craft="steel"]').click();
+  check('Task59: crafting still works', win.state.products.steel === 1);
+  doc.querySelector('[data-sell="steel"]').click();
+  check('Task59: selling still works', win.state.gold > 0 && win.state.products.steel === 0);
+  check('Task59: info follows secured state through the loop', doc.querySelector('#worldInfo [data-world-info="state"]').textContent === '확보됨');
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================
