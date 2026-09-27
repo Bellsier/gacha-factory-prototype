@@ -507,5 +507,47 @@ function renderAll(){
   buildWorkers();
   renderLastPull();
   updateNumbers();
+  updatePlayerSprite();
+}
+
+function playerTypingTarget(el){
+  if(!el || !el.tagName) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
+function onPlayerKey(e, down){
+  if(playerTypingTarget(e.target)) return;
+  const dir = playerDirFromKey(e.key);
+  if(!dir) return;
+  if(e.key.startsWith('Arrow')) e.preventDefault();
+  setPlayerHeld(dir, down);
+}
+
+document.addEventListener('keydown', (e)=> onPlayerKey(e, true));
+document.addEventListener('keyup', (e)=> onPlayerKey(e, false));
+window.addEventListener('blur', ()=> clearPlayerHeld());
+
+function updatePlayerSprite(){
+  const el = document.getElementById('playerChar');
+  if(!el || !state.world.player) return;
+  const p = state.world.player;
+  const b = BALANCE.world;
+  const spanX = b.BOUNDS_MAX_X - b.BOUNDS_MIN_X;
+  const spanY = b.BOUNDS_MAX_Y - b.BOUNDS_MIN_Y;
+  const left = spanX === 0 ? 0 : ((p.x - b.BOUNDS_MIN_X) / spanX) * 100;
+  const top = spanY === 0 ? 0 : ((p.y - b.BOUNDS_MIN_Y) / spanY) * 100;
+  el.style.left = left + '%';
+  el.style.top = top + '%';
+  el.className = 'player-char pose-' + p.pose + ' facing-' + p.facing;
+  el.setAttribute('data-player-pose', p.pose);
+  el.setAttribute('data-player-facing', p.facing);
+  const marker = document.querySelector('.world-base-marker');
+  if(marker){
+    const bx = spanX === 0 ? 0 : ((state.world.base.x - b.BOUNDS_MIN_X) / spanX) * 100;
+    const by = spanY === 0 ? 0 : ((state.world.base.y - b.BOUNDS_MIN_Y) / spanY) * 100;
+    marker.style.left = bx + '%';
+    marker.style.top = by + '%';
+  }
 }
 

@@ -26,7 +26,7 @@ const html = fs.readFileSync(HTML_PATH, 'utf8');
 // in the exact same order the browser loads them — this is not a reimplementation,
 // it is the literal file content index.html points at.
 const JS_DIR = path.join(__dirname, '..', 'js');
-const MODULE_FILES = ['data.js', 'balance.js', 'state.js', 'systems.js', 'factory.js', 'ui.js', 'main.js'];
+const MODULE_FILES = ['data.js', 'balance.js', 'state.js', 'systems.js', 'factory.js', 'player.js', 'ui.js', 'main.js'];
 const moduleSource = MODULE_FILES.map((f) => fs.readFileSync(path.join(JS_DIR, f), 'utf8')).join('\n');
 
 let passCount = 0;

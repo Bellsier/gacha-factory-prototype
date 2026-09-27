@@ -358,7 +358,9 @@ function tickLoop(){
   tickCrafting();
   tickWorkshops();
   tickAutoSell();
+  tickPlayer();
   updateNumbers();
+  updatePlayerSprite();
 }
 
 // passive ticket trickle — only once the first (50G-earned) ticket has been
