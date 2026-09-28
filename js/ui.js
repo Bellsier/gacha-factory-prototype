@@ -83,7 +83,7 @@ function buildMines(){
       '<button data-mine-mine="' + mine.id + '" ' + (mine.developmentState !== 'secured' ? 'disabled' : '') + '>채굴하기 (+' + mine.miningPower + ')</button>';
     wrap.appendChild(card);
   });
-  wrap.querySelectorAll('[data-secure-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!secureMine(btn.dataset.secureMine)) return; buildMines(); updateNumbers(); }; });
+  wrap.querySelectorAll('[data-secure-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!secureMine(btn.dataset.secureMine)) return; buildMines(); renderWorldObjects(); updateNumbers(); }; });
   wrap.querySelectorAll('[data-mine-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!mineMine(btn.dataset.mineMine)) return; updateNumbers(); }; });
 }
 // tab switching
@@ -507,6 +507,7 @@ function renderAll(){
   buildWorkers();
   renderLastPull();
   updateNumbers();
+  renderWorldObjects();
   updatePlayerSprite();
 }
 
@@ -528,26 +529,236 @@ document.addEventListener('keydown', (e)=> onPlayerKey(e, true));
 document.addEventListener('keyup', (e)=> onPlayerKey(e, false));
 window.addEventListener('blur', ()=> clearPlayerHeld());
 
+// ---------------------------------------------------------------------------
+// Task 57: one world -> screen conversion shared by the player, the base and
+// the world mines, so everything on #worldStage uses the same world units.
+// World bounds (BALANCE.world) are unchanged; the stage just keeps a small
+// visual margin so objects sitting on the bound edges (e.g. the base at 0,0)
+// are drawn fully inside the stage instead of clipped at its corner.
+// Pure presentation — no camera, no scrolling.
+// ---------------------------------------------------------------------------
+const WORLD_STAGE_MARGIN = { left: 12, right: 10, top: 32, bottom: 12 }; // % of the stage
+
+function worldToStagePercent(x, y){
+  const b = BALANCE.world;
+  const m = WORLD_STAGE_MARGIN;
+  const spanX = b.BOUNDS_MAX_X - b.BOUNDS_MIN_X;
+  const spanY = b.BOUNDS_MAX_Y - b.BOUNDS_MIN_Y;
+  const fx = spanX === 0 ? 0 : (x - b.BOUNDS_MIN_X) / spanX;
+  const fy = spanY === 0 ? 0 : (y - b.BOUNDS_MIN_Y) / spanY;
+  return {
+    left: m.left + fx * (100 - m.left - m.right),
+    top: m.top + fy * (100 - m.top - m.bottom),
+  };
+}
+
+function placeOnStage(el, x, y){
+  const pos = worldToStagePercent(x, y);
+  el.style.left = pos.left + '%';
+  el.style.top = pos.top + '%';
+}
+
+// Task 57: draws the base and every mine in state.world.mines onto the
+// stage. Structural — called from renderAll() (and after securing a mine),
+// never from the tick loop. The mine list (#worldMines) and this layer both
+// read the same state.world.mines array; no positions live in the HTML.
+function renderWorldObjects(){
+  const marker = document.querySelector('.world-base-marker');
+  if(marker){
+    placeOnStage(marker, state.world.base.x, state.world.base.y);
+    marker.title = '거점 Lv.' + state.world.base.level + ' (' + state.world.base.x + ', ' + state.world.base.y + ')';
+  }
+  const layer = document.getElementById('worldMineLayer');
+  if(!layer) return;
+  layer.innerHTML = '';
+  state.world.mines.forEach(mine=>{
+    if(!mine) return;
+    const resource = RESOURCES.find(r=>r.key===mine.resource);
+    const name = resource ? resource.name : mine.resource;
+    const secured = mine.developmentState === 'secured';
+    const node = document.createElement('div');
+    node.className = 'world-mine-node res-' + mine.resource + (secured ? ' is-secured' : ' is-unsecured');
+    node.setAttribute('data-world-mine', mine.id);
+    node.setAttribute('data-resource', mine.resource);
+    node.setAttribute('data-development-state', mine.developmentState);
+    node.title = name + ' 광맥 · ' + (secured ? '확보 완료' : '미확보') + ' (' + mine.x + ', ' + mine.y + ')';
+    const label = document.createElement('span');
+    label.className = 'world-mine-label';
+    label.textContent = name;
+    node.appendChild(label);
+    placeOnStage(node, mine.x, mine.y);
+    layer.appendChild(node);
+  });
+  renderWorldWorkshopMarkers();
+  applyWorldSelection();
+}
+
+// Task 60: draws one marker per existing state.world.workshops entry.
+// Presentation only — never creates a workshop, never selects one, and never
+// handles clicks. The layer and nodes stay click-through via CSS
+// (pointer-events:none). Positions use the same worldToStagePercent()
+// conversion as the base, mines, and player. Called from renderWorldObjects(),
+// so renderAll() refreshes the markers with the rest of the stage.
+function renderWorldWorkshopMarkers(){
+  const layer = document.getElementById('worldWorkshopLayer');
+  if(!layer) return;
+  layer.innerHTML = '';
+  const workshops = state.world && Array.isArray(state.world.workshops) ? state.world.workshops : [];
+  workshops.forEach(workshop=>{
+    if(!workshop) return;
+    const node = document.createElement('div');
+    node.className = 'world-workshop-node';
+    if(typeof workshop.id === 'string' && workshop.id.length > 0){
+      node.setAttribute('data-world-workshop', workshop.id);
+    }
+    node.title = '제작소 Lv.' + workshop.level + ' (' + workshop.x + ', ' + workshop.y + ')';
+    const label = document.createElement('span');
+    label.className = 'world-workshop-label';
+    label.textContent = '제작소';
+    node.appendChild(label);
+    placeOnStage(node, workshop.x, workshop.y);
+    layer.appendChild(node);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Task 58: world object selection (base or one mine), foundation only — no
+// info panel, no actions. The selection is UI-only session state: it lives
+// in this module variable, never in `state`, so it is never saved and a
+// reload / new game always starts with nothing selected.
+//   null                      -> nothing selected
+//   { type: 'base' }          -> the base
+//   { type: 'mine', id }      -> the mine with that id in state.world.mines
+// ---------------------------------------------------------------------------
+let worldSelection = null;
+
+function getWorldSelection(){
+  return worldSelection ? { ...worldSelection } : null;
+}
+
+function isWorldSelectionValid(sel){
+  if(!sel) return true;
+  if(sel.type === 'base') return true;
+  if(sel.type === 'mine') return state.world.mines.some(m => m && m.id === sel.id);
+  return false;
+}
+
+function selectWorldObject(type, id){
+  let next = null;
+  if(type === 'base') next = { type: 'base' };
+  else if(type === 'mine' && typeof id === 'string') next = { type: 'mine', id };
+  if(!next || !isWorldSelectionValid(next)) return false;
+  worldSelection = next;
+  applyWorldSelection();
+  return true;
+}
+
+function clearWorldSelection(){
+  worldSelection = null;
+  applyWorldSelection();
+}
+
+// Reflects worldSelection onto the stage DOM (one .is-selected at most).
+// Drops a selection whose mine no longer exists (e.g. after prestige).
+function applyWorldSelection(){
+  if(!isWorldSelectionValid(worldSelection)) worldSelection = null;
+  const stage = document.getElementById('worldStage');
+  if(!stage) return;
+  const sel = worldSelection;
+  stage.setAttribute('data-world-selected', sel ? (sel.type === 'mine' ? 'mine:' + sel.id : 'base') : '');
+  const marker = stage.querySelector('.world-base-marker');
+  if(marker) marker.classList.toggle('is-selected', !!sel && sel.type === 'base');
+  stage.querySelectorAll('[data-world-mine]').forEach(node=>{
+    node.classList.toggle('is-selected', !!sel && sel.type === 'mine' && node.getAttribute('data-world-mine') === sel.id);
+  });
+  renderWorldInfo();
+}
+
+// ---------------------------------------------------------------------------
+// Task 59: small read-only info box for the selected world object.
+// Every line is read from state.world at render time (no copied state), and
+// it re-renders whenever the selection is re-applied — i.e. on select/clear
+// and at the end of renderWorldObjects(), which already runs after securing
+// a mine, expanding, loading, etc. Hidden when nothing is selected.
+// ---------------------------------------------------------------------------
+function worldInfoLines(sel){
+  if(!sel) return null;
+  if(sel.type === 'base'){
+    const base = state.world.base;
+    return [
+      { key: 'title', text: '거점' },
+      { key: 'level', text: '레벨 ' + base.level },
+      { key: 'position', text: '위치 (' + base.x + ', ' + base.y + ')' },
+    ];
+  }
+  if(sel.type === 'mine'){
+    const mine = state.world.mines.find(m => m && m.id === sel.id);
+    if(!mine) return null;
+    const resource = RESOURCES.find(r => r.key === mine.resource);
+    const name = resource ? resource.name : mine.resource;
+    return [
+      { key: 'title', text: name + ' 광맥' },
+      { key: 'resource', text: name },
+      { key: 'grade', text: '등급 ' + mine.grade },
+      { key: 'state', text: mine.developmentState === 'secured' ? '확보됨' : '미확보' },
+    ];
+  }
+  return null;
+}
+
+function renderWorldInfo(){
+  const box = document.getElementById('worldInfo');
+  if(!box) return;
+  const lines = worldInfoLines(worldSelection);
+  box.innerHTML = '';
+  if(!lines){
+    box.hidden = true;
+    box.removeAttribute('data-world-info-type');
+    return;
+  }
+  lines.forEach(line=>{
+    const row = document.createElement('div');
+    row.className = 'world-info-' + line.key;
+    row.setAttribute('data-world-info', line.key);
+    row.textContent = line.text;
+    box.appendChild(row);
+  });
+  box.setAttribute('data-world-info-type', worldSelection.type);
+  box.hidden = false;
+}
+
+// One delegated click handler on the stage: an object click selects it,
+// anything else inside the stage (ground, player) clears the selection.
+// Because both cases are decided here from the same event, the "empty
+// space clears" branch can never overwrite an object selection.
+function onWorldStageClick(e){
+  const stage = e.currentTarget;
+  const target = e.target && e.target.closest ? e.target : null;
+  const mineNode = target ? target.closest('[data-world-mine]') : null;
+  if(mineNode && stage.contains(mineNode)){
+    selectWorldObject('mine', mineNode.getAttribute('data-world-mine'));
+    return;
+  }
+  const baseNode = target ? target.closest('.world-base-marker') : null;
+  if(baseNode && stage.contains(baseNode)){
+    selectWorldObject('base');
+    return;
+  }
+  clearWorldSelection();
+}
+
+(function bindWorldStageClick(){
+  const stage = document.getElementById('worldStage');
+  if(stage) stage.addEventListener('click', onWorldStageClick);
+})();
+
 function updatePlayerSprite(){
   const el = document.getElementById('playerChar');
   if(!el || !state.world.player) return;
   const p = state.world.player;
-  const b = BALANCE.world;
-  const spanX = b.BOUNDS_MAX_X - b.BOUNDS_MIN_X;
-  const spanY = b.BOUNDS_MAX_Y - b.BOUNDS_MIN_Y;
-  const left = spanX === 0 ? 0 : ((p.x - b.BOUNDS_MIN_X) / spanX) * 100;
-  const top = spanY === 0 ? 0 : ((p.y - b.BOUNDS_MIN_Y) / spanY) * 100;
-  el.style.left = left + '%';
-  el.style.top = top + '%';
+  placeOnStage(el, p.x, p.y);
   el.className = 'player-char pose-' + p.pose + ' facing-' + p.facing;
   el.setAttribute('data-player-pose', p.pose);
   el.setAttribute('data-player-facing', p.facing);
-  const marker = document.querySelector('.world-base-marker');
-  if(marker){
-    const bx = spanX === 0 ? 0 : ((state.world.base.x - b.BOUNDS_MIN_X) / spanX) * 100;
-    const by = spanY === 0 ? 0 : ((state.world.base.y - b.BOUNDS_MIN_Y) / spanY) * 100;
-    marker.style.left = bx + '%';
-    marker.style.top = by + '%';
-  }
 }
 

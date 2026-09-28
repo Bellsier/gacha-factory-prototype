@@ -208,6 +208,406 @@
   check('Task56: player movement does not consume resources', win.state.resources.iron === 0);
 })();
 
+(function test_T57_worldObjectsFromState() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  check('Task57: world mine layer exists inside worldStage', !!stage && !!stage.querySelector('#worldMineLayer'));
+  const html = doc.getElementById('worldMineLayer').outerHTML;
+  const nodes = [...stage.querySelectorAll('[data-world-mine]')];
+  check('Task57: one stage node per state.world.mines entry', nodes.length === win.state.world.mines.length && nodes.length === 2);
+  const ironNode = stage.querySelector('[data-world-mine="mine_start_iron"]');
+  const coalNode = stage.querySelector('[data-world-mine="mine_start_coal"]');
+  check('Task57: starting iron mine is drawn', !!ironNode && ironNode.getAttribute('data-resource') === 'iron');
+  check('Task57: starting coal mine is drawn', !!coalNode && coalNode.getAttribute('data-resource') === 'coal');
+  check('Task57: resource type has its own visual class', ironNode.classList.contains('res-iron') && coalNode.classList.contains('res-coal'));
+  check('Task57: unsecured state is visible on stage', ironNode.classList.contains('is-unsecured') && ironNode.getAttribute('data-development-state') === 'unsecured');
+  const ironPos = win.worldToStagePercent(2, 0);
+  const coalPos = win.worldToStagePercent(0, 2);
+  check('Task57: iron mine position comes from mine.x/mine.y', ironNode.style.left === ironPos.left + '%' && ironNode.style.top === ironPos.top + '%');
+  check('Task57: coal mine position comes from mine.x/mine.y', coalNode.style.left === coalPos.left + '%' && coalNode.style.top === coalPos.top + '%');
+  const base = stage.querySelector('.world-base-marker');
+  const basePos = win.worldToStagePercent(win.state.world.base.x, win.state.world.base.y);
+  check('Task57: exactly one base object on stage', stage.querySelectorAll('.world-base-marker').length === 1);
+  check('Task57: base position comes from state.world.base', base.style.left === basePos.left + '%' && base.style.top === basePos.top + '%');
+  // Same conversion as the player.
+  const p = win.state.world.player;
+  win.updatePlayerSprite();
+  const playerPos = win.worldToStagePercent(p.x, p.y);
+  const playerEl = doc.getElementById('playerChar');
+  check('Task57: player uses the same world->stage conversion', playerEl.style.left === playerPos.left + '%' && playerEl.style.top === playerPos.top + '%');
+  check('Task57: player on base spot shares base screen position', playerEl.style.left === base.style.left && playerEl.style.top === base.style.top);
+  // Conversion stays inside the stage for every in-bounds coordinate.
+  // World bounds are the Task 56 reference values (0..10 on both axes).
+  const corners = [[0,0],[10,10],[0,10],[10,0]];
+  check('Task57: world bounds map inside the stage', corners.every(([x,y])=>{ const q = win.worldToStagePercent(x,y); return q.left > 0 && q.left < 100 && q.top > 0 && q.top < 100; }));
+  check('Task57: conversion is monotonic', win.worldToStagePercent(3,0).left > win.worldToStagePercent(2,0).left && win.worldToStagePercent(0,3).top > win.worldToStagePercent(0,2).top);
+  const clampedMax = win.clampPlayerPosition(99, 99);
+  const clampedMin = win.clampPlayerPosition(-5, -5);
+  check('Task57: world bounds unchanged', clampedMax.x === 10 && clampedMax.y === 10 && clampedMin.x === 0 && clampedMin.y === 0);
+  // No positions hard-coded in markup.
+  const rawHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  check('Task57: index.html has no hard-coded mine nodes', !/data-world-mine=/.test(rawHtml) && !/world-mine-node/.test(rawHtml));
+  check('Task57: mine layer starts empty in markup', /<div id="worldMineLayer" class="world-mine-layer"><\/div>/.test(rawHtml) && typeof html === 'string');
+})();
+
+(function test_T57_worldObjectsFollowData() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  // Securing via the existing list button also updates the stage node.
+  doc.querySelector('[data-secure-mine="mine_start_iron"]').click();
+  const ironNode = doc.querySelector('#worldStage [data-world-mine="mine_start_iron"]');
+  check('Task57: securing from the mine list marks stage node secured', !!ironNode && ironNode.classList.contains('is-secured') && ironNode.getAttribute('data-development-state') === 'secured');
+  // Stage and the "월드 광맥" list read the same data.
+  const listIds = [...doc.querySelectorAll('#worldMines [data-secure-mine]')].map(e=>e.getAttribute('data-secure-mine')).sort().join(',');
+  const stageIds = [...doc.querySelectorAll('#worldStage [data-world-mine]')].map(e=>e.getAttribute('data-world-mine')).sort().join(',');
+  check('Task57: stage mines match world mine list', listIds === stageIds && stageIds.length > 0);
+  // Expansion adds mines to both views through renderAll().
+  win.state.gold = 700;
+  check('Task57: expansion succeeds', win.expandBase() === true);
+  win.renderAll();
+  const nodes = doc.querySelectorAll('#worldStage [data-world-mine]');
+  check('Task57: expanded mines appear on stage', nodes.length === win.state.world.mines.length && nodes.length === 4);
+  check('Task57: expanded list and stage still agree', doc.querySelectorAll('#worldMines [data-secure-mine]').length === nodes.length);
+  const mana = doc.querySelector('#worldStage [data-resource="mana"]');
+  const manaPos = win.worldToStagePercent(4, 0);
+  check('Task57: new mine drawn at its seeded coordinates', !!mana && mana.style.left === manaPos.left + '%' && mana.style.top === manaPos.top + '%');
+  // Re-rendering does not duplicate objects.
+  win.renderAll();
+  win.renderWorldObjects();
+  check('Task57: re-render does not duplicate mine nodes', doc.querySelectorAll('#worldStage [data-world-mine]').length === 4);
+  check('Task57: re-render keeps a single base marker', doc.querySelectorAll('#worldStage .world-base-marker').length === 1);
+  // Player movement still works with objects drawn and does not touch mines.
+  const before = JSON.stringify(win.state.world.mines);
+  win.setPlayerHeld('right', true);
+  for(let i=0;i<10;i++) win.tickLoop();
+  win.clearPlayerHeld();
+  win.tickLoop();
+  check('Task57: player still moves with world objects present', win.state.world.player.x > 0 && win.state.world.player.pose === 'idle');
+  check('Task57: walking does not change mine data', JSON.stringify(win.state.world.mines) === before);
+  check('Task57: tick does not rebuild mine nodes', doc.querySelectorAll('#worldStage [data-world-mine]').length === 4);
+  // Prestige reset returns the stage to the two starting mines.
+  win.state.world.mines.length = 0;
+  win.renderWorldObjects();
+  check('Task57: empty mine data draws no mine nodes', doc.querySelectorAll('#worldStage [data-world-mine]').length === 0);
+})();
+
+(function test_T58_worldSelectionClicks() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const base = () => stage.querySelector('.world-base-marker');
+  const mineNode = (id) => stage.querySelector('[data-world-mine="' + id + '"]');
+  const selectedCount = () => stage.querySelectorAll('.is-selected').length;
+  check('Task58: nothing selected on a new game', win.getWorldSelection() === null && selectedCount() === 0);
+  base().click();
+  check('Task58: clicking the base selects it', JSON.stringify(win.getWorldSelection()) === JSON.stringify({type:'base'}));
+  check('Task58: base shows selected mark', base().classList.contains('is-selected') && selectedCount() === 1);
+  mineNode('mine_start_iron').click();
+  const ironSel = win.getWorldSelection();
+  check('Task58: clicking iron mine selects it', ironSel && ironSel.type === 'mine' && ironSel.id === 'mine_start_iron');
+  check('Task58: selecting iron releases the base', !base().classList.contains('is-selected'));
+  check('Task58: only iron is marked selected', mineNode('mine_start_iron').classList.contains('is-selected') && selectedCount() === 1);
+  mineNode('mine_start_coal').click();
+  const coalSel = win.getWorldSelection();
+  check('Task58: iron -> coal switches selection', coalSel && coalSel.type === 'mine' && coalSel.id === 'mine_start_coal');
+  check('Task58: iron is no longer marked after switching', !mineNode('mine_start_iron').classList.contains('is-selected') && mineNode('mine_start_coal').classList.contains('is-selected') && selectedCount() === 1);
+  base().click();
+  check('Task58: selecting base while a mine is selected moves the selection', win.getWorldSelection().type === 'base' && selectedCount() === 1);
+  // Clicking a label (child of the mine node) still selects that mine.
+  mineNode('mine_start_coal').querySelector('.world-mine-label').click();
+  check('Task58: clicking a mine label selects its mine', win.getWorldSelection().id === 'mine_start_coal');
+  // Empty space inside the stage clears.
+  stage.querySelector('.world-ground').click();
+  check('Task58: clicking empty stage space clears the selection', win.getWorldSelection() === null && selectedCount() === 0);
+  mineNode('mine_start_iron').click();
+  stage.click();
+  check('Task58: clicking the stage itself clears the selection', win.getWorldSelection() === null);
+  // Player sprite is not selectable.
+  win.getWorldSelection();
+  doc.getElementById('playerChar').click();
+  check('Task58: player sprite is not a selection target', win.getWorldSelection() === null);
+  // Clicks outside the stage do nothing to the selection.
+  mineNode('mine_start_iron').click();
+  doc.querySelector('.ambience').click();
+  check('Task58: clicks outside the stage keep the selection', win.getWorldSelection() && win.getWorldSelection().id === 'mine_start_iron');
+  // Invalid selections are rejected.
+  check('Task58: unknown mine id is rejected', win.selectWorldObject('mine', 'no_such_mine') === false && win.getWorldSelection().id === 'mine_start_iron');
+  check('Task58: unknown type is rejected', win.selectWorldObject('player') === false);
+  // getWorldSelection returns a copy.
+  const copy = win.getWorldSelection();
+  copy.id = 'tampered';
+  check('Task58: selection cannot be mutated from outside', win.getWorldSelection().id === 'mine_start_iron');
+})();
+
+(function test_T58_selectionSurvivesSecureAndExpansion() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-secure-mine="mine_start_iron"]').click();
+  const iron = stage.querySelector('[data-world-mine="mine_start_iron"]');
+  check('Task58: securing still updates the stage state', iron.getAttribute('data-development-state') === 'secured' && iron.classList.contains('is-secured'));
+  check('Task58: selection is kept after securing', win.getWorldSelection().id === 'mine_start_iron' && iron.classList.contains('is-selected'));
+  stage.querySelector('[data-world-mine="mine_start_coal"]').click();
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  check('Task58: secured mine can be selected again', win.getWorldSelection().id === 'mine_start_iron');
+  win.state.gold = 700;
+  check('Task58: expansion succeeds', win.expandBase() === true);
+  win.renderAll();
+  check('Task58: selection kept across renderAll', stage.querySelector('[data-world-mine="mine_start_iron"]').classList.contains('is-selected'));
+  const mana = stage.querySelector('[data-resource="mana"]');
+  const crystal = stage.querySelector('[data-resource="crystal"]');
+  mana.click();
+  check('Task58: newly expanded mana mine is selectable', win.getWorldSelection().id === mana.getAttribute('data-world-mine'));
+  crystal.click();
+  check('Task58: newly expanded crystal mine is selectable', win.getWorldSelection().id === crystal.getAttribute('data-world-mine') && stage.querySelectorAll('.is-selected').length === 1);
+  // A selected mine that disappears drops the selection.
+  win.state.world.mines = win.state.world.mines.filter(m => m.resource !== 'crystal');
+  win.renderWorldObjects();
+  check('Task58: selection of a removed mine is dropped', win.getWorldSelection() === null && stage.querySelectorAll('.is-selected').length === 0);
+  // Movement keys still work with a selection active.
+  stage.querySelector('[data-world-mine="mine_start_coal"]').click();
+  const x0 = win.state.world.player.x;
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'd' }));
+  for(let i=0;i<5;i++) win.tickLoop();
+  doc.dispatchEvent(new win.KeyboardEvent('keyup', { key: 'd' }));
+  win.tickLoop();
+  check('Task58: WASD movement works while something is selected', win.state.world.player.x > x0 && win.state.world.player.pose === 'idle');
+  check('Task58: moving does not change the selection', win.getWorldSelection().id === 'mine_start_coal');
+})();
+
+(function test_T58_selectionNotSaved() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const stage = win.document.getElementById('worldStage');
+  const worldKeysBefore = Object.keys(win.state.world).sort().join(',');
+  stage.querySelector('[data-world-mine="mine_start_coal"]').click();
+  check('Task58: selection does not add fields to state.world', Object.keys(win.state.world).sort().join(',') === worldKeysBefore);
+  check('Task58: selection does not touch mine data', win.state.world.mines.every(m => !('selected' in m)));
+  check('Task58: save succeeds with a selection', win.saveGame() === true);
+  const raw = storage.getItem('gachaFactorySave');
+  check('Task58: save data has no selection', !/selected|selection/i.test(raw));
+  check('Task58: saveVersion stays 1', JSON.parse(raw).saveVersion === 1);
+  const win2 = newDom(storage).window;
+  check('Task58: reload starts with nothing selected', win2.getWorldSelection() === null && win2.document.querySelectorAll('#worldStage .is-selected').length === 0);
+  check('Task58: reload still restores the saved world', win2.state.world.mines.length === 2);
+})();
+
+(function test_T59_worldInfoPanel() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const box = doc.getElementById('worldInfo');
+  const line = (k) => { const el = box.querySelector('[data-world-info="' + k + '"]'); return el ? el.textContent : null; };
+  const lines = () => [...box.querySelectorAll('[data-world-info]')].map(e => e.textContent);
+  const mineNode = (id) => stage.querySelector('[data-world-mine="' + id + '"]');
+  check('Task59: info box lives inside worldStage', !!box && stage.contains(box));
+  check('Task59: info box hidden with nothing selected', box.hidden === true && lines().length === 0);
+  stage.querySelector('.world-base-marker').click();
+  check('Task59: base selection shows the info box', box.hidden === false && box.getAttribute('data-world-info-type') === 'base');
+  check('Task59: base info title', line('title') === '거점');
+  check('Task59: base info level from state', line('level') === '레벨 ' + win.state.world.base.level && line('level') === '레벨 1');
+  check('Task59: base info position from state', line('position') === '위치 (0, 0)');
+  mineNode('mine_start_iron').click();
+  check('Task59: iron info lines', JSON.stringify(lines()) === JSON.stringify(['철광석 광맥', '철광석', '등급 1', '미확보']));
+  check('Task59: info type switches to mine', box.getAttribute('data-world-info-type') === 'mine');
+  mineNode('mine_start_coal').click();
+  check('Task59: iron -> coal switches info', JSON.stringify(lines()) === JSON.stringify(['석탄 광맥', '석탄', '등급 1', '미확보']));
+  check('Task59: only one info block is shown', box.querySelectorAll('[data-world-info="title"]').length === 1);
+  stage.querySelector('.world-ground').click();
+  check('Task59: empty space click hides the info box', box.hidden === true && lines().length === 0);
+  // Securing the selected mine updates the info immediately.
+  mineNode('mine_start_iron').click();
+  doc.querySelector('[data-secure-mine="mine_start_iron"]').click();
+  check('Task59: securing flips info to 확보됨', line('state') === '확보됨' && box.hidden === false);
+  check('Task59: secured info still names iron', line('title') === '철광석 광맥');
+  // Info is kept after renderWorldObjects / renderAll.
+  win.renderWorldObjects();
+  check('Task59: info kept after renderWorldObjects', box.hidden === false && line('title') === '철광석 광맥' && line('state') === '확보됨');
+  win.renderAll();
+  check('Task59: info kept after renderAll', box.hidden === false && line('title') === '철광석 광맥');
+  // Info reads live state, not a copy.
+  win.state.world.base.level = 3;
+  stage.querySelector('.world-base-marker').click();
+  check('Task59: base level reads current state', line('level') === '레벨 3');
+  win.state.world.base.level = 1;
+  // Expansion: new mine info.
+  win.state.gold = 700;
+  check('Task59: expansion succeeds', win.expandBase() === true);
+  win.renderAll();
+  check('Task59: base info after expansion shows new level', line('level') === '레벨 2');
+  stage.querySelector('[data-resource="mana"]').click();
+  check('Task59: new mana mine info', JSON.stringify(lines()) === JSON.stringify(['마정석 광맥', '마정석', '등급 2', '미확보']));
+  stage.querySelector('[data-resource="crystal"]').click();
+  check('Task59: new crystal mine info', line('title') === '결정 광맥' && line('grade') === '등급 2');
+  // Selected mine removed -> info hidden.
+  win.state.world.mines = win.state.world.mines.filter(m => m.resource !== 'crystal');
+  win.renderWorldObjects();
+  check('Task59: removed selected mine hides info', box.hidden === true && lines().length === 0 && win.getWorldSelection() === null);
+  // Clicking on the info box area never selects anything by itself.
+  stage.querySelector('[data-world-mine="mine_start_coal"]').click();
+  check('Task59: info box is click-through (pointer-events none in CSS)', /\.world-info\{[^}]*pointer-events:none/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8')));
+  // Movement is unaffected while info is shown.
+  const x0 = win.state.world.player.x;
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight' }));
+  for(let i=0;i<5;i++) win.tickLoop();
+  doc.dispatchEvent(new win.KeyboardEvent('keyup', { key: 'ArrowRight' }));
+  win.tickLoop();
+  check('Task59: movement still works with info shown', win.state.world.player.x > x0);
+  check('Task59: movement leaves info as is', line('title') === '석탄 광맥');
+})();
+
+(function test_T59_infoNotSaved() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const stage = win.document.getElementById('worldStage');
+  const worldKeys = Object.keys(win.state.world).sort().join(',');
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  check('Task59: info render adds no fields to state.world', Object.keys(win.state.world).sort().join(',') === worldKeys);
+  check('Task59: info render leaves mine objects unchanged', JSON.stringify(Object.keys(win.state.world.mines[0]).sort()) === JSON.stringify(['developmentState','grade','id','miningPower','resource','x','y']));
+  check('Task59: save succeeds with info shown', win.saveGame() === true);
+  const raw = storage.getItem('gachaFactorySave');
+  check('Task59: save data has no selection/info', !/selected|selection|worldInfo|world-info/i.test(raw));
+  const win2 = newDom(storage).window;
+  const box2 = win2.document.getElementById('worldInfo');
+  check('Task59: reload hides the info box', box2.hidden === true && box2.children.length === 0 && win2.getWorldSelection() === null);
+})();
+
+(function test_T60_workshopMarkersFromState() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const layer = doc.getElementById('worldWorkshopLayer');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+  const rawHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const markers = () => layer.querySelectorAll('.world-workshop-node');
+  const marker = (id) => layer.querySelector('[data-world-workshop="' + id + '"]');
+  check('Task60: worldWorkshopLayer exists inside worldStage', !!layer && stage.contains(layer));
+  check('Task60: workshop layer starts empty in markup', /<div id="worldWorkshopLayer" class="world-workshop-layer"><\/div>/.test(rawHtml));
+  check('Task60: fresh state has no workshops', Array.isArray(win.state.world.workshops) && win.state.world.workshops.length === 0);
+  check('Task60: empty workshops draw no markers', markers().length === 0);
+  check('Task60: fresh start does not invent a workshop', markers().length === 0 && win.state.world.workshops.length === 0);
+
+  const workshopKeys = ['auto', 'id', 'level', 'progress', 'recipeKey', 'x', 'y'];
+  win.state.world.workshops = [
+    { id: 'workshop_a', x: 3, y: 1, level: 1, recipeKey: null, auto: false, progress: null },
+  ];
+  const beforeKeys = Object.keys(win.state.world.workshops[0]).sort().join(',');
+  win.renderWorldObjects();
+  const one = marker('workshop_a');
+  const onePos = win.worldToStagePercent(3, 1);
+  check('Task60: one workshop draws one marker', markers().length === 1 && !!one);
+  check('Task60: marker uses worldToStagePercent coordinates', !!one && one.style.left === onePos.left + '%' && one.style.top === onePos.top + '%');
+  check('Task60: rendering does not add workshop fields', Object.keys(win.state.world.workshops[0]).sort().join(',') === beforeKeys && beforeKeys === workshopKeys.join(','));
+
+  win.state.world.workshops.push(
+    { id: 'workshop_b', x: 6, y: 4, level: 2, recipeKey: 'steel', auto: false, progress: null }
+  );
+  win.renderAll();
+  const a = marker('workshop_a');
+  const b = marker('workshop_b');
+  const bPos = win.worldToStagePercent(6, 4);
+  check('Task60: renderAll shows each workshop', markers().length === 2 && !!a && !!b);
+  check('Task60: second marker uses its own coordinates', b.style.left === bPos.left + '%' && b.style.top === bPos.top + '%');
+  check('Task60: markers do not share one screen position', a.style.left !== b.style.left || a.style.top !== b.style.top);
+
+  win.state.world.workshops[0].x = 8;
+  win.state.world.workshops[0].y = 2;
+  win.renderWorldObjects();
+  const moved = win.worldToStagePercent(8, 2);
+  check('Task60: renderWorldObjects refreshes a moved marker', marker('workshop_a').style.left === moved.left + '%' && marker('workshop_a').style.top === moved.top + '%');
+  check('Task60: refresh does not duplicate markers', markers().length === 2);
+
+  win.state.world.workshops = [];
+  win.renderAll();
+  check('Task60: clearing workshops removes every marker', markers().length === 0);
+
+  const layerRule = css.match(/\.world-workshop-layer\{[^}]*\}/);
+  const nodeRule = css.match(/\.world-workshop-node\{[^}]*\}/);
+  check('Task60: workshop layer is click-through', !!layerRule && /pointer-events:\s*none/.test(layerRule[0]));
+  check('Task60: workshop marker is click-through', !!nodeRule && /pointer-events:\s*none/.test(nodeRule[0]));
+})();
+
+(function test_T60_selectionInfoAndMovementStayIntact() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const worldKeys = Object.keys(win.state.world).sort().join(',');
+  win.state.world.workshops = [
+    { id: 'workshop_keep', x: 4, y: 5, level: 1, recipeKey: null, auto: false, progress: null },
+  ];
+  win.renderWorldObjects();
+  const node = stage.querySelector('[data-world-workshop="workshop_keep"]');
+  check('Task60: workshop marker is not selected on its own', !!node && !node.classList.contains('is-selected') && win.getWorldSelection() === null);
+  node.click();
+  check('Task60: clicking a workshop marker does not select it', win.getWorldSelection() === null && !node.classList.contains('is-selected'));
+  check('Task60: workshop click adds no selection type', stage.getAttribute('data-world-selected') === '');
+  stage.querySelector('.world-base-marker').click();
+  check('Task60: base selection still works', JSON.stringify(win.getWorldSelection()) === JSON.stringify({ type: 'base' }));
+  check('Task60: base info still shows', doc.getElementById('worldInfo').hidden === false && doc.querySelector('#worldInfo [data-world-info="title"]').textContent === '거점');
+  check('Task60: workshop marker stays unselected while the base is selected', !node.classList.contains('is-selected') && stage.querySelectorAll('.is-selected').length === 1);
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  check('Task60: mine selection still works', win.getWorldSelection().type === 'mine' && win.getWorldSelection().id === 'mine_start_iron');
+  check('Task60: mine info still shows', doc.querySelector('#worldInfo [data-world-info="title"]').textContent === '철광석 광맥');
+  stage.querySelector('.world-ground').click();
+  check('Task60: empty space still clears selection and info', win.getWorldSelection() === null && doc.getElementById('worldInfo').hidden === true);
+  check('Task60: rendering workshops adds no world fields', Object.keys(win.state.world).sort().join(',') === worldKeys);
+  check('Task60: save succeeds without new workshop fields', win.saveGame() === true);
+  const raw = storage.getItem('gachaFactorySave');
+  const saved = JSON.parse(raw);
+  const savedWorkshop = saved.run.world.workshops[0];
+  check('Task60: saveVersion stays 1', saved.saveVersion === 1);
+  check('Task60: saved workshop keeps the existing fields only', Object.keys(savedWorkshop).sort().join(',') === 'auto,id,level,progress,recipeKey,x,y');
+  const x0 = win.state.world.player.x;
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'd' }));
+  for(let i = 0; i < 5; i++) win.tickLoop();
+  doc.dispatchEvent(new win.KeyboardEvent('keyup', { key: 'd' }));
+  win.tickLoop();
+  check('Task60: player movement still works', win.state.world.player.x > x0 && win.state.world.player.pose === 'idle');
+  check('Task60: movement does not change workshop data', JSON.stringify(win.state.world.workshops) === JSON.stringify([{ id: 'workshop_keep', x: 4, y: 5, level: 1, recipeKey: null, auto: false, progress: null }]));
+})();
+
+(function test_T60_coreLoopRegression() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  win.state.world.workshops = [
+    { id: 'workshop_loop', x: 1, y: 1, level: 1, recipeKey: null, auto: false, progress: null },
+  ];
+  win.renderAll();
+  ['mine_start_iron', 'mine_start_coal'].forEach(id => doc.querySelector('[data-secure-mine="' + id + '"]').click());
+  check('Task60: securing a mine still works', win.state.world.mines.every(m => m.developmentState === 'secured'));
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_coal"]').click();
+  check('Task60: mining still works', win.state.resources.iron === 2 && win.state.resources.coal === 1);
+  doc.querySelector('[data-craft="steel"]').click();
+  check('Task60: crafting still works', win.state.products.steel === 1);
+  doc.querySelector('[data-sell="steel"]').click();
+  check('Task60: selling still works', win.state.gold > 0 && win.state.products.steel === 0);
+  win.state.gold = 700;
+  check('Task60: expansion still works', win.expandBase() === true && win.state.world.base.level === 2);
+  check('Task60: workshop marker remains after the core loop', doc.querySelectorAll('#worldWorkshopLayer .world-workshop-node').length === 1);
+  check('Task60: core loop does not create extra workshops', win.state.world.workshops.length === 1 && win.state.world.workshops[0].id === 'workshop_loop');
+})();
+
+(function test_T59_coreLoopRegression() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  doc.querySelector('#worldStage [data-world-mine="mine_start_iron"]').click();
+  ['mine_start_iron','mine_start_coal'].forEach(id => doc.querySelector('[data-secure-mine="' + id + '"]').click());
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_coal"]').click();
+  check('Task59: mining still works', win.state.resources.iron === 2 && win.state.resources.coal === 1);
+  doc.querySelector('[data-craft="steel"]').click();
+  check('Task59: crafting still works', win.state.products.steel === 1);
+  doc.querySelector('[data-sell="steel"]').click();
+  check('Task59: selling still works', win.state.gold > 0 && win.state.products.steel === 0);
+  check('Task59: info follows secured state through the loop', doc.querySelector('#worldInfo [data-world-info="state"]').textContent === '확보됨');
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================
