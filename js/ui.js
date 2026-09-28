@@ -507,6 +507,7 @@ function renderAll(){
   buildWorkers();
   renderLastPull();
   updateNumbers();
+  renderWorldGround();
   renderWorldObjects();
   updatePlayerSprite();
 }
@@ -530,32 +531,109 @@ document.addEventListener('keyup', (e)=> onPlayerKey(e, false));
 window.addEventListener('blur', ()=> clearPlayerHeld());
 
 // ---------------------------------------------------------------------------
-// Task 57: one world -> screen conversion shared by the player, the base and
-// the world mines, so everything on #worldStage uses the same world units.
-// World bounds (BALANCE.world) are unchanged; the stage just keeps a small
-// visual margin so objects sitting on the bound edges (e.g. the base at 0,0)
-// are drawn fully inside the stage instead of clipped at its corner.
-// Pure presentation — no camera, no scrolling.
+// Task 57 → Task 61: the one world -> screen conversion shared by the ground,
+// the player, the base, the mines and the workshops.
+//
+// Task 61 turns it into a fixed 2.5D camera: the world is a ground plane seen
+// from the south (world y = BOUNDS_MAX_Y is nearest the camera, y =
+// BOUNDS_MIN_Y is farthest). It is a true perspective projection of that
+// plane, so
+//   - far rows sit higher and are narrower, near rows lower and wider;
+//   - `scale` (1 on the nearest row, smaller further away) is how big an
+//     object standing at that spot looks;
+//   - straight world lines stay straight on screen (the ground grid is drawn
+//     with this same function, so objects always stand on it).
+// World bounds and PLAYER_SPEED are unchanged. The camera does not move yet —
+// no follow, no scrolling, no rotation.
 // ---------------------------------------------------------------------------
-const WORLD_STAGE_MARGIN = { left: 12, right: 10, top: 32, bottom: 12 }; // % of the stage
+const WORLD_VIEW = {
+  FAR_TOP: 24,     // % from stage top: screen row of the farthest world row
+  NEAR_TOP: 91,    // % from stage top: screen row of the nearest world row
+  NEAR_WIDTH: 72,  // % of stage width covered by the nearest world row
+  CENTER_X: 50,    // % — the camera looks straight down the middle of the world
+  FAR_DEPTH: 1.5,  // camera distance to the far row, relative to the near row (> 1)
+};
 
 function worldToStagePercent(x, y){
   const b = BALANCE.world;
-  const m = WORLD_STAGE_MARGIN;
+  const v = WORLD_VIEW;
   const spanX = b.BOUNDS_MAX_X - b.BOUNDS_MIN_X;
   const spanY = b.BOUNDS_MAX_Y - b.BOUNDS_MIN_Y;
   const fx = spanX === 0 ? 0 : (x - b.BOUNDS_MIN_X) / spanX;
-  const fy = spanY === 0 ? 0 : (y - b.BOUNDS_MIN_Y) / spanY;
+  const fy = spanY === 0 ? 0 : (y - b.BOUNDS_MIN_Y) / spanY; // 0 = far row, 1 = near row
+  const distance = 1 + (1 - fy) * (v.FAR_DEPTH - 1);       // 1 on the near row
+  const scale = 1 / distance;
+  const farScale = 1 / v.FAR_DEPTH;
+  const t = (scale - farScale) / (1 - farScale);           // 0 far → 1 near, linear in 1/distance
   return {
-    left: m.left + fx * (100 - m.left - m.right),
-    top: m.top + fy * (100 - m.top - m.bottom),
+    left: v.CENTER_X + (fx - 0.5) * v.NEAR_WIDTH * scale,
+    top: v.FAR_TOP + (v.NEAR_TOP - v.FAR_TOP) * t,
+    scale,
+    depth: fy,
   };
 }
 
-function placeOnStage(el, x, y){
+// Task 61: painter's order. Anything nearer the camera (larger world y) is
+// drawn in front. `bias` breaks ties on the same row (the player stands in
+// front of the base/mine it is standing on).
+function worldDepthZIndex(depth, bias){
+  const d = Number.isFinite(depth) ? depth : 0;
+  return Math.max(1, 100 + Math.round(d * 1000) * 2 + (bias || 0));
+}
+
+function placeOnStage(el, x, y, bias){
   const pos = worldToStagePercent(x, y);
   el.style.left = pos.left + '%';
   el.style.top = pos.top + '%';
+  el.style.setProperty('--depth-scale', pos.scale.toFixed(4));
+  el.style.zIndex = String(worldDepthZIndex(pos.depth, bias));
+}
+
+// Task 61: the ground plane and its world-unit grid, drawn once per
+// renderAll() from worldToStagePercent() so the grid and the objects share
+// one projection. SVG in stage-percent units (viewBox 0..100, stretched).
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const WORLD_GROUND_PAD = 0.6; // world units of ground drawn past the bounds
+
+function renderWorldGround(){
+  const ground = document.querySelector('#worldStage .world-ground');
+  if(!ground || !ground.ownerDocument.createElementNS) return;
+  const b = BALANCE.world;
+  const pad = WORLD_GROUND_PAD;
+  const pt = (x, y) => { const p = worldToStagePercent(x, y); return p.left.toFixed(3) + ',' + p.top.toFixed(3); };
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'world-ground-svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  const plane = document.createElementNS(SVG_NS, 'polygon');
+  plane.setAttribute('class', 'world-ground-plane');
+  plane.setAttribute('points', [
+    pt(b.BOUNDS_MIN_X - pad, b.BOUNDS_MIN_Y - pad),
+    pt(b.BOUNDS_MAX_X + pad, b.BOUNDS_MIN_Y - pad),
+    pt(b.BOUNDS_MAX_X + pad, b.BOUNDS_MAX_Y + pad),
+    pt(b.BOUNDS_MIN_X - pad, b.BOUNDS_MAX_Y + pad),
+  ].join(' '));
+  svg.appendChild(plane);
+  const line = (x1, y1, x2, y2, cls) => {
+    const a = worldToStagePercent(x1, y1), c = worldToStagePercent(x2, y2);
+    const el = document.createElementNS(SVG_NS, 'line');
+    el.setAttribute('class', cls);
+    el.setAttribute('x1', a.left.toFixed(3)); el.setAttribute('y1', a.top.toFixed(3));
+    el.setAttribute('x2', c.left.toFixed(3)); el.setAttribute('y2', c.top.toFixed(3));
+    el.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(el);
+  };
+  for(let x = b.BOUNDS_MIN_X; x <= b.BOUNDS_MAX_X; x++){
+    const edge = x === b.BOUNDS_MIN_X || x === b.BOUNDS_MAX_X;
+    line(x, b.BOUNDS_MIN_Y, x, b.BOUNDS_MAX_Y, edge ? 'world-grid-edge' : 'world-grid-line');
+  }
+  for(let y = b.BOUNDS_MIN_Y; y <= b.BOUNDS_MAX_Y; y++){
+    const edge = y === b.BOUNDS_MIN_Y || y === b.BOUNDS_MAX_Y;
+    line(b.BOUNDS_MIN_X, y, b.BOUNDS_MAX_X, y, edge ? 'world-grid-edge' : 'world-grid-line');
+  }
+  ground.innerHTML = '';
+  ground.appendChild(svg);
 }
 
 // Task 57: draws the base and every mine in state.world.mines onto the
@@ -756,7 +834,7 @@ function updatePlayerSprite(){
   const el = document.getElementById('playerChar');
   if(!el || !state.world.player) return;
   const p = state.world.player;
-  placeOnStage(el, p.x, p.y);
+  placeOnStage(el, p.x, p.y, 1); // Task 61: in front of whatever shares its row
   el.className = 'player-char pose-' + p.pose + ' facing-' + p.facing;
   el.setAttribute('data-player-pose', p.pose);
   el.setAttribute('data-player-facing', p.facing);

@@ -608,6 +608,98 @@
   check('Task59: info follows secured state through the loop', doc.querySelector('#worldInfo [data-world-info="state"]').textContent === '확보됨');
 })();
 
+(function test_T61_perspectiveProjection() {
+  const win = newDom(makeMemoryStorage()).window;
+  const P = (x, y) => win.worldToStagePercent(x, y);
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  // Task 56 world bounds (0..10) are the reference values.
+  const farL = P(0, 0), farR = P(10, 0), nearL = P(0, 10), nearR = P(10, 10);
+  check('Task61: projection returns scale and depth', typeof farL.scale === 'number' && typeof farL.depth === 'number');
+  check('Task61: far row sits higher than near row', farL.top < nearL.top);
+  check('Task61: far row is narrower than near row', (farR.left - farL.left) < (nearR.left - nearL.left));
+  check('Task61: near row has scale 1', near(nearL.scale, 1) && near(nearR.scale, 1));
+  check('Task61: far objects are drawn smaller', farL.scale < 1 && farL.scale > 0.4);
+  check('Task61: scale depends only on depth', near(P(0, 4).scale, P(9, 4).scale));
+  check('Task61: scale grows toward the camera', P(5, 2).scale < P(5, 5).scale && P(5, 5).scale < P(5, 8).scale);
+  check('Task61: camera is centred on the world', near(P(5, 0).left, 50) && near(P(5, 10).left, 50));
+  check('Task61: rows are symmetric around the centre', near(P(2, 3).left - 50, 50 - P(8, 3).left));
+  check('Task61: depth is 0 on far row and 1 on near row', near(farL.depth, 0) && near(nearL.depth, 1));
+  check('Task61: every in-bounds point stays inside the stage', [[0,0],[10,0],[0,10],[10,10],[5,5]].every(([x,y]) => { const q = P(x,y); return q.left > 0 && q.left < 100 && q.top > 0 && q.top < 100; }));
+  // True perspective: a straight world line (x = 3) stays straight on screen.
+  const a = P(3, 0), m = P(3, 5), c = P(3, 10);
+  const cross = (m.left - a.left) * (c.top - a.top) - (m.top - a.top) * (c.left - a.left);
+  check('Task61: straight world lines stay straight on screen', Math.abs(cross) < 1e-6);
+  // Rows get closer together further away (foreshortening).
+  check('Task61: far rows are foreshortened', (P(5, 1).top - P(5, 0).top) < (P(5, 10).top - P(5, 9).top));
+})();
+
+(function test_T61_groundAndDepth() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const ground = stage.querySelector('.world-ground');
+  const svg = ground.querySelector('svg.world-ground-svg');
+  check('Task61: ground is drawn as an SVG plane', !!svg && !!svg.querySelector('polygon.world-ground-plane'));
+  check('Task61: grid has one line per world unit on both axes', svg.querySelectorAll('line').length === 22);
+  const edges = svg.querySelectorAll('line.world-grid-edge');
+  check('Task61: world bounds are outlined', edges.length === 4);
+  // The far edge (y = 0) line runs between the projected far corners.
+  const farEdge = [...edges].find(l => Math.abs(+l.getAttribute('y1') - win.worldToStagePercent(0, 0).top) < 0.001 && Math.abs(+l.getAttribute('y2') - win.worldToStagePercent(10, 0).top) < 0.001);
+  check('Task61: grid uses the same projection as objects', !!farEdge && Math.abs(+farEdge.getAttribute('x1') - win.worldToStagePercent(0, 0).left) < 0.001);
+  win.renderAll();
+  check('Task61: re-render does not duplicate the ground', ground.querySelectorAll('svg').length === 1);
+  // Depth scale and painter order on objects.
+  const iron = stage.querySelector('[data-world-mine="mine_start_iron"]');   // (2,0)
+  const coal = stage.querySelector('[data-world-mine="mine_start_coal"]');   // (0,2)
+  const base = stage.querySelector('.world-base-marker');                    // (0,0)
+  const player = doc.getElementById('playerChar');
+  const sc = (el) => parseFloat(el.style.getPropertyValue('--depth-scale'));
+  const z = (el) => parseInt(el.style.zIndex, 10);
+  check('Task61: objects carry their depth scale', Math.abs(sc(iron) - win.worldToStagePercent(2, 0).scale) < 1e-3 && Math.abs(sc(coal) - win.worldToStagePercent(0, 2).scale) < 1e-3);
+  check('Task61: nearer mine is drawn larger', sc(coal) > sc(iron));
+  check('Task61: nearer mine is drawn in front', z(coal) > z(iron));
+  check('Task61: base carries depth scale too', Math.abs(sc(base) - win.worldToStagePercent(0, 0).scale) < 1e-3);
+  check('Task61: player on the base is drawn in front of it', z(player) > z(base));
+  // Player behind / in front of the coal mine as it walks.
+  win.state.world.player.x = 0; win.state.world.player.y = 1.5; win.updatePlayerSprite();
+  check('Task61: player north of coal is behind it', z(player) < z(coal));
+  check('Task61: player further away looks smaller', sc(player) < sc(coal));
+  win.state.world.player.y = 2.5; win.updatePlayerSprite();
+  check('Task61: player south of coal is in front of it', z(player) > z(coal));
+  // Movement updates depth each tick without changing speed or bounds.
+  win.state.world.player.x = 5; win.state.world.player.y = 5; win.updatePlayerSprite();
+  const zBefore = z(player), sBefore = sc(player);
+  win.setPlayerHeld('down', true);
+  for(let i = 0; i < 10; i++) win.tickLoop();
+  win.clearPlayerHeld(); win.tickLoop();
+  check('Task61: walking toward the camera moves 3 units/s (PLAYER_SPEED unchanged)', Math.abs(win.state.world.player.y - 8) < 1e-9);
+  check('Task61: walking toward the camera raises depth order', z(player) > zBefore);
+  check('Task61: walking toward the camera grows the player', sc(player) > sBefore);
+  const clampedMax = win.clampPlayerPosition(99, 99);
+  check('Task61: world bounds unchanged', clampedMax.x === 10 && clampedMax.y === 10);
+  // Workshops take part in depth too.
+  const ws = win.addWorkshop({ id: 't61_ws', x: 4, y: 6, level: 1, recipeKey: 'steel' });
+  win.renderAll();
+  const wsNode = stage.querySelector('[data-world-workshop="t61_ws"]');
+  check('Task61: workshop marker carries depth scale and order', !!ws && !!wsNode && Math.abs(sc(wsNode) - win.worldToStagePercent(4, 6).scale) < 1e-3 && z(wsNode) > z(coal));
+  // Info box stays above every depth-sorted object.
+  const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+  const infoZ = parseInt((css.match(/\.world-info\{[^}]*z-index:(\d+)/) || [])[1], 10);
+  check('Task61: info box is above the deepest possible object', infoZ > win.worldDepthZIndex(1.5, 1));
+  check('Task61: object layers do not isolate depth (no layer z-index)', !/\.world-mine-layer\{[^}]*z-index/.test(css) && !/\.world-workshop-layer\{[^}]*z-index/.test(css));
+  check('Task61: stage isolates its depth stack', /\.world-stage\{[^}]*isolation:isolate/.test(css));
+  // Selection still works on the ground and objects (nodes were rebuilt by renderAll).
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  check('Task61: mines stay selectable', win.getWorldSelection() && win.getWorldSelection().id === 'mine_start_iron');
+  ground.querySelector('polygon.world-ground-plane').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  check('Task61: clicking the ground clears selection', win.getWorldSelection() === null);
+  // Nothing new is saved.
+  const storage = makeMemoryStorage();
+  const w2 = newDom(storage).window;
+  w2.saveGame();
+  check('Task61: save data has no view/camera fields', !/depth|camera|scale|WORLD_VIEW/i.test(storage.getItem('gachaFactorySave')));
+})();
+
 // =============================================================================
 // SUMMARY
 // =============================================================================
