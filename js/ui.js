@@ -589,7 +589,36 @@ function renderWorldObjects(){
     placeOnStage(node, mine.x, mine.y);
     layer.appendChild(node);
   });
+  renderWorldWorkshopMarkers();
   applyWorldSelection();
+}
+
+// Task 60: draws one marker per existing state.world.workshops entry.
+// Presentation only — never creates a workshop, never selects one, and never
+// handles clicks. The layer and nodes stay click-through via CSS
+// (pointer-events:none). Positions use the same worldToStagePercent()
+// conversion as the base, mines, and player. Called from renderWorldObjects(),
+// so renderAll() refreshes the markers with the rest of the stage.
+function renderWorldWorkshopMarkers(){
+  const layer = document.getElementById('worldWorkshopLayer');
+  if(!layer) return;
+  layer.innerHTML = '';
+  const workshops = state.world && Array.isArray(state.world.workshops) ? state.world.workshops : [];
+  workshops.forEach(workshop=>{
+    if(!workshop) return;
+    const node = document.createElement('div');
+    node.className = 'world-workshop-node';
+    if(typeof workshop.id === 'string' && workshop.id.length > 0){
+      node.setAttribute('data-world-workshop', workshop.id);
+    }
+    node.title = '제작소 Lv.' + workshop.level + ' (' + workshop.x + ', ' + workshop.y + ')';
+    const label = document.createElement('span');
+    label.className = 'world-workshop-label';
+    label.textContent = '제작소';
+    node.appendChild(label);
+    placeOnStage(node, workshop.x, workshop.y);
+    layer.appendChild(node);
+  });
 }
 
 // ---------------------------------------------------------------------------

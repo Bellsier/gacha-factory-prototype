@@ -474,6 +474,124 @@
   check('Task59: reload hides the info box', box2.hidden === true && box2.children.length === 0 && win2.getWorldSelection() === null);
 })();
 
+(function test_T60_workshopMarkersFromState() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const layer = doc.getElementById('worldWorkshopLayer');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+  const rawHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const markers = () => layer.querySelectorAll('.world-workshop-node');
+  const marker = (id) => layer.querySelector('[data-world-workshop="' + id + '"]');
+  check('Task60: worldWorkshopLayer exists inside worldStage', !!layer && stage.contains(layer));
+  check('Task60: workshop layer starts empty in markup', /<div id="worldWorkshopLayer" class="world-workshop-layer"><\/div>/.test(rawHtml));
+  check('Task60: fresh state has no workshops', Array.isArray(win.state.world.workshops) && win.state.world.workshops.length === 0);
+  check('Task60: empty workshops draw no markers', markers().length === 0);
+  check('Task60: fresh start does not invent a workshop', markers().length === 0 && win.state.world.workshops.length === 0);
+
+  const workshopKeys = ['auto', 'id', 'level', 'progress', 'recipeKey', 'x', 'y'];
+  win.state.world.workshops = [
+    { id: 'workshop_a', x: 3, y: 1, level: 1, recipeKey: null, auto: false, progress: null },
+  ];
+  const beforeKeys = Object.keys(win.state.world.workshops[0]).sort().join(',');
+  win.renderWorldObjects();
+  const one = marker('workshop_a');
+  const onePos = win.worldToStagePercent(3, 1);
+  check('Task60: one workshop draws one marker', markers().length === 1 && !!one);
+  check('Task60: marker uses worldToStagePercent coordinates', !!one && one.style.left === onePos.left + '%' && one.style.top === onePos.top + '%');
+  check('Task60: rendering does not add workshop fields', Object.keys(win.state.world.workshops[0]).sort().join(',') === beforeKeys && beforeKeys === workshopKeys.join(','));
+
+  win.state.world.workshops.push(
+    { id: 'workshop_b', x: 6, y: 4, level: 2, recipeKey: 'steel', auto: false, progress: null }
+  );
+  win.renderAll();
+  const a = marker('workshop_a');
+  const b = marker('workshop_b');
+  const bPos = win.worldToStagePercent(6, 4);
+  check('Task60: renderAll shows each workshop', markers().length === 2 && !!a && !!b);
+  check('Task60: second marker uses its own coordinates', b.style.left === bPos.left + '%' && b.style.top === bPos.top + '%');
+  check('Task60: markers do not share one screen position', a.style.left !== b.style.left || a.style.top !== b.style.top);
+
+  win.state.world.workshops[0].x = 8;
+  win.state.world.workshops[0].y = 2;
+  win.renderWorldObjects();
+  const moved = win.worldToStagePercent(8, 2);
+  check('Task60: renderWorldObjects refreshes a moved marker', marker('workshop_a').style.left === moved.left + '%' && marker('workshop_a').style.top === moved.top + '%');
+  check('Task60: refresh does not duplicate markers', markers().length === 2);
+
+  win.state.world.workshops = [];
+  win.renderAll();
+  check('Task60: clearing workshops removes every marker', markers().length === 0);
+
+  const layerRule = css.match(/\.world-workshop-layer\{[^}]*\}/);
+  const nodeRule = css.match(/\.world-workshop-node\{[^}]*\}/);
+  check('Task60: workshop layer is click-through', !!layerRule && /pointer-events:\s*none/.test(layerRule[0]));
+  check('Task60: workshop marker is click-through', !!nodeRule && /pointer-events:\s*none/.test(nodeRule[0]));
+})();
+
+(function test_T60_selectionInfoAndMovementStayIntact() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const worldKeys = Object.keys(win.state.world).sort().join(',');
+  win.state.world.workshops = [
+    { id: 'workshop_keep', x: 4, y: 5, level: 1, recipeKey: null, auto: false, progress: null },
+  ];
+  win.renderWorldObjects();
+  const node = stage.querySelector('[data-world-workshop="workshop_keep"]');
+  check('Task60: workshop marker is not selected on its own', !!node && !node.classList.contains('is-selected') && win.getWorldSelection() === null);
+  node.click();
+  check('Task60: clicking a workshop marker does not select it', win.getWorldSelection() === null && !node.classList.contains('is-selected'));
+  check('Task60: workshop click adds no selection type', stage.getAttribute('data-world-selected') === '');
+  stage.querySelector('.world-base-marker').click();
+  check('Task60: base selection still works', JSON.stringify(win.getWorldSelection()) === JSON.stringify({ type: 'base' }));
+  check('Task60: base info still shows', doc.getElementById('worldInfo').hidden === false && doc.querySelector('#worldInfo [data-world-info="title"]').textContent === '거점');
+  check('Task60: workshop marker stays unselected while the base is selected', !node.classList.contains('is-selected') && stage.querySelectorAll('.is-selected').length === 1);
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  check('Task60: mine selection still works', win.getWorldSelection().type === 'mine' && win.getWorldSelection().id === 'mine_start_iron');
+  check('Task60: mine info still shows', doc.querySelector('#worldInfo [data-world-info="title"]').textContent === '철광석 광맥');
+  stage.querySelector('.world-ground').click();
+  check('Task60: empty space still clears selection and info', win.getWorldSelection() === null && doc.getElementById('worldInfo').hidden === true);
+  check('Task60: rendering workshops adds no world fields', Object.keys(win.state.world).sort().join(',') === worldKeys);
+  check('Task60: save succeeds without new workshop fields', win.saveGame() === true);
+  const raw = storage.getItem('gachaFactorySave');
+  const saved = JSON.parse(raw);
+  const savedWorkshop = saved.run.world.workshops[0];
+  check('Task60: saveVersion stays 1', saved.saveVersion === 1);
+  check('Task60: saved workshop keeps the existing fields only', Object.keys(savedWorkshop).sort().join(',') === 'auto,id,level,progress,recipeKey,x,y');
+  const x0 = win.state.world.player.x;
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'd' }));
+  for(let i = 0; i < 5; i++) win.tickLoop();
+  doc.dispatchEvent(new win.KeyboardEvent('keyup', { key: 'd' }));
+  win.tickLoop();
+  check('Task60: player movement still works', win.state.world.player.x > x0 && win.state.world.player.pose === 'idle');
+  check('Task60: movement does not change workshop data', JSON.stringify(win.state.world.workshops) === JSON.stringify([{ id: 'workshop_keep', x: 4, y: 5, level: 1, recipeKey: null, auto: false, progress: null }]));
+})();
+
+(function test_T60_coreLoopRegression() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  win.state.world.workshops = [
+    { id: 'workshop_loop', x: 1, y: 1, level: 1, recipeKey: null, auto: false, progress: null },
+  ];
+  win.renderAll();
+  ['mine_start_iron', 'mine_start_coal'].forEach(id => doc.querySelector('[data-secure-mine="' + id + '"]').click());
+  check('Task60: securing a mine still works', win.state.world.mines.every(m => m.developmentState === 'secured'));
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_coal"]').click();
+  check('Task60: mining still works', win.state.resources.iron === 2 && win.state.resources.coal === 1);
+  doc.querySelector('[data-craft="steel"]').click();
+  check('Task60: crafting still works', win.state.products.steel === 1);
+  doc.querySelector('[data-sell="steel"]').click();
+  check('Task60: selling still works', win.state.gold > 0 && win.state.products.steel === 0);
+  win.state.gold = 700;
+  check('Task60: expansion still works', win.expandBase() === true && win.state.world.base.level === 2);
+  check('Task60: workshop marker remains after the core loop', doc.querySelectorAll('#worldWorkshopLayer .world-workshop-node').length === 1);
+  check('Task60: core loop does not create extra workshops', win.state.world.workshops.length === 1 && win.state.world.workshops[0].id === 'workshop_loop');
+})();
+
 (function test_T59_coreLoopRegression() {
   const win = newDom(makeMemoryStorage()).window;
   const doc = win.document;
