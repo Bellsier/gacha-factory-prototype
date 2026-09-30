@@ -18,19 +18,29 @@ const MINE_DEVELOPMENT_STATES = ['unsecured', 'secured'];
 const PLAYER_FACINGS = ['up', 'down', 'left', 'right'];
 const PLAYER_POSES = ['idle', 'walk'];
 
-function freshPlayerState(){
-  return { x: 0, y: 0, facing: 'down', pose: 'idle' };
+// Task 62: the player starts on the base (not at world 0,0).
+function freshPlayerState(base){
+  const at = base || freshBasePosition();
+  return { x: at.x, y: at.y, facing: 'down', pose: 'idle' };
+}
+
+// Task 62: new-game base position (base-centred world, slightly east).
+function freshBasePosition(){
+  return { x: BALANCE.world.START_BASE_X, y: BALANCE.world.START_BASE_Y };
 }
 
 function freshWorldState(){
+  const base = { ...freshBasePosition(), level: 1 };
   return {
-    base: { x: 0, y: 0, level: 1 },
+    base,
+    // Task 62: starting mines keep their old layout relative to the base
+    // (east and south of it). Random generation replaces this in a later Task.
     mines: [
-      { id: 'mine_start_iron', x: 2, y: 0, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' },
-      { id: 'mine_start_coal', x: 0, y: 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+      { id: 'mine_start_iron', x: base.x + 2, y: base.y, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+      { id: 'mine_start_coal', x: base.x, y: base.y + 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
     ],
     workshops: [],
-    player: freshPlayerState(),
+    player: freshPlayerState(base),
   };
 }
 
@@ -183,6 +193,11 @@ function isValidNodeSize(v){
 function isValidGridCoord(v){
   return Number.isInteger(v) && v >= 0;
 }
+// Task 62: world coordinates (base, mines, workshops) are integers of either
+// sign. isValidGridCoord stays for the non-negative Factory grid only.
+function isValidWorldCoord(v){
+  return Number.isSafeInteger(v);
+}
 function sanitizeFactoryNode(n){
   if(!isPlainObject(n)) return null;
   if(!FACTORY_NODE_TYPES.includes(n.type)) return null;
@@ -242,8 +257,8 @@ function sanitizeFactoryGrid(raw){
 function sanitizeMine(m){
   if(!isPlainObject(m)) return null;
   const result = {
-    x: isValidGridCoord(m.x) ? m.x : 0,
-    y: isValidGridCoord(m.y) ? m.y : 0,
+    x: isValidWorldCoord(m.x) ? m.x : 0,
+    y: isValidWorldCoord(m.y) ? m.y : 0,
     resource: RESOURCES.some(r => r.key === m.resource) ? m.resource : RESOURCES[0].key,
     grade: isNonNegativeInt(m.grade) && m.grade >= 1 ? m.grade : 1,
     miningPower: isNonNegativeFinite(m.miningPower) && m.miningPower > 0 ? m.miningPower : 1,
@@ -267,8 +282,8 @@ function sanitizeMines(raw){
 function sanitizeWorkshop(w){
   if(!isPlainObject(w)) return null;
   const result = {
-    x: isValidGridCoord(w.x) ? w.x : 0,
-    y: isValidGridCoord(w.y) ? w.y : 0,
+    x: isValidWorldCoord(w.x) ? w.x : 0,
+    y: isValidWorldCoord(w.y) ? w.y : 0,
     level: isNonNegativeInt(w.level) && w.level >= 1 ? w.level : 1,
     recipeKey: typeof w.recipeKey === 'string' && RECIPES.some(r => r.key === w.recipeKey) ? w.recipeKey : null,
     auto: typeof w.auto === 'boolean' ? w.auto : false,
@@ -298,12 +313,13 @@ function clampPlayerAxis(v, min, max){
   return v;
 }
 
-function sanitizePlayer(raw){
-  const fresh = freshPlayerState();
+// Task 62: a missing/invalid player falls back to standing on the base.
+function sanitizePlayer(raw, base){
+  const fresh = freshPlayerState(base);
   if(!isPlainObject(raw)) return fresh;
   return {
-    x: clampPlayerAxis(raw.x, BALANCE.world.BOUNDS_MIN_X, BALANCE.world.BOUNDS_MAX_X),
-    y: clampPlayerAxis(raw.y, BALANCE.world.BOUNDS_MIN_Y, BALANCE.world.BOUNDS_MAX_Y),
+    x: isFiniteNumber(raw.x) ? clampPlayerAxis(raw.x, BALANCE.world.BOUNDS_MIN_X, BALANCE.world.BOUNDS_MAX_X) : fresh.x,
+    y: isFiniteNumber(raw.y) ? clampPlayerAxis(raw.y, BALANCE.world.BOUNDS_MIN_Y, BALANCE.world.BOUNDS_MAX_Y) : fresh.y,
     facing: PLAYER_FACINGS.includes(raw.facing) ? raw.facing : fresh.facing,
     pose: 'idle',
   };
@@ -312,15 +328,21 @@ function sanitizePlayer(raw){
 function sanitizeWorldState(raw){
   if(!isPlainObject(raw)) return freshWorldState();
   const baseRaw = isPlainObject(raw.base) ? raw.base : {};
+  // Task 62: saved world coordinates are kept exactly as saved (an older
+  // save's base at 0,0 and its mines stay where they were — still valid in the
+  // wider -10..10 world, same layout). Nothing is shifted or regenerated.
+  // Only a missing/invalid base coordinate falls back to the new-game base.
+  const baseFallback = freshBasePosition();
+  const base = {
+    x: isValidWorldCoord(baseRaw.x) ? baseRaw.x : baseFallback.x,
+    y: isValidWorldCoord(baseRaw.y) ? baseRaw.y : baseFallback.y,
+    level: isNonNegativeInt(baseRaw.level) && baseRaw.level >= 1 ? baseRaw.level : 1,
+  };
   return {
-    base: {
-      x: isValidGridCoord(baseRaw.x) ? baseRaw.x : 0,
-      y: isValidGridCoord(baseRaw.y) ? baseRaw.y : 0,
-      level: isNonNegativeInt(baseRaw.level) && baseRaw.level >= 1 ? baseRaw.level : 1,
-    },
+    base,
     mines: sanitizeMines(raw.mines),
     workshops: sanitizeWorkshops(raw.workshops),
-    player: sanitizePlayer(raw.player),
+    player: sanitizePlayer(raw.player, base),
   };
 }
 

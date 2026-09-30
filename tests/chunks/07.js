@@ -2,8 +2,9 @@
   const win = newDom(makeMemoryStorage()).window;
   const mines = win.state.world.mines;
   check('Task34: fresh run starts with two mines', mines.length === 2);
-  check('Task34: starting iron mine is present at (2,0)', mines.some(m => m.id === 'mine_start_iron' && m.x === 2 && m.y === 0 && m.resource === 'iron'));
-  check('Task34: starting coal mine is present at (0,2)', mines.some(m => m.id === 'mine_start_coal' && m.x === 0 && m.y === 2 && m.resource === 'coal'));
+  // Task 62: same layout relative to the base, which moved from (0,0) to (2,0).
+  check('Task34: starting iron mine is present at base+(2,0) = (4,0)', mines.some(m => m.id === 'mine_start_iron' && m.x === 4 && m.y === 0 && m.resource === 'iron'));
+  check('Task34: starting coal mine is present at base+(0,2) = (2,2)', mines.some(m => m.id === 'mine_start_coal' && m.x === 2 && m.y === 2 && m.resource === 'coal'));
   check('Task34: starting mines begin unsecured', mines.every(m => m.developmentState === 'unsecured'));
   check('Task34: starting mines use grade 1 and miningPower 1', mines.every(m => m.grade === 1 && m.miningPower === 1));
 })();
@@ -91,7 +92,8 @@
   const invalid = win.sanitizeWorldState({
     workshops: [{ x: -1, y: 1.5, level: 0 }],
   });
-  check('Task36: invalid workshop position falls back safely', invalid.workshops[0].x === 0 && invalid.workshops[0].y === 0);
+  // Task 62: x:-1 is a valid world coord now; the non-integer y still falls back.
+  check('Task36: invalid workshop position falls back safely', invalid.workshops[0].x === -1 && invalid.workshops[0].y === 0);
   check('Task36: invalid workshop level falls back to 1', invalid.workshops[0].level === 1);
 })();
 
@@ -123,7 +125,7 @@
   check('Task37: duplicate coordinate rejection leaves state unchanged', JSON.stringify(win.state.world.workshops) === duplicateBefore);
 
   const invalidCases = [
-    { x: -1, y: 1, level: 1 },
+    { x: Number.NaN, y: 1, level: 1 }, // Task 62: negative coords are valid now; NaN is not
     { x: 1.5, y: 1, level: 1 },
     { x: 1, y: 1.5, level: 1 },
     { x: 1, y: 1, level: 0 },

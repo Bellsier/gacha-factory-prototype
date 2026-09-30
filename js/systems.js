@@ -105,15 +105,21 @@ function checkDualAutomation(){
 // callbacks so the state-change logic itself can be read/tested apart from
 // the DOM-building code around it. Behavior and log text are unchanged.
 // ---------------------------------------------------------------------------
+// Task 62: WORLD_MINE_SEEDS x/y are offsets from the base, so seeded mines
+// keep the same layout around the base whether it is at the new-game (2,0)
+// or at an older save's (0,0). The site-unlock structure itself is unchanged.
 function seedWorldMinesForSite(siteKey){
   const seeds = WORLD_MINE_SEEDS[siteKey] || [];
+  const base = state.world.base;
   seeds.forEach(seed=>{
-    const exists = state.world.mines.some(mine => mine && mine.x === seed.x && mine.y === seed.y);
+    const x = base.x + seed.x;
+    const y = base.y + seed.y;
+    const exists = state.world.mines.some(mine => mine && mine.x === x && mine.y === y);
     if(exists) return;
     addMine({
       id: 'mine_' + siteKey + '_' + seed.resource,
-      x: seed.x,
-      y: seed.y,
+      x,
+      y,
       resource: seed.resource,
       grade: seed.grade,
       miningPower: seed.miningPower,

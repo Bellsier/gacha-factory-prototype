@@ -132,7 +132,7 @@
   const win = newDom(makeMemoryStorage()).window;
   const player = win.state.world.player;
   check('Task56: fresh world has a single player', !!player && typeof player.x === 'number');
-  check('Task56: player starts at the base origin', player.x === 0 && player.y === 0);
+  check('Task56: player starts on the base', player.x === win.state.world.base.x && player.y === win.state.world.base.y); // Task 62: base is (2,0)
   check('Task56: player starts idle', player.pose === 'idle');
   check('Task56: player sprite is on the world stage', !!win.document.getElementById('playerChar'));
   check('Task56: world stage shows idle pose', win.document.getElementById('playerChar').getAttribute('data-player-pose') === 'idle');
@@ -166,12 +166,12 @@
   const storage = makeMemoryStorage();
   const win = newDom(storage).window;
   win.state.world.player.x = 40;
-  win.state.world.player.y = -8;
+  win.state.world.player.y = -18; // Task 62: below the new -10 min
   const clamped = win.clampPlayerPosition(win.state.world.player.x, win.state.world.player.y);
   win.state.world.player.x = clamped.x;
   win.state.world.player.y = clamped.y;
   check('Task56: x is clamped to the world max', clamped.x === 10);
-  check('Task56: y is clamped to the world min', clamped.y === 0);
+  check('Task56: y is clamped to the world min', clamped.y === -10); // Task 62: bounds -10..10
   win.setPlayerHeld('right', true);
   win.state.world.player.x = 10;
   win.tickPlayer();
@@ -222,8 +222,8 @@
   check('Task57: starting coal mine is drawn', !!coalNode && coalNode.getAttribute('data-resource') === 'coal');
   check('Task57: resource type has its own visual class', ironNode.classList.contains('res-iron') && coalNode.classList.contains('res-coal'));
   check('Task57: unsecured state is visible on stage', ironNode.classList.contains('is-unsecured') && ironNode.getAttribute('data-development-state') === 'unsecured');
-  const ironPos = win.worldToStagePercent(2, 0);
-  const coalPos = win.worldToStagePercent(0, 2);
+  const ironPos = win.worldToStagePercent(4, 0); // Task 62: start mines at base+(2,0) / base+(0,2)
+  const coalPos = win.worldToStagePercent(2, 2);
   check('Task57: iron mine position comes from mine.x/mine.y', ironNode.style.left === ironPos.left + '%' && ironNode.style.top === ironPos.top + '%');
   check('Task57: coal mine position comes from mine.x/mine.y', coalNode.style.left === coalPos.left + '%' && coalNode.style.top === coalPos.top + '%');
   const base = stage.querySelector('.world-base-marker');
@@ -243,8 +243,8 @@
   check('Task57: world bounds map inside the stage', corners.every(([x,y])=>{ const q = win.worldToStagePercent(x,y); return q.left > 0 && q.left < 100 && q.top > 0 && q.top < 100; }));
   check('Task57: conversion is monotonic', win.worldToStagePercent(3,0).left > win.worldToStagePercent(2,0).left && win.worldToStagePercent(0,3).top > win.worldToStagePercent(0,2).top);
   const clampedMax = win.clampPlayerPosition(99, 99);
-  const clampedMin = win.clampPlayerPosition(-5, -5);
-  check('Task57: world bounds unchanged', clampedMax.x === 10 && clampedMax.y === 10 && clampedMin.x === 0 && clampedMin.y === 0);
+  const clampedMin = win.clampPlayerPosition(-50, -50);
+  check('Task57: world bounds are -10..10 (Task 62)', clampedMax.x === 10 && clampedMax.y === 10 && clampedMin.x === -10 && clampedMin.y === -10);
   // No positions hard-coded in markup.
   const rawHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   check('Task57: index.html has no hard-coded mine nodes', !/data-world-mine=/.test(rawHtml) && !/world-mine-node/.test(rawHtml));
@@ -270,7 +270,7 @@
   check('Task57: expanded mines appear on stage', nodes.length === win.state.world.mines.length && nodes.length === 4);
   check('Task57: expanded list and stage still agree', doc.querySelectorAll('#worldMines [data-secure-mine]').length === nodes.length);
   const mana = doc.querySelector('#worldStage [data-resource="mana"]');
-  const manaPos = win.worldToStagePercent(4, 0);
+  const manaPos = win.worldToStagePercent(6, 0); // Task 62: seed (4,0) is relative to the base at (2,0)
   check('Task57: new mine drawn at its seeded coordinates', !!mana && mana.style.left === manaPos.left + '%' && mana.style.top === manaPos.top + '%');
   // Re-rendering does not duplicate objects.
   win.renderAll();
@@ -408,7 +408,7 @@
   check('Task59: base selection shows the info box', box.hidden === false && box.getAttribute('data-world-info-type') === 'base');
   check('Task59: base info title', line('title') === '거점');
   check('Task59: base info level from state', line('level') === '레벨 ' + win.state.world.base.level && line('level') === '레벨 1');
-  check('Task59: base info position from state', line('position') === '위치 (0, 0)');
+  check('Task59: base info position from state', line('position') === '위치 (2, 0)'); // Task 62
   mineNode('mine_start_iron').click();
   check('Task59: iron info lines', JSON.stringify(lines()) === JSON.stringify(['철광석 광맥', '철광석', '등급 1', '미확보']));
   check('Task59: info type switches to mine', box.getAttribute('data-world-info-type') === 'mine');
@@ -612,8 +612,8 @@
   const win = newDom(makeMemoryStorage()).window;
   const P = (x, y) => win.worldToStagePercent(x, y);
   const near = (a, b) => Math.abs(a - b) < 1e-9;
-  // Task 56 world bounds (0..10) are the reference values.
-  const farL = P(0, 0), farR = P(10, 0), nearL = P(0, 10), nearR = P(10, 10);
+  // Task 62 world bounds (-10..10) are the reference values.
+  const farL = P(-10, -10), farR = P(10, -10), nearL = P(-10, 10), nearR = P(10, 10);
   check('Task61: projection returns scale and depth', typeof farL.scale === 'number' && typeof farL.depth === 'number');
   check('Task61: far row sits higher than near row', farL.top < nearL.top);
   check('Task61: far row is narrower than near row', (farR.left - farL.left) < (nearR.left - nearL.left));
@@ -621,12 +621,12 @@
   check('Task61: far objects are drawn smaller', farL.scale < 1 && farL.scale > 0.4);
   check('Task61: scale depends only on depth', near(P(0, 4).scale, P(9, 4).scale));
   check('Task61: scale grows toward the camera', P(5, 2).scale < P(5, 5).scale && P(5, 5).scale < P(5, 8).scale);
-  check('Task61: camera is centred on the world', near(P(5, 0).left, 50) && near(P(5, 10).left, 50));
-  check('Task61: rows are symmetric around the centre', near(P(2, 3).left - 50, 50 - P(8, 3).left));
+  check('Task61: camera is centred on the world', near(P(0, -10).left, 50) && near(P(0, 10).left, 50));
+  check('Task61: rows are symmetric around the centre', near(P(-3, 3).left - 50, 50 - P(3, 3).left));
   check('Task61: depth is 0 on far row and 1 on near row', near(farL.depth, 0) && near(nearL.depth, 1));
-  check('Task61: every in-bounds point stays inside the stage', [[0,0],[10,0],[0,10],[10,10],[5,5]].every(([x,y]) => { const q = P(x,y); return q.left > 0 && q.left < 100 && q.top > 0 && q.top < 100; }));
+  check('Task61: every in-bounds point stays inside the stage', [[-10,-10],[10,-10],[-10,10],[10,10],[0,0],[2,0]].every(([x,y]) => { const q = P(x,y); return q.left > 0 && q.left < 100 && q.top > 0 && q.top < 100; }));
   // True perspective: a straight world line (x = 3) stays straight on screen.
-  const a = P(3, 0), m = P(3, 5), c = P(3, 10);
+  const a = P(3, -10), m = P(3, 0), c = P(3, 10);
   const cross = (m.left - a.left) * (c.top - a.top) - (m.top - a.top) * (c.left - a.left);
   check('Task61: straight world lines stay straight on screen', Math.abs(cross) < 1e-6);
   // Rows get closer together further away (foreshortening).
@@ -640,12 +640,12 @@
   const ground = stage.querySelector('.world-ground');
   const svg = ground.querySelector('svg.world-ground-svg');
   check('Task61: ground is drawn as an SVG plane', !!svg && !!svg.querySelector('polygon.world-ground-plane'));
-  check('Task61: grid has one line per world unit on both axes', svg.querySelectorAll('line').length === 22);
+  check('Task61: grid has one line per world unit on both axes', svg.querySelectorAll('line').length === 42); // Task 62: 21 + 21 for -10..10
   const edges = svg.querySelectorAll('line.world-grid-edge');
   check('Task61: world bounds are outlined', edges.length === 4);
   // The far edge (y = 0) line runs between the projected far corners.
-  const farEdge = [...edges].find(l => Math.abs(+l.getAttribute('y1') - win.worldToStagePercent(0, 0).top) < 0.001 && Math.abs(+l.getAttribute('y2') - win.worldToStagePercent(10, 0).top) < 0.001);
-  check('Task61: grid uses the same projection as objects', !!farEdge && Math.abs(+farEdge.getAttribute('x1') - win.worldToStagePercent(0, 0).left) < 0.001);
+  const farEdge = [...edges].find(l => Math.abs(+l.getAttribute('y1') - win.worldToStagePercent(-10, -10).top) < 0.001 && Math.abs(+l.getAttribute('y2') - win.worldToStagePercent(10, -10).top) < 0.001);
+  check('Task61: grid uses the same projection as objects', !!farEdge && Math.abs(+farEdge.getAttribute('x1') - win.worldToStagePercent(-10, -10).left) < 0.001);
   win.renderAll();
   check('Task61: re-render does not duplicate the ground', ground.querySelectorAll('svg').length === 1);
   // Depth scale and painter order on objects.
@@ -698,6 +698,133 @@
   const w2 = newDom(storage).window;
   w2.saveGame();
   check('Task61: save data has no view/camera fields', !/depth|camera|scale|WORLD_VIEW/i.test(storage.getItem('gachaFactorySave')));
+})();
+
+// =============================================================================
+// TASK 62 — Base-centred world coordinates (-10..10, base at (2,0)).
+// =============================================================================
+(function test_T62_newGameCoordinates() {
+  const win = newDom(makeMemoryStorage()).window;
+  const w = win.state.world;
+  check('Task62: new game base is at (2,0)', w.base.x === 2 && w.base.y === 0 && w.base.level === 1);
+  check('Task62: player starts on the base', w.player.x === 2 && w.player.y === 0 && w.player.pose === 'idle');
+  check('Task62: starting mines keep their layout around the base', w.mines.some(m => m.id === 'mine_start_iron' && m.x === 4 && m.y === 0) && w.mines.some(m => m.id === 'mine_start_coal' && m.x === 2 && m.y === 2));
+  check('Task62: only the two starting mines exist', w.mines.length === 2);
+  const lo = win.clampPlayerPosition(-99, -99), hi = win.clampPlayerPosition(99, 99);
+  check('Task62: world bounds are -10..10 on both axes', lo.x === -10 && lo.y === -10 && hi.x === 10 && hi.y === 10);
+  const mid = win.clampPlayerPosition(-4.5, 7.25);
+  check('Task62: in-bounds negative positions are not clamped', mid.x === -4.5 && mid.y === 7.25);
+})();
+
+(function test_T62_movementInAllDirections() {
+  const win = newDom(makeMemoryStorage()).window;
+  const p = win.state.world.player;
+  const hold = (dir, ticks) => { win.setPlayerHeld(dir, true); for(let i=0;i<ticks;i++) win.tickPlayer(); win.clearPlayerHeld(); win.tickPlayer(); };
+  hold('left', 20);   // 2 s at 3 u/s = 6 units west
+  check('Task62: walking west from the base reaches negative x', Math.abs(p.x - (-4)) < 1e-9 && p.facing === 'left');
+  hold('up', 20);
+  check('Task62: walking north reaches negative y', Math.abs(p.y - (-6)) < 1e-9 && p.facing === 'up');
+  hold('left', 100);
+  hold('up', 100);
+  check('Task62: west/north edges clamp at -10', p.x === -10 && p.y === -10);
+  hold('right', 200);
+  hold('down', 200);
+  check('Task62: east/south edges clamp at 10', p.x === 10 && p.y === 10);
+  p.x = 0; p.y = 0;
+  win.setPlayerHeld('left', true); win.setPlayerHeld('up', true);
+  for(let i=0;i<10;i++) win.tickPlayer();
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task62: diagonal speed is still normalised', Math.abs(Math.hypot(p.x, p.y) - 3) < 1e-9 && p.x < 0 && p.y < 0);
+  check('Task62: movement ends idle', p.pose === 'idle');
+})();
+
+(function test_T62_worldCoordinateValidation() {
+  const win = newDom(makeMemoryStorage()).window;
+  const m = win.addMine({ id: 'mine_west', x: -6, y: -3, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' });
+  check('Task62: mines accept negative coordinates', !!m && m.x === -6 && m.y === -3);
+  check('Task62: mines reject non-integer coordinates', win.addMine({ x: -1.5, y: 0, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' }) === null);
+  check('Task62: duplicate negative coordinates are rejected', win.addMine({ x: -6, y: -3, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' }) === null);
+  const ws = win.addWorkshop({ id: 'ws_west', x: -2, y: -1, level: 1, recipeKey: 'steel' });
+  check('Task62: workshops accept negative coordinates', !!ws && ws.x === -2 && ws.y === -1);
+  check('Task62: Factory grid still rejects negative coordinates', win.addFactoryNode({ type: 'production', x: -1, y: 0, width: 1, height: 1 }) === null);
+  const world = win.sanitizeWorldState({ base: { x: -3, y: 4, level: 2 }, mines: [{ id: 'mine_n', x: -7, y: -9, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'secured' }], workshops: [], player: { x: -8.5, y: -9.5, facing: 'left' } });
+  check('Task62: sanitize keeps negative base coords', world.base.x === -3 && world.base.y === 4);
+  check('Task62: sanitize keeps negative mine coords', world.mines[0].x === -7 && world.mines[0].y === -9);
+  check('Task62: sanitize keeps negative player coords', world.player.x === -8.5 && world.player.y === -9.5);
+  const noBase = win.sanitizeWorldState({ mines: [], workshops: [] });
+  check('Task62: missing base falls back to the new-game base', noBase.base.x === 2 && noBase.base.y === 0);
+  check('Task62: missing player stands on the (fallback) base', noBase.player.x === 2 && noBase.player.y === 0);
+  const badPlayer = win.sanitizeWorldState({ base: { x: -4, y: 3, level: 1 }, mines: [], workshops: [], player: { x: 'far', y: null } });
+  check('Task62: invalid player coords fall back to the saved base', badPlayer.player.x === -4 && badPlayer.player.y === 3);
+})();
+
+(function test_T62_expansionSeedsRelativeToBase() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.gold = 700;
+  check('Task62: expansion still works', win.expandBase() === true);
+  const mana = win.state.world.mines.find(m => m.resource === 'mana');
+  const crystal = win.state.world.mines.find(m => m.resource === 'crystal');
+  check('Task62: expansion seeds are placed relative to the base', mana.x === 6 && mana.y === 0 && crystal.x === 2 && crystal.y === 4);
+  check('Task62: site unlock structure is unchanged', win.state.unlockedSites.manaVein === true && win.state.world.mines.length === 4);
+})();
+
+(function test_T62_legacySaveLoadsUnchanged() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  win.saveGame();
+  const payload = JSON.parse(storage.getItem('gachaFactorySave'));
+  // An older save: base at the old origin, the old start-mine layout, player in 0..10.
+  payload.run.world = {
+    base: { x: 0, y: 0, level: 2 },
+    mines: [
+      { id: 'mine_start_iron', x: 2, y: 0, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'secured' },
+      { id: 'mine_start_coal', x: 0, y: 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+      { id: 'mine_manaVein_mana', x: 4, y: 0, resource: 'mana', grade: 2, miningPower: 1, developmentState: 'unsecured' },
+    ],
+    workshops: [{ id: 'ws_old', x: 7, y: 1, level: 1, recipeKey: 'steel', auto: false, progress: null }],
+    player: { x: 3.5, y: 1.25, facing: 'left', pose: 'walk' },
+  };
+  payload.run.unlockedSites.manaVein = true;
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const loaded = win.loadGame();
+  check('Task62: older save still loads', loaded.ok === true);
+  const w = loaded.run.world;
+  check('Task62: older save keeps its base position', w.base.x === 0 && w.base.y === 0 && w.base.level === 2);
+  check('Task62: older save keeps every mine exactly', JSON.stringify(w.mines.map(m => [m.id, m.x, m.y, m.developmentState])) === JSON.stringify([['mine_start_iron',2,0,'secured'],['mine_start_coal',0,2,'unsecured'],['mine_manaVein_mana',4,0,'unsecured']]));
+  check('Task62: older save gets no new/regenerated mines', w.mines.length === 3);
+  check('Task62: older save keeps workshops and player', w.workshops[0].x === 7 && w.workshops[0].y === 1 && w.player.x === 3.5 && w.player.y === 1.25);
+  // Expanding an older save keeps its old seed layout (relative to its base at 0,0).
+  const win2 = newDom(storage).window;
+  check('Task62: game boots from the older save', win2.state.world.base.x === 0 && win2.state.world.mines.length === 3);
+  win2.state.gold = 5000;
+  check('Task62: older save can still expand', win2.expandBase() === true);
+  const rare = win2.state.world.mines.find(m => m.resource === 'rareMetal');
+  check('Task62: older save expansion uses its own base as origin', !!rare && rare.x === 6 && rare.y === 0);
+  win2.saveGame();
+  check('Task62: saveVersion stays 1', JSON.parse(storage.getItem('gachaFactorySave')).saveVersion === 1);
+})();
+
+(function test_T62_projectionAndDepthInNewWorld() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const P = (x, y) => win.worldToStagePercent(x, y);
+  const base = P(2, 0);
+  check('Task62: base is drawn slightly east of the stage centre', base.left > 50 && base.left < 60);
+  check('Task62: world origin is on the camera centre line', Math.abs(P(0, 0).left - 50) < 1e-9);
+  check('Task62: whole -10..10 world is inside the stage', [[-10,-10],[10,-10],[-10,10],[10,10]].every(([x,y]) => { const q = P(x,y); return q.left > 0 && q.left < 100 && q.top > 0 && q.top < 100; }));
+  check('Task62: north (negative y) is farther and smaller', P(2, -5).top < base.top && P(2, -5).scale < base.scale);
+  const marker = doc.querySelector('.world-base-marker');
+  check('Task62: base marker drawn at (2,0)', marker.style.left === base.left + '%' && marker.style.top === base.top + '%');
+  const player = doc.getElementById('playerChar');
+  check('Task62: player drawn on the base at start', player.style.left === marker.style.left && player.style.top === marker.style.top);
+  check('Task62: player on base is in front of it', parseInt(player.style.zIndex, 10) > parseInt(marker.style.zIndex, 10));
+  win.addMine({ id: 'mine_north', x: 2, y: -4, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' });
+  win.renderAll();
+  const north = doc.querySelector('[data-world-mine="mine_north"]');
+  check('Task62: mine north of the base is drawn behind it', parseInt(north.style.zIndex, 10) < parseInt(doc.querySelector('.world-base-marker').style.zIndex, 10));
+  check('Task62: ground grid covers -10..10', doc.querySelectorAll('.world-ground line').length === 42);
+  doc.querySelector('.world-base-marker').click();
+  check('Task62: base info shows (2, 0)', doc.querySelector('#worldInfo [data-world-info="position"]').textContent === '위치 (2, 0)');
 })();
 
 // =============================================================================

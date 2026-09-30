@@ -25,6 +25,7 @@ const RECIPES = [
   {key:'quantumCore', name:'퀀텀 코어', need:{precisionPart:2, cosmicShard:1}, out:1, sell:400, craftTime:15},
   {key:'plasmaCore', name:'플라즈마 코어', need:{precisionPart:2, plasma:1}, out:1, sell:420, craftTime:15},
 ];
+// Task 62: x/y are offsets from state.world.base (see seedWorldMinesForSite).
 const WORLD_MINE_SEEDS = {
   manaVein: [
     {x:4, y:0, resource:'mana', grade:2, miningPower:1},

@@ -48,10 +48,15 @@ const BALANCE = {
     // expandBase/unlockSite spend SITES[key].unlockCost, not a separate world cost.
     EXPANSION_SITE_ORDER: ['abandonedMine','manaVein','ruins','spaceStation'],
     PLAYER_SPEED: 3, // world units per second; tickPlayer divides by TICKS_PER_SECOND
-    BOUNDS_MIN_X: 0,
-    BOUNDS_MIN_Y: 0,
+    // Task 62: base-centred world. Coordinates may be negative or positive;
+    // the walkable area is BOUNDS_* (can be widened later without touching
+    // any other code). The base starts slightly east of the world centre.
+    BOUNDS_MIN_X: -10,
+    BOUNDS_MIN_Y: -10,
     BOUNDS_MAX_X: 10,
     BOUNDS_MAX_Y: 10,
+    START_BASE_X: 2,
+    START_BASE_Y: 0,
   },
   gacha: {
     FIRST_TICKET_GOLD_THRESHOLD: 50, // one-time gold milestone that grants the first ticket

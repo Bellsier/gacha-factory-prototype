@@ -59,7 +59,8 @@
 (function test_T27_freshWorldDefaults() {
   const win = newDom(makeMemoryStorage()).window;
   check('Task27: fresh run has world state', !!win.state.world);
-  check('Task27: base starts at the origin', win.state.world.base.x === 0 && win.state.world.base.y === 0);
+  // Task 62: the base now starts at (2,0) in the base-centred world, not at the origin.
+  check('Task27: base starts at the new-game base position (2,0)', win.state.world.base.x === 2 && win.state.world.base.y === 0);
   check('Task27: base starts at level 1', win.state.world.base.level === 1);
   check('Task27: fresh world has the seeded starting mines', Array.isArray(win.state.world.mines) && win.state.world.mines.length === 2);
 })();
@@ -96,8 +97,9 @@
     }],
   });
   const mine = world.mines[0];
-  check('Task27: invalid base fields fall back independently', world.base.x === 0 && world.base.y === 0 && world.base.level === 1);
-  check('Task27: invalid mine position falls back independently', mine.x === 0 && mine.y === 0);
+  // Task 62: negative world coords are valid now (x:-1 / x:-3 are kept); non-integers still fall back.
+  check('Task27: invalid base fields fall back independently', world.base.x === -1 && world.base.y === 0 && world.base.level === 1);
+  check('Task27: invalid mine position falls back independently', mine.x === -3 && mine.y === 0);
   check('Task27: invalid mine resource falls back to a real resource', win.RESOURCES.some(r => r.key === mine.resource));
   check('Task27: invalid mine grade falls back to 1', mine.grade === 1);
   check('Task27: invalid mine power falls back to 1', mine.miningPower === 1);
@@ -175,7 +177,7 @@
   check('Task28: duplicate coordinate rejection does not mutate state', JSON.stringify(win.state.world.mines) === before);
 
   const invalidCases = [
-    { x: -1, y: 1, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+    { x: Number.NaN, y: 1, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' }, // Task 62: negative coords are valid now; NaN is not
     { x: 1.5, y: 2, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' },
     { x: 2, y: 2, resource: 'missing', grade: 1, miningPower: 1, developmentState: 'unsecured' },
     { x: 2, y: 3, resource: 'iron', grade: 0, miningPower: 1, developmentState: 'unsecured' },
@@ -224,7 +226,7 @@
 // =============================================================================
 (function test_T30_secureMine() {
   const win = newDom(makeMemoryStorage()).window;
-  const mine = win.addMine({ id:'mine_secure', x:2, y:2, resource:'iron', grade:1, miningPower:1, developmentState:'unsecured' });
+  const mine = win.addMine({ id:'mine_secure', x:5, y:5, resource:'iron', grade:1, miningPower:1, developmentState:'unsecured' });
   check('Task30: unsecured mine is created', !!mine && mine.developmentState === 'unsecured');
   check('Task30: secureMine transitions mine to secured', win.secureMine('mine_secure') === true && win.state.world.mines.find(m => m.id === 'mine_secure').developmentState === 'secured');
   check('Task30: securing an already secured mine is rejected', win.secureMine('mine_secure') === false);
