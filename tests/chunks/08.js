@@ -222,8 +222,11 @@
   check('Task57: starting coal mine is drawn', !!coalNode && coalNode.getAttribute('data-resource') === 'coal');
   check('Task57: resource type has its own visual class', ironNode.classList.contains('res-iron') && coalNode.classList.contains('res-coal'));
   check('Task57: unsecured state is visible on stage', ironNode.classList.contains('is-unsecured') && ironNode.getAttribute('data-development-state') === 'unsecured');
-  const ironPos = win.worldToStagePercent(4, 0); // Task 62: start mines at base+(2,0) / base+(0,2)
-  const coalPos = win.worldToStagePercent(2, 2);
+  // Task 63: starter positions are random; read them from the mine data.
+  const ironMine = win.state.world.mines.find(m => m.id === 'mine_start_iron');
+  const coalMine = win.state.world.mines.find(m => m.id === 'mine_start_coal');
+  const ironPos = win.worldToStagePercent(ironMine.x, ironMine.y);
+  const coalPos = win.worldToStagePercent(coalMine.x, coalMine.y);
   check('Task57: iron mine position comes from mine.x/mine.y', ironNode.style.left === ironPos.left + '%' && ironNode.style.top === ironPos.top + '%');
   check('Task57: coal mine position comes from mine.x/mine.y', coalNode.style.left === coalPos.left + '%' && coalNode.style.top === coalPos.top + '%');
   const base = stage.querySelector('.world-base-marker');
@@ -646,6 +649,13 @@
   // The far edge (y = 0) line runs between the projected far corners.
   const farEdge = [...edges].find(l => Math.abs(+l.getAttribute('y1') - win.worldToStagePercent(-10, -10).top) < 0.001 && Math.abs(+l.getAttribute('y2') - win.worldToStagePercent(10, -10).top) < 0.001);
   check('Task61: grid uses the same projection as objects', !!farEdge && Math.abs(+farEdge.getAttribute('x1') - win.worldToStagePercent(-10, -10).left) < 0.001);
+  // Task 63: starter mines are random per game; pin a known layout (iron at
+  // (2,0), coal at (0,2), base at (0,0) — the layout these depth checks were
+  // written for) so the depth comparisons below stay deterministic.
+  win.state.world.base.x = 0; win.state.world.base.y = 0;
+  const pinIron = win.state.world.mines.find(m => m.id === 'mine_start_iron'); pinIron.x = 2; pinIron.y = 0;
+  const pinCoal = win.state.world.mines.find(m => m.id === 'mine_start_coal'); pinCoal.x = 0; pinCoal.y = 2;
+  win.state.world.player.x = 0; win.state.world.player.y = 0;
   win.renderAll();
   check('Task61: re-render does not duplicate the ground', ground.querySelectorAll('svg').length === 1);
   // Depth scale and painter order on objects.
@@ -708,7 +718,9 @@
   const w = win.state.world;
   check('Task62: new game base is at (2,0)', w.base.x === 2 && w.base.y === 0 && w.base.level === 1);
   check('Task62: player starts on the base', w.player.x === 2 && w.player.y === 0 && w.player.pose === 'idle');
-  check('Task62: starting mines keep their layout around the base', w.mines.some(m => m.id === 'mine_start_iron' && m.x === 4 && m.y === 0) && w.mines.some(m => m.id === 'mine_start_coal' && m.x === 2 && m.y === 2));
+  // Task 63: starter positions are random; they must still sit around the base (distance 2..3).
+  const aroundBase = (m) => { const d = Math.hypot(m.x - w.base.x, m.y - w.base.y); return d >= 2 && d <= 3; };
+  check('Task62: starting mines sit around the base', w.mines.some(m => m.id === 'mine_start_iron' && aroundBase(m)) && w.mines.some(m => m.id === 'mine_start_coal' && aroundBase(m)));
   check('Task62: only the two starting mines exist', w.mines.length === 2);
   const lo = win.clampPlayerPosition(-99, -99), hi = win.clampPlayerPosition(99, 99);
   check('Task62: world bounds are -10..10 on both axes', lo.x === -10 && lo.y === -10 && hi.x === 10 && hi.y === 10);
@@ -908,6 +920,234 @@
   check('Task62b: every seeded expansion mine is placed inside the bounds', win.state.world.mines.length === 8 && win.state.world.mines.every(m => win.isValidWorldX(m.x) && win.isValidWorldY(m.y)));
   const far = win.state.world.mines.find(m => m.resource === 'cosmicShard');
   check('Task62b: farthest seeded mine sits exactly on the east edge', !!far && far.x === 10 && far.y === 0);
+})();
+
+// =============================================================================
+// TASK 63 — Random mine layout per new game.
+// Deterministic: rule checks over many generations driven by fixed pseudo-random
+// sequences, plus validity checks on real (Math.random) new games. No test
+// depends on one particular random outcome.
+// =============================================================================
+function t63Lcg(seed) {
+  let s = (seed >>> 0) || 1;
+  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+}
+function t63LayoutProblems(win, base, mines, opts) {
+  const o = opts || {};
+  const problems = [];
+  const seen = new Set();
+  mines.forEach(m => {
+    if (!Number.isInteger(m.x) || !Number.isInteger(m.y)) problems.push('non-integer ' + m.id);
+    if (!win.isValidWorldX(m.x) || !win.isValidWorldY(m.y)) problems.push('out of bounds ' + m.id);
+    if (m.x < -10 || m.x > 10 || m.y < -10 || m.y > 10) problems.push('outside -10..10 ' + m.id);
+    if (m.x === base.x && m.y === base.y) problems.push('on base ' + m.id);
+    const key = m.x + ',' + m.y;
+    if (seen.has(key)) problems.push('duplicate cell ' + key);
+    seen.add(key);
+  });
+  const ids = mines.map(m => m.id);
+  if (new Set(ids).size !== ids.length) problems.push('duplicate ids');
+  ['iron', 'coal'].forEach(res => {
+    const starter = mines.find(m => m.id === 'mine_start_' + res);
+    if (!starter || starter.resource !== res) { problems.push('missing starter ' + res); return; }
+    const d = Math.hypot(starter.x - base.x, starter.y - base.y);
+    if (d < 2 || d > 3) problems.push('starter ' + res + ' not near base (d=' + d.toFixed(2) + ')');
+    if (starter.grade !== 1 || starter.miningPower !== 1 || starter.developmentState !== 'unsecured') problems.push('starter ' + res + ' fields');
+  });
+  if (o.checkSpacing) {
+    const a = mines.find(m => m.id === 'mine_start_iron'), b = mines.find(m => m.id === 'mine_start_coal');
+    if (a && b && Math.hypot(a.x - b.x, a.y - b.y) < 2) problems.push('starters closer than 2');
+  }
+  return problems;
+}
+
+(function test_T63_newGameLayoutRules() {
+  const win = newDom(makeMemoryStorage()).window;
+  const w = win.state.world;
+  check('Task63: new game has a mine list', Array.isArray(w.mines) && w.mines.length >= 2);
+  check('Task63: at least one iron mine', w.mines.some(m => m.resource === 'iron'));
+  check('Task63: at least one coal mine', w.mines.some(m => m.resource === 'coal'));
+  const problems = t63LayoutProblems(win, w.base, w.mines, { checkSpacing: true });
+  check('Task63: new game layout obeys every rule', problems.length === 0, problems.join('; '));
+  check('Task63: mine data keeps the existing shape', w.mines.every(m => JSON.stringify(Object.keys(m).sort()) === JSON.stringify(['developmentState','grade','id','miningPower','resource','x','y'])));
+  check('Task63: starter mines start grade 1 / power 1 / unsecured', w.mines.every(m => m.grade === 1 && m.miningPower === 1 && m.developmentState === 'unsecured'));
+  check('Task63: base and player unchanged by generation', w.base.x === 2 && w.base.y === 0 && w.player.x === 2 && w.player.y === 0);
+  check('Task63: default extra mine count keeps the current world size', w.mines.length === 2);
+})();
+
+(function test_T63_manyRealNewGamesAreValid() {
+  let allValid = true, detail = '';
+  for (let i = 0; i < 6; i++) {
+    const win = newDom(makeMemoryStorage()).window;
+    const p = t63LayoutProblems(win, win.state.world.base, win.state.world.mines, { checkSpacing: true });
+    if (p.length) { allValid = false; detail = p.join('; '); }
+  }
+  check('Task63: six real new games all produce valid layouts', allValid, detail);
+})();
+
+(function test_T63_generatorRuleSweep() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = { x: 2, y: 0 };
+  let bad = 0, detail = '';
+  for (let seed = 1; seed <= 300; seed++) {
+    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+    const p = t63LayoutProblems(win, base, mines, { checkSpacing: true });
+    if (p.length || mines.length !== 2) { bad++; detail = 'seed ' + seed + ': ' + p.join('; '); }
+  }
+  check('Task63: 300 seeded generations all obey the rules', bad === 0, detail);
+  const edge0 = win.generateInitialWorldMines(base, { random: () => 0 });
+  const edge1 = win.generateInitialWorldMines(base, { random: () => 0.9999999 });
+  check('Task63: extreme random values still give valid layouts', t63LayoutProblems(win, base, edge0, { checkSpacing: true }).length === 0 && t63LayoutProblems(win, base, edge1, { checkSpacing: true }).length === 0);
+  const badRandom = win.generateInitialWorldMines(base, { random: () => Number.NaN });
+  check('Task63: a broken random source cannot break the rules', t63LayoutProblems(win, base, badRandom).length === 0);
+  check('Task63: starters are clear of the expansion seed cells (>= 4 from base)', (() => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+      // Reference values: WORLD_MINE_SEEDS offsets from data.js (4,0),(0,4),(6,0),(0,6),(8,0),(0,8).
+      const seedCells = [[4,0],[0,4],[6,0],[0,6],[8,0],[0,8]].map(([dx, dy]) => (base.x + dx) + ',' + (base.y + dy));
+      if (mines.some(m => seedCells.includes(m.x + ',' + m.y))) return false;
+    }
+    return true;
+  })());
+})();
+
+(function test_T63_layoutsVary() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = { x: 2, y: 0 };
+  const sig = (mines) => mines.map(m => m.id + '@' + m.x + ',' + m.y).join('|');
+  const a = sig(win.generateInitialWorldMines(base, { random: () => 0 }));
+  const b = sig(win.generateInitialWorldMines(base, { random: () => 0.9999999 }));
+  check('Task63: different random values give different layouts', a !== b);
+  const layouts = new Set();
+  for (let seed = 1; seed <= 50; seed++) layouts.add(sig(win.generateInitialWorldMines(base, { random: t63Lcg(seed) })));
+  check('Task63: many distinct layouts across seeds', layouts.size >= 10, 'distinct=' + layouts.size);
+  const same1 = sig(win.generateInitialWorldMines(base, { random: t63Lcg(42) }));
+  const same2 = sig(win.generateInitialWorldMines(base, { random: t63Lcg(42) }));
+  check('Task63: same random sequence gives the same layout', same1 === same2);
+  const ironCells = new Set();
+  for (let seed = 1; seed <= 50; seed++) { const m = win.generateInitialWorldMines(base, { random: t63Lcg(seed) }).find(x => x.id === 'mine_start_iron'); ironCells.add(m.x + ',' + m.y); }
+  check('Task63: the starter iron position is not fixed', ironCells.size > 1);
+})();
+
+(function test_T63_extraMinesStructure() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = { x: 2, y: 0 };
+  let ok = true, detail = '';
+  for (let seed = 1; seed <= 40; seed++) {
+    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed), extraCount: 12 });
+    const p = t63LayoutProblems(win, base, mines, { checkSpacing: true });
+    if (p.length || mines.length !== 14) { ok = false; detail = p.join('; ') + ' n=' + mines.length; }
+    if (!mines.filter(m => !m.id.startsWith('mine_start_')).every(m => (m.resource === 'iron' || m.resource === 'coal') && m.grade === 1 && m.miningPower === 1 && m.developmentState === 'unsecured')) { ok = false; detail = 'extra uses a locked-site resource or wrong fields'; }
+  }
+  check('Task63: extra mines obey the same rules and only use start-site resources', ok, detail);
+  const custom = win.generateInitialWorldMines(base, { random: t63Lcg(7), extraCount: 3, extraResources: ['coal'] });
+  check('Task63: extra resource pool can be supplied', custom.filter(m => m.id.startsWith('mine_gen_')).every(m => m.resource === 'coal') && custom.length === 5);
+  const huge = win.generateInitialWorldMines(base, { random: t63Lcg(9), extraCount: 1000 });
+  check('Task63: extra mines stop when the world is full (no overlap, no base cell)', huge.length === 21 * 21 - 1 && t63LayoutProblems(win, base, huge).length === 0);
+  check('Task63: new run start resources are the open site only (iron, coal)', JSON.stringify(win.worldGenStartResources().sort()) === JSON.stringify(['coal', 'iron']));
+})();
+
+(function test_T63_baseNearEdgeStaysInBounds() {
+  const win = newDom(makeMemoryStorage()).window;
+  let ok = true, detail = '';
+  [{ x: 10, y: 10 }, { x: -10, y: -10 }, { x: 10, y: -10 }, { x: -10, y: 0 }].forEach(base => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed), extraCount: 5 });
+      const p = t63LayoutProblems(win, base, mines);
+      if (p.length) { ok = false; detail = JSON.stringify(base) + ' ' + p.join('; '); }
+    }
+  });
+  check('Task63: a base on the world edge still gets in-bounds starters', ok, detail);
+})();
+
+(function test_T63_saveLoadKeepsLayout() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const fields = (ms) => JSON.stringify(ms.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]));
+  const snapshot = fields(win.state.world.mines);
+  check('Task63: save succeeds', win.saveGame() === true);
+  const loaded = win.loadGame();
+  check('Task63: loadGame returns the identical mines', loaded.ok === true && fields(loaded.run.world.mines) === snapshot);
+  const win2 = newDom(storage).window;
+  check('Task63: booting from the save keeps the identical mines (no re-generation)', fields(win2.state.world.mines) === snapshot);
+  win2.saveGame();
+  const win3 = newDom(storage).window;
+  check('Task63: a second save/boot round trip still keeps them', fields(win3.state.world.mines) === snapshot);
+  check('Task63: saveVersion stays 1', JSON.parse(storage.getItem('gachaFactorySave')).saveVersion === 1);
+})();
+
+(function test_T63_existingSavesNotRegenerated() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  win.saveGame();
+  const payload = JSON.parse(storage.getItem('gachaFactorySave'));
+  const custom = [
+    { id: 'mine_start_iron', x: 9, y: -9, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'secured' },
+    { id: 'mine_start_coal', x: -9, y: 9, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+    { id: 'mine_old_extra', x: 0, y: -5, resource: 'mana', grade: 2, miningPower: 3, developmentState: 'unsecured' },
+  ];
+  payload.run.world.mines = custom;
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const booted = newDom(storage).window;
+  const mineFields = (ms) => JSON.stringify(ms.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]));
+  check('Task63: an existing save keeps its own mines exactly', mineFields(booted.state.world.mines) === mineFields(custom), mineFields(booted.state.world.mines));
+  // A save whose world has an empty mine list is respected too (not refilled).
+  payload.run.world.mines = [];
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const empty = newDom(storage).window;
+  check('Task63: an existing save with no mines is not refilled', empty.state.world.mines.length === 0);
+  // Pre-world saves (no world at all) still get a fresh generated world.
+  delete payload.run.world;
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const noWorld = newDom(storage).window;
+  check('Task63: a save without any world gets a valid new world', t63LayoutProblems(noWorld, noWorld.state.world.base, noWorld.state.world.mines).length === 0);
+})();
+
+(function test_T63_seedsAndSitesKept() {
+  const win = newDom(makeMemoryStorage()).window;
+  const dataSrc = fs.readFileSync(path.join(__dirname, '..', 'js', 'data.js'), 'utf8');
+  check('Task63: WORLD_MINE_SEEDS still exists for site expansion', /const WORLD_MINE_SEEDS = \{/.test(dataSrc) && /manaVein:/.test(dataSrc));
+  check('Task63: new game does not use WORLD_MINE_SEEDS', win.state.world.mines.every(m => m.id.startsWith('mine_start_') || m.id.startsWith('mine_gen_')));
+  win.state.gold = 20000;
+  check('Task63: site expansion still works', win.expandBase() === true && win.expandBase() === true && win.expandBase() === true);
+  const ids = win.state.world.mines.map(m => m.id);
+  check('Task63: every site seed is added on expansion (no collision with random starters)', ['mine_manaVein_mana','mine_manaVein_crystal','mine_ruins_rareMetal','mine_ruins_relic','mine_spaceStation_cosmicShard','mine_spaceStation_plasma'].every(id => ids.includes(id)) && ids.length === 8);
+  check('Task63: unlockedSites still drives expansion', win.state.unlockedSites.spaceStation === true);
+})();
+
+(function test_T63_coreLoopWithRandomLayout() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  stage.querySelector('[data-world-mine="mine_start_iron"]').click();
+  check('Task63: random starter mine can be selected', win.getWorldSelection() && win.getWorldSelection().id === 'mine_start_iron');
+  check('Task63: info shows the selected starter', doc.querySelector('#worldInfo [data-world-info="title"]').textContent === '철광석 광맥');
+  ['mine_start_iron', 'mine_start_coal'].forEach(id => doc.querySelector('[data-secure-mine="' + id + '"]').click());
+  check('Task63: securing works', win.state.world.mines.filter(m => m.id.startsWith('mine_start_')).every(m => m.developmentState === 'secured'));
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_coal"]').click();
+  check('Task63: mining into shared storage works', win.state.resources.iron === 2 && win.state.resources.coal === 1);
+  doc.querySelector('[data-craft="steel"]').click();
+  check('Task63: crafting works', win.state.products.steel === 1);
+  doc.querySelector('[data-sell="steel"]').click();
+  check('Task63: selling works', win.state.gold > 0 && win.state.products.steel === 0);
+  win.state.gold = 700;
+  check('Task63: expansion works', win.expandBase() === true);
+  win.renderAll();
+  check('Task63: stage shows every mine', doc.querySelectorAll('#worldStage [data-world-mine]').length === win.state.world.mines.length);
+  const mineFields = (ms) => JSON.stringify(ms.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]));
+  const before = mineFields(win.state.world.mines);
+  win.saveGame();
+  const win2 = newDom(storage).window;
+  check('Task63: progress and layout survive save/load', mineFields(win2.state.world.mines) === before && win2.state.world.base.level === 2, mineFields(win2.state.world.mines) + ' vs ' + before);
+})();
+
+(function test_T63_prestigeStartsNewRandomWorld() {
+  const win = newDom(makeMemoryStorage()).window;
+  const fresh = win.freshRunState();
+  check('Task63: a new run (prestige) builds a valid generated world', t63LayoutProblems(win, fresh.world.base, fresh.world.mines).length === 0 && fresh.world.mines.length === 2);
 })();
 
 // =============================================================================

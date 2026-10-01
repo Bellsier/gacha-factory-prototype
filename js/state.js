@@ -29,16 +29,14 @@ function freshBasePosition(){
   return { x: BALANCE.world.START_BASE_X, y: BALANCE.world.START_BASE_Y };
 }
 
+// New-game entry point for the world. Task 63: the mine layout is generated
+// randomly here, once per new run (js/worldgen.js); loading a save never comes
+// through here for a save that has a world — sanitizeWorldState keeps it.
 function freshWorldState(){
   const base = { ...freshBasePosition(), level: 1 };
   return {
     base,
-    // Task 62: starting mines keep their old layout relative to the base
-    // (east and south of it). Random generation replaces this in a later Task.
-    mines: [
-      { id: 'mine_start_iron', x: base.x + 2, y: base.y, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' },
-      { id: 'mine_start_coal', x: base.x, y: base.y + 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
-    ],
+    mines: generateInitialWorldMines(base),
     workshops: [],
     player: freshPlayerState(base),
   };

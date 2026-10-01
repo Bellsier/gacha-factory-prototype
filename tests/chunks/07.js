@@ -2,9 +2,12 @@
   const win = newDom(makeMemoryStorage()).window;
   const mines = win.state.world.mines;
   check('Task34: fresh run starts with two mines', mines.length === 2);
-  // Task 62: same layout relative to the base, which moved from (0,0) to (2,0).
-  check('Task34: starting iron mine is present at base+(2,0) = (4,0)', mines.some(m => m.id === 'mine_start_iron' && m.x === 4 && m.y === 0 && m.resource === 'iron'));
-  check('Task34: starting coal mine is present at base+(0,2) = (2,2)', mines.some(m => m.id === 'mine_start_coal' && m.x === 2 && m.y === 2 && m.resource === 'coal'));
+  // Task 63: starter positions are random per new game; the rule is "near the
+  // base" (distance 2..3 from it), checked here instead of fixed coordinates.
+  const b = win.state.world.base;
+  const nearBase = (m) => { const d = Math.hypot(m.x - b.x, m.y - b.y); return d >= 2 && d <= 3; };
+  check('Task34: starting iron mine is present near the base', mines.some(m => m.id === 'mine_start_iron' && m.resource === 'iron' && nearBase(m)));
+  check('Task34: starting coal mine is present near the base', mines.some(m => m.id === 'mine_start_coal' && m.resource === 'coal' && nearBase(m)));
   check('Task34: starting mines begin unsecured', mines.every(m => m.developmentState === 'unsecured'));
   check('Task34: starting mines use grade 1 and miningPower 1', mines.every(m => m.grade === 1 && m.miningPower === 1));
 })();

@@ -58,6 +58,15 @@ const BALANCE = {
     START_BASE_X: 2,
     START_BASE_Y: 0,
   },
+  worldGen: {
+    // Task 63: new-game mine layout (js/worldgen.js). Starter iron/coal are
+    // placed at a random cell this far from the base (world units). Max 3
+    // keeps them a ~1 s walk away and clear of the expansion seeds (>= 4 out).
+    STARTER_MIN_DIST: 2,
+    STARTER_MAX_DIST: 3,
+    STARTER_MIN_SPACING: 2, // starter mines are at least this far apart
+    EXTRA_MINES: 0,         // extra random mines; kept 0 until the ring/rarity Task sets counts
+  },
   gacha: {
     FIRST_TICKET_GOLD_THRESHOLD: 50, // one-time gold milestone that grants the first ticket
     PULL_COST_GOLD: 50,              // gold cost of a direct gold-funded gacha pull
