@@ -193,11 +193,18 @@ function isValidNodeSize(v){
 function isValidGridCoord(v){
   return Number.isInteger(v) && v >= 0;
 }
-// Task 62: world coordinates (base, mines, workshops) are integers of either
-// sign. isValidGridCoord stays for the non-negative Factory grid only.
-function isValidWorldCoord(v){
-  return Number.isSafeInteger(v);
+// Task 62: world coordinates (base, mines, workshops) are integers inside the
+// world bounds from BALANCE.world (currently -10..10 on both axes). Each axis
+// is checked against its own bounds so X and Y may differ later.
+// isValidGridCoord stays for the non-negative Factory grid only.
+function isValidWorldCoord(v, axis){
+  const b = BALANCE.world;
+  const min = axis === 'y' ? b.BOUNDS_MIN_Y : b.BOUNDS_MIN_X;
+  const max = axis === 'y' ? b.BOUNDS_MAX_Y : b.BOUNDS_MAX_X;
+  return Number.isInteger(v) && v >= min && v <= max;
 }
+function isValidWorldX(v){ return isValidWorldCoord(v, 'x'); }
+function isValidWorldY(v){ return isValidWorldCoord(v, 'y'); }
 function sanitizeFactoryNode(n){
   if(!isPlainObject(n)) return null;
   if(!FACTORY_NODE_TYPES.includes(n.type)) return null;
@@ -257,8 +264,8 @@ function sanitizeFactoryGrid(raw){
 function sanitizeMine(m){
   if(!isPlainObject(m)) return null;
   const result = {
-    x: isValidWorldCoord(m.x) ? m.x : 0,
-    y: isValidWorldCoord(m.y) ? m.y : 0,
+    x: isValidWorldX(m.x) ? m.x : 0,
+    y: isValidWorldY(m.y) ? m.y : 0,
     resource: RESOURCES.some(r => r.key === m.resource) ? m.resource : RESOURCES[0].key,
     grade: isNonNegativeInt(m.grade) && m.grade >= 1 ? m.grade : 1,
     miningPower: isNonNegativeFinite(m.miningPower) && m.miningPower > 0 ? m.miningPower : 1,
@@ -282,8 +289,8 @@ function sanitizeMines(raw){
 function sanitizeWorkshop(w){
   if(!isPlainObject(w)) return null;
   const result = {
-    x: isValidWorldCoord(w.x) ? w.x : 0,
-    y: isValidWorldCoord(w.y) ? w.y : 0,
+    x: isValidWorldX(w.x) ? w.x : 0,
+    y: isValidWorldY(w.y) ? w.y : 0,
     level: isNonNegativeInt(w.level) && w.level >= 1 ? w.level : 1,
     recipeKey: typeof w.recipeKey === 'string' && RECIPES.some(r => r.key === w.recipeKey) ? w.recipeKey : null,
     auto: typeof w.auto === 'boolean' ? w.auto : false,
@@ -334,8 +341,8 @@ function sanitizeWorldState(raw){
   // Only a missing/invalid base coordinate falls back to the new-game base.
   const baseFallback = freshBasePosition();
   const base = {
-    x: isValidWorldCoord(baseRaw.x) ? baseRaw.x : baseFallback.x,
-    y: isValidWorldCoord(baseRaw.y) ? baseRaw.y : baseFallback.y,
+    x: isValidWorldX(baseRaw.x) ? baseRaw.x : baseFallback.x,
+    y: isValidWorldY(baseRaw.y) ? baseRaw.y : baseFallback.y,
     level: isNonNegativeInt(baseRaw.level) && baseRaw.level >= 1 ? baseRaw.level : 1,
   };
   return {

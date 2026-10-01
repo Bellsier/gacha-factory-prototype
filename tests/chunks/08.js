@@ -828,6 +828,89 @@
 })();
 
 // =============================================================================
+// TASK 62 (보완) — world coordinate validation matches the real -10..10 bounds.
+// =============================================================================
+(function test_T62b_worldCoordBounds() {
+  const win = newDom(makeMemoryStorage()).window;
+  // Reference values: Task 62 bounds are -10..10 on both axes.
+  check('Task62b: world coord -10 is valid (x)', win.isValidWorldCoord(-10, 'x') === true && win.isValidWorldX(-10) === true);
+  check('Task62b: world coord 10 is valid (x)', win.isValidWorldCoord(10, 'x') === true && win.isValidWorldX(10) === true);
+  check('Task62b: world coord -10 / 10 are valid (y)', win.isValidWorldY(-10) === true && win.isValidWorldY(10) === true);
+  check('Task62b: world coord -11 is rejected', win.isValidWorldX(-11) === false && win.isValidWorldY(-11) === false);
+  check('Task62b: world coord 11 is rejected', win.isValidWorldX(11) === false && win.isValidWorldY(11) === false);
+  check('Task62b: far-out coords are rejected', win.isValidWorldX(20) === false && win.isValidWorldY(-1000) === false);
+  check('Task62b: non-integer / non-number coords are rejected', win.isValidWorldX(1.5) === false && win.isValidWorldX(Number.NaN) === false && win.isValidWorldX('3') === false && win.isValidWorldY(null) === false);
+  check('Task62b: 0 and the base (2,0) are valid', win.isValidWorldX(0) && win.isValidWorldY(0) && win.isValidWorldX(2));
+})();
+
+(function test_T62b_minesRespectBounds() {
+  const win = newDom(makeMemoryStorage()).window;
+  const mk = (id, x, y) => win.addMine({ id, x, y, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' });
+  const nw = mk('mine_nw', -10, -10);
+  check('Task62b: mine can be created at (-10,-10)', !!nw && nw.x === -10 && nw.y === -10);
+  const se = mk('mine_se', 10, 10);
+  check('Task62b: mine can be created at (10,10)', !!se && se.x === 10 && se.y === 10);
+  const count = win.state.world.mines.length;
+  check('Task62b: mine is not created at (-11,0)', mk('mine_w_out', -11, 0) === null);
+  check('Task62b: mine is not created at (0,11)', mk('mine_s_out', 0, 11) === null);
+  check('Task62b: mine is not created at (11,0) or (0,-11)', mk('mine_e_out', 11, 0) === null && mk('mine_n_out', 0, -11) === null);
+  check('Task62b: rejected mines leave state unchanged', win.state.world.mines.length === count);
+})();
+
+(function test_T62b_workshopsRespectBounds() {
+  const win = newDom(makeMemoryStorage()).window;
+  const mk = (id, x, y) => win.addWorkshop({ id, x, y, level: 1, recipeKey: 'steel' });
+  const nw = mk('ws_nw', -10, -10);
+  check('Task62b: workshop can be created at (-10,-10)', !!nw && nw.x === -10 && nw.y === -10);
+  const se = mk('ws_se', 10, 10);
+  check('Task62b: workshop can be created at (10,10)', !!se && se.x === 10 && se.y === 10);
+  const count = win.state.world.workshops.length;
+  check('Task62b: workshop is not created at (-11,0)', mk('ws_w_out', -11, 0) === null);
+  check('Task62b: workshop is not created at (0,11)', mk('ws_s_out', 0, 11) === null);
+  check('Task62b: workshop is not created at (11,0) or (0,-11)', mk('ws_e_out', 11, 0) === null && mk('ws_n_out', 0, -11) === null);
+  check('Task62b: rejected workshops leave state unchanged', win.state.world.workshops.length === count);
+})();
+
+(function test_T62b_sanitizeUsesBounds() {
+  const win = newDom(makeMemoryStorage()).window;
+  const edge = win.sanitizeWorldState({
+    base: { x: -10, y: 10, level: 1 },
+    mines: [{ id: 'm_edge', x: 10, y: -10, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' }],
+    workshops: [{ id: 'w_edge', x: -10, y: -10, level: 1 }],
+  });
+  check('Task62b: sanitize keeps base on the bounds', edge.base.x === -10 && edge.base.y === 10);
+  check('Task62b: sanitize keeps mine on the bounds', edge.mines[0].x === 10 && edge.mines[0].y === -10);
+  check('Task62b: sanitize keeps workshop on the bounds', edge.workshops[0].x === -10 && edge.workshops[0].y === -10);
+  const out = win.sanitizeWorldState({
+    base: { x: 11, y: -11, level: 1 },
+    mines: [{ id: 'm_out', x: -11, y: 3, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' }],
+    workshops: [{ id: 'w_out', x: 4, y: 11, level: 1 }],
+  });
+  check('Task62b: out-of-bounds base falls back to the new-game base', out.base.x === 2 && out.base.y === 0);
+  check('Task62b: out-of-bounds mine axis falls back like any invalid coord', out.mines[0].x === 0 && out.mines[0].y === 3);
+  check('Task62b: out-of-bounds workshop axis falls back like any invalid coord', out.workshops[0].x === 4 && out.workshops[0].y === 0);
+})();
+
+(function test_T62b_factoryGridUnchanged() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task62b: Factory Node still rejects negative x', win.addFactoryNode({ type: 'production', x: -1, y: 0, width: 1, height: 1 }) === null);
+  check('Task62b: Factory Node still rejects negative y', win.addFactoryNode({ type: 'production', x: 0, y: -1, width: 1, height: 1 }) === null);
+  check('Task62b: Factory Node accepts 0 and beyond the world bound', !!win.addFactoryNode({ id: 'node_far', type: 'production', x: 12, y: 0, width: 1, height: 1 }));
+  check('Task62b: grid validator unchanged (non-negative integers)', win.isValidGridCoord(0) && win.isValidGridCoord(24) && !win.isValidGridCoord(-1) && !win.isValidGridCoord(1.5));
+})();
+
+(function test_T62b_existingWorldStillValid() {
+  const win = newDom(makeMemoryStorage()).window;
+  const w = win.state.world;
+  check('Task62b: new-game base and start mines are inside the bounds', [w.base, ...w.mines].every(o => win.isValidWorldX(o.x) && win.isValidWorldY(o.y)));
+  win.state.gold = 20000;
+  win.expandBase(); win.expandBase(); win.expandBase();
+  check('Task62b: every seeded expansion mine is placed inside the bounds', win.state.world.mines.length === 8 && win.state.world.mines.every(m => win.isValidWorldX(m.x) && win.isValidWorldY(m.y)));
+  const far = win.state.world.mines.find(m => m.resource === 'cosmicShard');
+  check('Task62b: farthest seeded mine sits exactly on the east edge', !!far && far.x === 10 && far.y === 0);
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 

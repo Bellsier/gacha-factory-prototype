@@ -158,7 +158,7 @@ function isMineDevelopmentStateValid(developmentState){
 
 function isMineValid(mine, existingMines){
   if(!isPlainObject(mine)) return false;
-  if(!isValidWorldCoord(mine.x) || !isValidWorldCoord(mine.y)) return false; // Task 62: world coords may be negative
+  if(!isValidWorldX(mine.x) || !isValidWorldY(mine.y)) return false; // Task 62: integer inside the world bounds (may be negative)
   if(!isMineResourceValid(mine.resource)) return false;
   if(!isNonNegativeInt(mine.grade) || mine.grade < 1) return false;
   if(!isNonNegativeFinite(mine.miningPower) || mine.miningPower <= 0) return false;
@@ -203,7 +203,7 @@ function isWorkshopRecipeValid(recipeKey){
 
 function isWorkshopValid(workshop, existingWorkshops){
   if(!isPlainObject(workshop)) return false;
-  if(!isValidWorldCoord(workshop.x) || !isValidWorldCoord(workshop.y)) return false; // Task 62: world coords may be negative
+  if(!isValidWorldX(workshop.x) || !isValidWorldY(workshop.y)) return false; // Task 62: integer inside the world bounds (may be negative)
   if(!isNonNegativeInt(workshop.level) || workshop.level < 1) return false;
   if(!isWorkshopRecipeValid(workshop.recipeKey)) return false;
   if(!(workshop.progress === null || (isNonNegativeFinite(workshop.progress) && workshop.progress > 0))) return false;
