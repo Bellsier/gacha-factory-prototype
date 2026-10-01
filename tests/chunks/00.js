@@ -70,7 +70,17 @@ function makeMemoryStorage() {
 // text used for this test run.
 // ---------------------------------------------------------------------------
 const allDoms = [];
-function newDom(storage) {
+// Task 64: a brand-new game now also places random distance-ring mines
+// (ids `mine_ring_*`). Tests written before Task 64 assume a new game holds
+// only the two starter mines and add mines at fixed coordinates, which could
+// randomly collide with ring mines. So by default, when the game boots with
+// NO save in storage, the ring mines are removed right after boot (starters
+// and everything else untouched). Tests that check the real generated world
+// pass { fullWorld: true }. A game booted from a save is never modified.
+function newDom(storage, opts) {
+  const options = opts || {};
+  let hadSave = true;
+  try { hadSave = storage.getItem('gachaFactorySave') !== null; } catch (e) { hadSave = true; }
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.test/' });
   const win = dom.window;
   Object.defineProperty(win, 'localStorage', { value: storage, configurable: true });
@@ -105,6 +115,10 @@ function newDom(storage) {
     TICK_MS: { get: () => win.__expose.TICK_MS(), configurable: true },
     TICKS_PER_SECOND: { get: () => win.__expose.TICKS_PER_SECOND(), configurable: true },
   });
+  if (!options.fullWorld && !hadSave) {
+    win.state.world.mines = win.state.world.mines.filter(m => !(m && typeof m.id === 'string' && m.id.startsWith('mine_ring_')));
+    win.renderAll();
+  }
   allDoms.push(dom);
   return dom;
 }

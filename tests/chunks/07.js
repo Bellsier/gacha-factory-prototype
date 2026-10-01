@@ -24,7 +24,8 @@
     }
   }));
   const win = newDom(storage).window;
-  check('Task34: saves without world data receive the starting seed', win.state.world.mines.length === 2);
+  // Task 64: a save without world data gets a full new world (starters + distance rings = 14 mines).
+  check('Task34: saves without world data receive the starting seed', win.state.world.mines.length === 14 && ['mine_start_iron','mine_start_coal'].every(id => win.state.world.mines.some(m => m.id === id)));
 })();
 
 (function test_T34_explicitEmptyMinesPreserved() {

@@ -65,7 +65,19 @@ const BALANCE = {
     STARTER_MIN_DIST: 2,
     STARTER_MAX_DIST: 3,
     STARTER_MIN_SPACING: 2, // starter mines are at least this far apart
-    EXTRA_MINES: 0,         // extra random mines; kept 0 until the ring/rarity Task sets counts
+    EXTRA_MINES: 0,         // Task 63 extra mines anywhere (unused now that rings set the counts)
+    // Task 64: distance rings around the base, [minDist, maxDist) in world
+    // units. Each ring places `count` mines (the iron/coal starters count
+    // toward the first ring) with resources picked by weight. Farther rings:
+    // fewer mines, rarer resources. With the base at (2,0) in a -10..10 world
+    // the farthest cell is ~15.6 away, so the last ring reaches the edges.
+    MIN_SPACING: 2, // preferred minimum distance between mines (falls back if a ring is full)
+    RINGS: [
+      { key: 'near',  minDist: 2,  maxDist: 4,        count: 5, resources: { iron: 1, coal: 1 } },
+      { key: 'mid',   minDist: 4,  maxDist: 7,        count: 4, resources: { iron: 2, coal: 2, mana: 1, crystal: 1 } },
+      { key: 'far',   minDist: 7,  maxDist: 10,       count: 3, resources: { mana: 2, crystal: 2, rareMetal: 1, relic: 1 } },
+      { key: 'outer', minDist: 10, maxDist: Infinity, count: 2, resources: { rareMetal: 2, relic: 2, cosmicShard: 1, plasma: 1 } },
+    ],
   },
   gacha: {
     FIRST_TICKET_GOLD_THRESHOLD: 50, // one-time gold milestone that grants the first ticket

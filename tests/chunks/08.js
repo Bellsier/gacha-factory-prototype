@@ -928,9 +928,16 @@
 // sequences, plus validity checks on real (Math.random) new games. No test
 // depends on one particular random outcome.
 // =============================================================================
+// Seeded PRNG (mulberry32): consecutive seeds give well-mixed sequences.
 function t63Lcg(seed) {
-  let s = (seed >>> 0) || 1;
-  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+  let a = (seed >>> 0) || 1;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 function t63LayoutProblems(win, base, mines, opts) {
   const o = opts || {};
@@ -962,7 +969,7 @@ function t63LayoutProblems(win, base, mines, opts) {
 }
 
 (function test_T63_newGameLayoutRules() {
-  const win = newDom(makeMemoryStorage()).window;
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
   const w = win.state.world;
   check('Task63: new game has a mine list', Array.isArray(w.mines) && w.mines.length >= 2);
   check('Task63: at least one iron mine', w.mines.some(m => m.resource === 'iron'));
@@ -970,39 +977,40 @@ function t63LayoutProblems(win, base, mines, opts) {
   const problems = t63LayoutProblems(win, w.base, w.mines, { checkSpacing: true });
   check('Task63: new game layout obeys every rule', problems.length === 0, problems.join('; '));
   check('Task63: mine data keeps the existing shape', w.mines.every(m => JSON.stringify(Object.keys(m).sort()) === JSON.stringify(['developmentState','grade','id','miningPower','resource','x','y'])));
-  check('Task63: starter mines start grade 1 / power 1 / unsecured', w.mines.every(m => m.grade === 1 && m.miningPower === 1 && m.developmentState === 'unsecured'));
+  check('Task63: starter mines start grade 1 / power 1 / unsecured', w.mines.filter(m => m.id.startsWith('mine_start_')).every(m => m.grade === 1 && m.miningPower === 1 && m.developmentState === 'unsecured') && w.mines.every(m => m.miningPower === 1 && m.developmentState === 'unsecured')); // Task 64: ring mines take their site grade
   check('Task63: base and player unchanged by generation', w.base.x === 2 && w.base.y === 0 && w.player.x === 2 && w.player.y === 0);
-  check('Task63: default extra mine count keeps the current world size', w.mines.length === 2);
+  check('Task63: new world size is starters + distance rings (Task 64: 14)', w.mines.length === 14);
 })();
 
 (function test_T63_manyRealNewGamesAreValid() {
   let allValid = true, detail = '';
   for (let i = 0; i < 6; i++) {
-    const win = newDom(makeMemoryStorage()).window;
+    const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
     const p = t63LayoutProblems(win, win.state.world.base, win.state.world.mines, { checkSpacing: true });
     if (p.length) { allValid = false; detail = p.join('; '); }
   }
   check('Task63: six real new games all produce valid layouts', allValid, detail);
 })();
 
+// Task 64: these Task 63 checks cover starters + extra mines, so they pass rings: [] to isolate that behaviour.
 (function test_T63_generatorRuleSweep() {
   const win = newDom(makeMemoryStorage()).window;
   const base = { x: 2, y: 0 };
   let bad = 0, detail = '';
   for (let seed = 1; seed <= 300; seed++) {
-    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed), rings: [] });
     const p = t63LayoutProblems(win, base, mines, { checkSpacing: true });
     if (p.length || mines.length !== 2) { bad++; detail = 'seed ' + seed + ': ' + p.join('; '); }
   }
   check('Task63: 300 seeded generations all obey the rules', bad === 0, detail);
-  const edge0 = win.generateInitialWorldMines(base, { random: () => 0 });
-  const edge1 = win.generateInitialWorldMines(base, { random: () => 0.9999999 });
+  const edge0 = win.generateInitialWorldMines(base, { random: () => 0, rings: [] });
+  const edge1 = win.generateInitialWorldMines(base, { random: () => 0.9999999, rings: [] });
   check('Task63: extreme random values still give valid layouts', t63LayoutProblems(win, base, edge0, { checkSpacing: true }).length === 0 && t63LayoutProblems(win, base, edge1, { checkSpacing: true }).length === 0);
-  const badRandom = win.generateInitialWorldMines(base, { random: () => Number.NaN });
+  const badRandom = win.generateInitialWorldMines(base, { random: () => Number.NaN, rings: [] });
   check('Task63: a broken random source cannot break the rules', t63LayoutProblems(win, base, badRandom).length === 0);
   check('Task63: starters are clear of the expansion seed cells (>= 4 from base)', (() => {
     for (let seed = 1; seed <= 300; seed++) {
-      const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+      const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed), rings: [] });
       // Reference values: WORLD_MINE_SEEDS offsets from data.js (4,0),(0,4),(6,0),(0,6),(8,0),(0,8).
       const seedCells = [[4,0],[0,4],[6,0],[0,6],[8,0],[0,8]].map(([dx, dy]) => (base.x + dx) + ',' + (base.y + dy));
       if (mines.some(m => seedCells.includes(m.x + ',' + m.y))) return false;
@@ -1015,17 +1023,17 @@ function t63LayoutProblems(win, base, mines, opts) {
   const win = newDom(makeMemoryStorage()).window;
   const base = { x: 2, y: 0 };
   const sig = (mines) => mines.map(m => m.id + '@' + m.x + ',' + m.y).join('|');
-  const a = sig(win.generateInitialWorldMines(base, { random: () => 0 }));
-  const b = sig(win.generateInitialWorldMines(base, { random: () => 0.9999999 }));
+  const a = sig(win.generateInitialWorldMines(base, { random: () => 0, rings: [] }));
+  const b = sig(win.generateInitialWorldMines(base, { random: () => 0.9999999, rings: [] }));
   check('Task63: different random values give different layouts', a !== b);
   const layouts = new Set();
-  for (let seed = 1; seed <= 50; seed++) layouts.add(sig(win.generateInitialWorldMines(base, { random: t63Lcg(seed) })));
+  for (let seed = 1; seed <= 50; seed++) layouts.add(sig(win.generateInitialWorldMines(base, { random: t63Lcg(seed), rings: [] })));
   check('Task63: many distinct layouts across seeds', layouts.size >= 10, 'distinct=' + layouts.size);
-  const same1 = sig(win.generateInitialWorldMines(base, { random: t63Lcg(42) }));
-  const same2 = sig(win.generateInitialWorldMines(base, { random: t63Lcg(42) }));
+  const same1 = sig(win.generateInitialWorldMines(base, { random: t63Lcg(42), rings: [] }));
+  const same2 = sig(win.generateInitialWorldMines(base, { random: t63Lcg(42), rings: [] }));
   check('Task63: same random sequence gives the same layout', same1 === same2);
   const ironCells = new Set();
-  for (let seed = 1; seed <= 50; seed++) { const m = win.generateInitialWorldMines(base, { random: t63Lcg(seed) }).find(x => x.id === 'mine_start_iron'); ironCells.add(m.x + ',' + m.y); }
+  for (let seed = 1; seed <= 50; seed++) { const m = win.generateInitialWorldMines(base, { random: t63Lcg(seed), rings: [] }).find(x => x.id === 'mine_start_iron'); ironCells.add(m.x + ',' + m.y); }
   check('Task63: the starter iron position is not fixed', ironCells.size > 1);
 })();
 
@@ -1034,16 +1042,16 @@ function t63LayoutProblems(win, base, mines, opts) {
   const base = { x: 2, y: 0 };
   let ok = true, detail = '';
   for (let seed = 1; seed <= 40; seed++) {
-    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed), extraCount: 12 });
+    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed), extraCount: 12, rings: [] });
     const p = t63LayoutProblems(win, base, mines, { checkSpacing: true });
     if (p.length || mines.length !== 14) { ok = false; detail = p.join('; ') + ' n=' + mines.length; }
     if (!mines.filter(m => !m.id.startsWith('mine_start_')).every(m => (m.resource === 'iron' || m.resource === 'coal') && m.grade === 1 && m.miningPower === 1 && m.developmentState === 'unsecured')) { ok = false; detail = 'extra uses a locked-site resource or wrong fields'; }
   }
   check('Task63: extra mines obey the same rules and only use start-site resources', ok, detail);
-  const custom = win.generateInitialWorldMines(base, { random: t63Lcg(7), extraCount: 3, extraResources: ['coal'] });
+  const custom = win.generateInitialWorldMines(base, { random: t63Lcg(7), extraCount: 3, extraResources: ['coal'], rings: [] });
   check('Task63: extra resource pool can be supplied', custom.filter(m => m.id.startsWith('mine_gen_')).every(m => m.resource === 'coal') && custom.length === 5);
-  const huge = win.generateInitialWorldMines(base, { random: t63Lcg(9), extraCount: 1000 });
-  check('Task63: extra mines stop when the world is full (no overlap, no base cell)', huge.length === 21 * 21 - 1 && t63LayoutProblems(win, base, huge).length === 0);
+  const huge = win.generateInitialWorldMines(base, { random: t63Lcg(9), extraCount: 1000, rings: [] });
+  check('Task63: extra mines stop when the world is full (no overlap, no base cell)', huge.length === 21 * 21 - 1 - 6 /* Task 64: base cell + 6 reserved expansion seed cells */ && t63LayoutProblems(win, base, huge).length === 0);
   check('Task63: new run start resources are the open site only (iron, coal)', JSON.stringify(win.worldGenStartResources().sort()) === JSON.stringify(['coal', 'iron']));
 })();
 
@@ -1062,7 +1070,7 @@ function t63LayoutProblems(win, base, mines, opts) {
 
 (function test_T63_saveLoadKeepsLayout() {
   const storage = makeMemoryStorage();
-  const win = newDom(storage).window;
+  const win = newDom(storage, { fullWorld: true }).window;
   const fields = (ms) => JSON.stringify(ms.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]));
   const snapshot = fields(win.state.world.mines);
   check('Task63: save succeeds', win.saveGame() === true);
@@ -1117,7 +1125,7 @@ function t63LayoutProblems(win, base, mines, opts) {
 
 (function test_T63_coreLoopWithRandomLayout() {
   const storage = makeMemoryStorage();
-  const win = newDom(storage).window;
+  const win = newDom(storage, { fullWorld: true }).window;
   const doc = win.document;
   const stage = doc.getElementById('worldStage');
   stage.querySelector('[data-world-mine="mine_start_iron"]').click();
@@ -1147,7 +1155,232 @@ function t63LayoutProblems(win, base, mines, opts) {
 (function test_T63_prestigeStartsNewRandomWorld() {
   const win = newDom(makeMemoryStorage()).window;
   const fresh = win.freshRunState();
-  check('Task63: a new run (prestige) builds a valid generated world', t63LayoutProblems(win, fresh.world.base, fresh.world.mines).length === 0 && fresh.world.mines.length === 2);
+  check('Task63: a new run (prestige) builds a valid generated world', t63LayoutProblems(win, fresh.world.base, fresh.world.mines).length === 0 && fresh.world.mines.length === 14); // Task 64: starters + rings
+})();
+
+// =============================================================================
+// TASK 64 — Distance rings: fewer, rarer mines farther from the base.
+// Deterministic: seeded random sources (t63Lcg) and fixed values; no test
+// depends on one particular Math.random outcome.
+// Reference values (BALANCE.worldGen.RINGS approved for Task 64):
+//   near  [2,4)   5 mines  iron, coal
+//   mid   [4,7)   4 mines  iron, coal, mana, crystal
+//   far   [7,10)  3 mines  mana, crystal, rareMetal, relic
+//   outer [10,∞)  2 mines  rareMetal, relic, cosmicShard, plasma
+// =============================================================================
+const T64_RINGS = [
+  { key: 'near',  min: 2,  max: 4,        count: 5, pool: ['iron', 'coal'] },
+  { key: 'mid',   min: 4,  max: 7,        count: 4, pool: ['iron', 'coal', 'mana', 'crystal'] },
+  { key: 'far',   min: 7,  max: 10,       count: 3, pool: ['mana', 'crystal', 'rareMetal', 'relic'] },
+  { key: 'outer', min: 10, max: Infinity, count: 2, pool: ['rareMetal', 'relic', 'cosmicShard', 'plasma'] },
+];
+const T64_TIER = { iron: 1, coal: 1, mana: 2, crystal: 2, rareMetal: 3, relic: 3, cosmicShard: 4, plasma: 4 };
+const T64_SEED_OFFSETS = [[4,0],[0,4],[6,0],[0,6],[8,0],[0,8]];
+function t64Ring(base, m) {
+  const d = Math.hypot(m.x - base.x, m.y - base.y);
+  return T64_RINGS.findIndex(r => d >= r.min && d < r.max);
+}
+function t64Problems(win, base, mines, opts) {
+  const o = opts || {};
+  const p = t63LayoutProblems(win, base, mines);
+  const seedCells = T64_SEED_OFFSETS.map(([dx, dy]) => (base.x + dx) + ',' + (base.y + dy));
+  const perRing = T64_RINGS.map(() => 0);
+  mines.forEach(m => {
+    const ri = t64Ring(base, m);
+    if (ri < 0) { p.push('outside every ring ' + m.id); return; }
+    perRing[ri]++;
+    if (!T64_RINGS[ri].pool.includes(m.resource)) p.push(m.id + ' resource ' + m.resource + ' not allowed in ' + T64_RINGS[ri].key);
+    if (m.grade !== T64_TIER[m.resource]) p.push(m.id + ' grade ' + m.grade + ' != site tier');
+    if (m.miningPower !== 1 || m.developmentState !== 'unsecured') p.push(m.id + ' initial fields');
+    if (seedCells.includes(m.x + ',' + m.y)) p.push(m.id + ' on an expansion seed cell');
+  });
+  if (o.exactCounts) T64_RINGS.forEach((r, i) => { if (perRing[i] !== r.count) p.push(r.key + ' has ' + perRing[i] + ' mines, expected ' + r.count); });
+  if (o.spacing) {
+    for (let i = 0; i < mines.length; i++) for (let j = i + 1; j < mines.length; j++)
+      if (Math.hypot(mines[i].x - mines[j].x, mines[i].y - mines[j].y) < 2) p.push('mines closer than 2: ' + mines[i].id + ' / ' + mines[j].id);
+  }
+  return { problems: p, perRing };
+}
+
+(function test_T64_ringTable() {
+  const win = newDom(makeMemoryStorage()).window;
+  // BALANCE is not reachable from the test window; the seeded sweep below checks the real generator against this table.
+  check('Task64: ring counts shrink outward (reference table)', T64_RINGS.every((r, i) => i === 0 || r.count < T64_RINGS[i - 1].count));
+  check('Task64: rings are contiguous from the starter distance outward', T64_RINGS.every((r, i) => i === 0 ? r.min === 2 : r.min === T64_RINGS[i - 1].max) && T64_RINGS[T64_RINGS.length - 1].max === Infinity);
+  check('Task64: nearest ring holds only iron/coal', JSON.stringify(T64_RINGS[0].pool) === JSON.stringify(['iron', 'coal']));
+  const maxTier = (r) => Math.max(...r.pool.map(k => T64_TIER[k]));
+  const minTier = (r) => Math.min(...r.pool.map(k => T64_TIER[k]));
+  check('Task64: rarest available resource rises outward', T64_RINGS.every((r, i) => i === 0 || maxTier(r) > maxTier(T64_RINGS[i - 1])));
+  check('Task64: commonest available resource rises outward (never falls)', T64_RINGS.every((r, i) => i === 0 || minTier(r) >= minTier(T64_RINGS[i - 1])));
+  check('Task64: grade follows the resource site tier', Object.keys(T64_TIER).every(k => win.worldGenResourceGrade(k) === T64_TIER[k]));
+})();
+
+(function test_T64_seededSweepObeysEveryRule() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = { x: 2, y: 0 };
+  let bad = 0, detail = '';
+  for (let seed = 1; seed <= 300; seed++) {
+    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+    const r = t64Problems(win, base, mines, { exactCounts: true, spacing: true });
+    if (r.problems.length || mines.length !== 14) { bad++; detail = 'seed ' + seed + ': ' + r.problems.slice(0, 3).join('; ') + ' n=' + mines.length; }
+  }
+  check('Task64: 300 seeded worlds obey every ring rule (counts, pools, grades, bounds, spacing)', bad === 0, detail);
+  const extremes = [() => 0, () => 0.9999999, () => Number.NaN].map(rnd => win.generateInitialWorldMines(base, { random: rnd }));
+  check('Task64: extreme / broken random sources still obey the rules', extremes.every(ms => t64Problems(win, base, ms, { exactCounts: true }).problems.length === 0));
+})();
+
+(function test_T64_nearRingHasBasics() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = { x: 2, y: 0 };
+  let ok = true;
+  for (let seed = 1; seed <= 200; seed++) {
+    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+    const near = mines.filter(m => t64Ring(base, m) === 0);
+    if (!(near.length === 5 && near.some(m => m.resource === 'iron') && near.some(m => m.resource === 'coal') && near.every(m => m.resource === 'iron' || m.resource === 'coal'))) ok = false;
+  }
+  check('Task64: near ring always has 5 mines, all iron/coal, with at least one of each', ok);
+})();
+
+(function test_T64_rareResourcesFarAway() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = { x: 2, y: 0 };
+  // Deterministic proof that the rarest tier can appear: random -> ~1 always
+  // picks the last weighted entry, which in the outer ring is plasma (tier 4).
+  const hi = win.generateInitialWorldMines(base, { random: () => 0.9999999 });
+  check('Task64: outer ring can produce a top-tier resource', hi.some(m => t64Ring(base, m) === 3 && T64_TIER[m.resource] === 4));
+  check('Task64: far ring can produce a tier-3 resource', hi.some(m => t64Ring(base, m) === 2 && T64_TIER[m.resource] === 3));
+  const lo = win.generateInitialWorldMines(base, { random: () => 0 });
+  check('Task64: outer ring never drops below tier 3', lo.filter(m => t64Ring(base, m) === 3).every(m => T64_TIER[m.resource] >= 3));
+  // Across many seeded worlds: average tier strictly rises ring by ring, and
+  // the top tier shows up somewhere but stays limited.
+  const sum = [0, 0, 0, 0], cnt = [0, 0, 0, 0];
+  let topTier = 0, worldsWithTop = 0;
+  for (let seed = 1; seed <= 300; seed++) {
+    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+    mines.forEach(m => { const ri = t64Ring(base, m); sum[ri] += T64_TIER[m.resource]; cnt[ri]++; });
+    const tops = mines.filter(m => T64_TIER[m.resource] === 4).length;
+    topTier += tops; if (tops > 0) worldsWithTop++;
+  }
+  const avg = sum.map((s, i) => s / cnt[i]);
+  check('Task64: average resource tier rises with distance', avg.every((a, i) => i === 0 || a > avg[i - 1]), avg.map(a => a.toFixed(2)).join(' < '));
+  check('Task64: top-tier mines appear in some worlds', worldsWithTop > 0);
+  check('Task64: top-tier mines stay limited (at most 2 per world, only in the outer ring)', topTier <= 300 * 2);
+  check('Task64: mine count per ring falls outward', [5, 4, 3, 2].every((c, i) => cnt[i] === c * 300));
+})();
+
+(function test_T64_weightedPick() {
+  const win = newDom(makeMemoryStorage()).window;
+  const w = { iron: 2, coal: 2, mana: 1, crystal: 1 };
+  check('Task64: weighted pick covers the first weight band', win.worldGenPickWeighted(w, () => 0) === 'iron' && win.worldGenPickWeighted(w, () => 0.33) === 'iron');
+  check('Task64: weighted pick covers the middle bands', win.worldGenPickWeighted(w, () => 0.34) === 'coal' && win.worldGenPickWeighted(w, () => 0.7) === 'mana');
+  check('Task64: weighted pick covers the last band', win.worldGenPickWeighted(w, () => 0.9999) === 'crystal');
+  check('Task64: weighted pick ignores unknown or non-positive entries', win.worldGenPickWeighted({ bogus: 5, iron: 0, coal: 1 }, () => 0.5) === 'coal' && win.worldGenPickWeighted({}, () => 0.5) === null);
+})();
+
+(function test_T64_edgeBasesStayValid() {
+  const win = newDom(makeMemoryStorage()).window;
+  let ok = true, detail = '';
+  [{ x: 10, y: 10 }, { x: -10, y: -10 }, { x: 0, y: 0 }, { x: -10, y: 5 }].forEach(base => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+      const r = t64Problems(win, base, mines);
+      if (r.problems.length) { ok = false; detail = JSON.stringify(base) + ' ' + r.problems.slice(0, 2).join('; '); }
+    }
+  });
+  check('Task64: other base positions (edges, old-save origin) still give valid ring layouts', ok, detail);
+})();
+
+(function test_T64_realNewGames() {
+  let ok = true, detail = '';
+  const layouts = new Set();
+  for (let i = 0; i < 5; i++) {
+    const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+    const w = win.state.world;
+    const r = t64Problems(win, w.base, w.mines, { exactCounts: true });
+    if (r.problems.length || w.mines.length !== 14) { ok = false; detail = r.problems.slice(0, 3).join('; '); }
+    layouts.add(w.mines.map(m => m.resource + '@' + m.x + ',' + m.y).join('|'));
+    if (i === 0) {
+      check('Task64: stage draws every generated mine', win.document.querySelectorAll('#worldStage [data-world-mine]').length === 14);
+      check('Task64: mine list shows every generated mine', win.document.querySelectorAll('#worldMines [data-secure-mine]').length === 14);
+    }
+  }
+  check('Task64: five real new games all follow the ring rules', ok, detail);
+})();
+
+(function test_T64_lockedSiteMinesCannotBeSecuredYet() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const doc = win.document;
+  const outer = win.state.world.mines.find(m => t64Ring(win.state.world.base, m) === 3); // tier >= 3, site locked at start
+  check('Task64: a far rare mine exists from the start', !!outer && T64_TIER[outer.resource] >= 3);
+  check('Task64: a mine of a locked site cannot be secured', win.secureMine(outer.id) === false && outer.developmentState === 'unsecured');
+  const btn = doc.querySelector('[data-secure-mine="' + outer.id + '"]');
+  check('Task64: its list button is disabled and says the site must be unlocked', btn.disabled === true && btn.textContent.includes('해금 필요'));
+  check('Task64: starter (open site) mines can still be secured', win.secureMine('mine_start_iron') === true);
+  win.state.gold = 20000;
+  win.expandBase(); win.expandBase(); win.expandBase();
+  win.renderAll();
+  check('Task64: after its site is unlocked the far mine can be secured', win.secureMine(outer.id) === true);
+  const before = win.state.resources[outer.resource];
+  check('Task64: and mined into shared storage', win.mineMine(outer.id) === true && win.state.resources[outer.resource] === before + 1);
+  check('Task64: list button is enabled once its site is open', (() => { win.buildMines(); const m2 = win.state.world.mines.find(m => m.developmentState === 'unsecured'); if (!m2) return true; const b2 = doc.querySelector('[data-secure-mine="' + m2.id + '"]'); return b2.disabled === false && b2.textContent === '광맥 확보'; })());
+})();
+
+(function test_T64_expansionStillAddsEverySeed() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const start = win.state.world.mines.length;
+  win.state.gold = 20000;
+  check('Task64: expansion works on a ring world', win.expandBase() === true && win.state.world.mines.length === start + 2);
+  win.expandBase(); win.expandBase();
+  const ids = win.state.world.mines.map(m => m.id);
+  check('Task64: all six seeded expansion mines are added (seed cells were kept free)', ['mine_manaVein_mana','mine_manaVein_crystal','mine_ruins_rareMetal','mine_ruins_relic','mine_spaceStation_cosmicShard','mine_spaceStation_plasma'].every(id => ids.includes(id)) && ids.length === start + 6);
+  check('Task64: no two mines share a cell after expanding', new Set(win.state.world.mines.map(m => m.x + ',' + m.y)).size === win.state.world.mines.length);
+})();
+
+(function test_T64_saveLoadIdentical() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage, { fullWorld: true }).window;
+  const full = (ms) => JSON.stringify(ms.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]));
+  const snap = full(win.state.world.mines);
+  win.saveGame();
+  const loaded = win.loadGame();
+  check('Task64: loadGame returns the identical ring world (all 14 mines, same order)', loaded.ok && full(loaded.run.world.mines) === snap && loaded.run.world.mines.length === 14);
+  const win2 = newDom(storage).window;
+  check('Task64: booting from the save keeps the identical ring world', full(win2.state.world.mines) === snap);
+  // An older save holding just two mines is not topped up with ring mines.
+  const payload = JSON.parse(storage.getItem('gachaFactorySave'));
+  payload.run.world.mines = [
+    { id: 'mine_start_iron', x: 2, y: 0, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'secured' },
+    { id: 'mine_start_coal', x: 0, y: 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+  ];
+  payload.run.world.base = { x: 0, y: 0, level: 1 };
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const old = newDom(storage).window;
+  check('Task64: an older 2-mine save stays exactly 2 mines (no ring generation on load)', old.state.world.mines.length === 2 && old.state.world.mines[0].x === 2 && old.state.world.mines[1].y === 2);
+  check('Task64: saveVersion stays 1', JSON.parse(storage.getItem('gachaFactorySave')).saveVersion === 1);
+})();
+
+(function test_T64_coreLoopOnRingWorld() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage, { fullWorld: true }).window;
+  const doc = win.document;
+  const ring = win.state.world.mines.find(m => m.id.startsWith('mine_ring_'));
+  doc.querySelector('#worldStage [data-world-mine="' + ring.id + '"]').click();
+  check('Task64: a ring mine can be selected on the stage', win.getWorldSelection() && win.getWorldSelection().id === ring.id);
+  check('Task64: info shows its grade', doc.querySelector('#worldInfo [data-world-info="grade"]').textContent === '등급 ' + ring.grade);
+  ['mine_start_iron', 'mine_start_coal'].forEach(id => doc.querySelector('[data-secure-mine="' + id + '"]').click());
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_coal"]').click();
+  check('Task64: mining works', win.state.resources.iron === 2 && win.state.resources.coal === 1);
+  doc.querySelector('[data-craft="steel"]').click();
+  check('Task64: crafting works', win.state.products.steel === 1);
+  doc.querySelector('[data-sell="steel"]').click();
+  check('Task64: selling works', win.state.gold > 0);
+  win.state.gold = 700;
+  check('Task64: expansion works', win.expandBase() === true);
+  win.saveGame();
+  const win2 = newDom(storage).window;
+  check('Task64: progress survives save/load', win2.state.world.base.level === 2 && win2.state.world.mines.length === 16);
 })();
 
 // =============================================================================

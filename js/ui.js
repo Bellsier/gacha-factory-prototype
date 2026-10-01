@@ -74,12 +74,16 @@ function buildMines(){
   if(state.world.mines.length === 0){ wrap.innerHTML = '<div class="rate">아직 발견된 광맥이 없습니다.</div>'; return; }
   state.world.mines.forEach(mine=>{
     const resource = RESOURCES.find(r=>r.key===mine.resource);
+    const secured = mine.developmentState === 'secured';
+    // Task 64: a mine whose site is still locked can't be secured yet.
+    const siteLocked = !secured && !isMineSiteUnlocked(mine);
+    const site = resource ? SITES.find(s => s.key === resource.site) : null;
     const card = document.createElement('div');
     card.className = 'line world-mine';
     card.innerHTML = '<div class="res-name">' + (resource ? resource.name : mine.resource) + '</div>' +
       '<div class="rate">위치 (' + mine.x + ', ' + mine.y + ') · 등급 ' + mine.grade + ' · 채굴력 ' + mine.miningPower + '</div>' +
-      '<div class="rate">' + (mine.developmentState === 'secured' ? '확보 완료' : '미확보') + '</div>' +
-      '<button data-secure-mine="' + mine.id + '" ' + (mine.developmentState === 'secured' ? 'disabled' : '') + '>' + (mine.developmentState === 'secured' ? '확보됨' : '광맥 확보') + '</button>' +
+      '<div class="rate">' + (secured ? '확보 완료' : '미확보') + '</div>' +
+      '<button data-secure-mine="' + mine.id + '" ' + (secured || siteLocked ? 'disabled' : '') + '>' + (secured ? '확보됨' : siteLocked ? '잠김 · ' + (site ? site.name : '지역') + ' 해금 필요' : '광맥 확보') + '</button>' +
       '<button data-mine-mine="' + mine.id + '" ' + (mine.developmentState !== 'secured' ? 'disabled' : '') + '>채굴하기 (+' + mine.miningPower + ')</button>';
     wrap.appendChild(card);
   });

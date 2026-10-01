@@ -300,13 +300,23 @@ function setWorkshopRecipe(workshopId, recipeKey){
 
 // ---------------------------------------------------------------------------
 // Task 30: Mine securing.
-// Securing is only the development-state transition for now. Costs, region
-// requirements, and expansion rules are intentionally deferred to later
-// design/implementation Tasks.
+// Securing is only the development-state transition for now. Costs and
+// expansion rules are intentionally deferred to later design/implementation
+// Tasks.
+// Task 64: region requirement — a mine can only be secured once its
+// resource's site is unlocked. New worlds now place rarer mines in the far
+// rings from the start; without this they could be secured before their site
+// is reached, skipping the site-unlock progression.
+function isMineSiteUnlocked(mine){
+  const res = mine ? RESOURCES.find(r => r.key === mine.resource) : null;
+  return !!res && !!state.unlockedSites[res.site];
+}
+
 function secureMine(mineId){
   if(typeof mineId !== 'string' || mineId.length === 0) return false;
   const mine = state.world.mines.find(m => m && m.id === mineId);
   if(!mine || mine.developmentState !== 'unsecured') return false;
+  if(!isMineSiteUnlocked(mine)) return false;
   mine.developmentState = 'secured';
   return true;
 }

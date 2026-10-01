@@ -118,7 +118,7 @@
   storage._setRaw('gachaFactorySave', JSON.stringify(legacyPayload));
   const legacy = win.loadGame();
   check('Task27: legacy save without world still loads', legacy.ok === true);
-  check('Task27: legacy save receives fresh world defaults', legacy.ok === true && legacy.run.world.base.level === 1 && legacy.run.world.mines.length === 2 && legacy.run.world.mines.some(m => m.id === 'mine_start_iron') && legacy.run.world.mines.some(m => m.id === 'mine_start_coal'));
+  check('Task27: legacy save receives fresh world defaults', legacy.ok === true && legacy.run.world.base.level === 1 && legacy.run.world.mines.length === 14 /* Task 64: starters + distance rings (5+4+3+2) */ && legacy.run.world.mines.some(m => m.id === 'mine_start_iron') && legacy.run.world.mines.some(m => m.id === 'mine_start_coal'));
 
   win.state.world = {
     base: { x: 6, y: 9, level: 2 },
@@ -158,7 +158,7 @@
 (function test_T28_addMineKeepsUniqueProvidedId() {
   const win = newDom(makeMemoryStorage()).window;
   const mine = win.addMine({
-    id: 'mine_custom', x: 1, y: 2, resource: 'coal', grade: 1, miningPower: 2, developmentState: 'secured'
+    id: 'mine_custom', x: -5, y: 5, resource: 'coal', grade: 1, miningPower: 2, developmentState: 'secured' // Task 64: away from the random starter cells (2..3 from the base)
   });
   check('Task28: valid provided mine id is preserved', mine && mine.id === 'mine_custom');
 })();
