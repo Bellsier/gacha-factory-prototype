@@ -733,12 +733,18 @@
   const p = win.state.world.player;
   const hold = (dir, ticks) => { win.setPlayerHeld(dir, true); for(let i=0;i<ticks;i++) win.tickPlayer(); win.clearPlayerHeld(); win.tickPlayer(); };
   hold('left', 20);   // 2 s at 3 u/s = 6 units west
-  check('Task62: walking west from the base reaches negative x', Math.abs(p.x - (-4)) < 1e-9 && p.facing === 'left');
+  // Task 66: the mountain face at this row is x = -3.5 (+0.3 player margin), so
+  // walking west reaches negative x and then stops flush against the rock.
+  check('Task62: walking west from the base reaches negative x', p.x < 0 && Math.abs(p.x - (-3.2)) < 1e-3 && p.facing === 'left');
   hold('up', 20);
   check('Task62: walking north reaches negative y', Math.abs(p.y - (-6)) < 1e-9 && p.facing === 'up');
   hold('left', 100);
   hold('up', 100);
-  check('Task62: west/north edges clamp at -10', p.x === -10 && p.y === -10);
+  // Task 66: the north edge still clamps at -10; going west now ends at the
+  // mountain (face x -4 on row y=-6, + 0.3 margin) instead of the world edge,
+  // and walking north from there keeps that x.
+  check('Task62: west/north edges clamp at -10', p.y === -10 && Math.abs(p.x - (-3.7)) < 1e-3);
+  check('Task62: west world edge still clamps in the clamp function', win.clampPlayerPosition(-99, 0).x === -10);
   hold('right', 200);
   hold('down', 200);
   check('Task62: east/south edges clamp at 10', p.x === 10 && p.y === 10);
@@ -759,10 +765,10 @@
   const ws = win.addWorkshop({ id: 'ws_west', x: -2, y: -1, level: 1, recipeKey: 'steel' });
   check('Task62: workshops accept negative coordinates', !!ws && ws.x === -2 && ws.y === -1);
   check('Task62: Factory grid still rejects negative coordinates', win.addFactoryNode({ type: 'production', x: -1, y: 0, width: 1, height: 1 }) === null);
-  const world = win.sanitizeWorldState({ base: { x: -3, y: 4, level: 2 }, mines: [{ id: 'mine_n', x: -7, y: -9, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'secured' }], workshops: [], player: { x: -8.5, y: -9.5, facing: 'left' } });
+  const world = win.sanitizeWorldState({ base: { x: -3, y: 4, level: 2 }, mines: [{ id: 'mine_n', x: -7, y: -9, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'secured' }], workshops: [], player: { x: -2.5, y: -9.5, facing: 'left' } }); // Task 66: x -8.5 is inside the mountain now; -2.5 is open ground
   check('Task62: sanitize keeps negative base coords', world.base.x === -3 && world.base.y === 4);
   check('Task62: sanitize keeps negative mine coords', world.mines[0].x === -7 && world.mines[0].y === -9);
-  check('Task62: sanitize keeps negative player coords', world.player.x === -8.5 && world.player.y === -9.5);
+  check('Task62: sanitize keeps negative player coords', world.player.x === -2.5 && world.player.y === -9.5);
   const noBase = win.sanitizeWorldState({ mines: [], workshops: [] });
   check('Task62: missing base falls back to the new-game base', noBase.base.x === 2 && noBase.base.y === 0);
   check('Task62: missing player stands on the (fallback) base', noBase.player.x === 2 && noBase.player.y === 0);
@@ -1050,7 +1056,7 @@ function t63LayoutProblems(win, base, mines, opts) {
   check('Task63: extra mines obey the same rules and only use start-site resources', ok, detail);
   const custom = win.generateInitialWorldMines(base, { random: t63Lcg(7), extraCount: 3, extraResources: ['coal'], rings: [] });
   check('Task63: extra resource pool can be supplied', custom.filter(m => m.id.startsWith('mine_gen_')).every(m => m.resource === 'coal') && custom.length === 5);
-  const huge = win.generateInitialWorldMines(base, { random: t63Lcg(9), extraCount: 1000, rings: [] });
+  const huge = win.generateInitialWorldMines(base, { random: t63Lcg(9), extraCount: 1000, rings: [], walkable: () => true /* Task 66: whole grid, as this check was written */ });
   check('Task63: extra mines stop when the world is full (no overlap, no base cell)', huge.length === 21 * 21 - 1 - 6 /* Task 64: base cell + 6 reserved expansion seed cells */ && t63LayoutProblems(win, base, huge).length === 0);
   check('Task63: new run start resources are the open site only (iron, coal)', JSON.stringify(win.worldGenStartResources().sort()) === JSON.stringify(['coal', 'iron']));
 })();
@@ -1060,7 +1066,8 @@ function t63LayoutProblems(win, base, mines, opts) {
   let ok = true, detail = '';
   [{ x: 10, y: 10 }, { x: -10, y: -10 }, { x: 10, y: -10 }, { x: -10, y: 0 }].forEach(base => {
     for (let seed = 1; seed <= 30; seed++) {
-      const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed), extraCount: 5 });
+      // Task 66: some of these hypothetical bases sit inside the mountain; check the bounds logic on the open grid.
+      const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed), extraCount: 5, walkable: () => true });
       const p = t63LayoutProblems(win, base, mines);
       if (p.length) { ok = false; detail = JSON.stringify(base) + ' ' + p.join('; '); }
     }
@@ -1282,7 +1289,8 @@ function t64Problems(win, base, mines, opts) {
   let ok = true, detail = '';
   [{ x: 10, y: 10 }, { x: -10, y: -10 }, { x: 0, y: 0 }, { x: -10, y: 5 }].forEach(base => {
     for (let seed = 1; seed <= 40; seed++) {
-      const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+      // Task 66: (-10,*) bases sit inside the mountain; check the ring logic on the open grid.
+      const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed), walkable: () => true });
       const r = t64Problems(win, base, mines);
       if (r.problems.length) { ok = false; detail = JSON.stringify(base) + ' ' + r.problems.slice(0, 2).join('; '); }
     }
@@ -1489,7 +1497,7 @@ function t65MidOk(base, mines) {
   win.addMine({ id: 't65_far', x: 9, y: 9, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' });
   w.hiddenMineIds.push('t65_far');
   w.player.x = 9; w.player.y = 6.4;   // distance 2.6 -> stays hidden
-  check('Task65: distance 2.6 does not discover', win.tickExploration().length === 0 && w.hiddenMineIds.includes('t65_far'));
+  check('Task65: distance 2.6 does not discover', !win.tickExploration().includes('t65_far') && w.hiddenMineIds.includes('t65_far')); // other generated mines may sit nearby
 })();
 
 (function test_T65_tickLoopDiscovers() {
@@ -1592,6 +1600,243 @@ function t65MidOk(base, mines) {
   check('Task65: secure / mine / craft / sell loop still works', win.state.products.steel === 0 && win.state.gold > 0 && win.state.resources.iron === 0);
   win.state.gold = 700;
   check('Task65: expansion still works', win.expandBase() === true);
+})();
+
+// =============================================================================
+// TASK 66 — Mountain range as a real boundary + locked tunnel.
+// Reference values (js/terrain.js, approved for Task 66):
+//   east face x: y<-6 -> -4.5, [-6,-2) -> -4, [-2,3) -> -3.5, [3,7) -> -4, y>=7 -> -4.5
+//   player margin 0.3; tunnel centred y=1, ±0.8, cut 1 unit deep (gate x -4.5), locked
+// =============================================================================
+const T66_FACE = (y) => y < -6 ? -4.5 : y < -2 ? -4 : y < 3 ? -3.5 : y < 7 ? -4 : -4.5;
+const T66_STEP = 3 / 10; // PLAYER_SPEED / TICKS_PER_SECOND
+
+(function test_T66_terrainGeometry() {
+  const win = newDom(makeMemoryStorage()).window;
+  let faceOk = true;
+  for (let y = -10; y <= 10; y += 0.25) if (win.terrainRockFaceX(y) !== T66_FACE(y)) faceOk = false;
+  check('Task66: rock face matches the reference shape over the whole world height', faceOk);
+  const t = win.terrainTunnel();
+  check('Task66: tunnel mouth sits on the rock face at y=1', t.y === 1 && t.mouthX === -3.5 && t.halfWidth === 0.8);
+  check('Task66: tunnel is cut 1 unit deep to a gate at x=-4.5', t.gateX === -4.5 && win.terrainFaceX(1) === -4.5 && win.terrainFaceX(1.8) === -4.5 && win.terrainFaceX(1.81) === -3.5);
+  check('Task66: tunnel is locked', t.locked === true);
+  check('Task66: base and starter area are open ground', win.isWorldPointWalkable(2, 0) && win.isWorldPointWalkable(0, 2) && win.isWorldPointWalkable(-1, 0));
+  check('Task66: rock is not walkable', !win.isWorldPointWalkable(-4, 0) && !win.isWorldPointWalkable(-5, -8) && !win.isWorldPointWalkable(-3.3, 0));
+  check('Task66: land beyond the range is not walkable', !win.isWorldPointWalkable(-9, 0) && !win.isWorldPointWalkable(-10, -10) && !win.isWorldPointWalkable(-8, 9));
+  check('Task66: player keeps a 0.3 margin from rock', win.isWorldPointWalkable(-3.2, 0) && !win.isWorldPointWalkable(-3.21, 0));
+  check('Task66: world bounds still apply', !win.isWorldPointWalkable(10.01, 0) && !win.isWorldPointWalkable(5, -10.01) && win.isWorldPointWalkable(10, 10));
+  check('Task66: non-numbers are never walkable', !win.isWorldPointWalkable(Number.NaN, 0) && !win.isWorldPointWalkable(0, undefined));
+})();
+
+(function test_T66_noWayAround() {
+  // Flood-fill everything reachable from the base on a fine grid using the
+  // real walkability test: nothing west of the face (rock/beyond/gate) is reachable,
+  // and the range spans the whole height, so there is no way around it.
+  const win = newDom(makeMemoryStorage()).window;
+  const step = 0.25;
+  const key = (x, y) => x.toFixed(2) + ',' + y.toFixed(2);
+  const seen = new Set([key(2, 0)]);
+  const queue = [[2, 0]];
+  let westmost = Infinity, westOk = true;
+  while (queue.length) {
+    const [x, y] = queue.pop();
+    if (x < win.terrainFaceX(y) + 0.3 - 1e-9) westOk = false;
+    westmost = Math.min(westmost, x);
+    [[step, 0], [-step, 0], [0, step], [0, -step]].forEach(([ax, ay]) => {
+      const nx = +(x + ax).toFixed(2), ny = +(y + ay).toFixed(2);
+      const k = key(nx, ny);
+      if (seen.has(k) || !win.isWorldPointWalkable(nx, ny)) return;
+      seen.add(k); queue.push([nx, ny]);
+    });
+  }
+  check('Task66: every reachable point is east of the mountain face', westOk);
+  check('Task66: the farthest-west reachable point is inside the tunnel recess (not beyond the gate)', westmost >= -4.5 + 0.3 - 1e-9 && westmost <= -4.0);
+  check('Task66: the north and south world edges are reachable (no gap is needed to go around)', seen.has(key(0, -10)) && seen.has(key(0, 10)));
+  check('Task66: no reachable point lies beyond the range', [...seen].every(k => +k.split(',')[0] > -5));
+})();
+
+(function test_T66_walkingIntoTheMountain() {
+  const win = newDom(makeMemoryStorage()).window;
+  const p = win.state.world.player;
+  let maxJump = 0, everInside = false;
+  const run = (dirs, ticks) => {
+    dirs.forEach(d => win.setPlayerHeld(d, true));
+    for (let i = 0; i < ticks; i++) {
+      const bx = p.x, by = p.y;
+      win.tickPlayer();
+      maxJump = Math.max(maxJump, Math.hypot(p.x - bx, p.y - by));
+      if (!win.isWorldPointWalkable(p.x, p.y)) everInside = true;
+    }
+    win.clearPlayerHeld(); win.tickPlayer();
+  };
+  // Straight west on several rows: stops flush against the face, never inside.
+  let rowsOk = true;
+  [-9, -5, -1, 0, 2.5, 5, 9].forEach(y => {
+    p.x = 3; p.y = y;
+    run(['left'], 60);
+    if (Math.abs(p.x - (T66_FACE(y) + 0.3)) > 1e-3 || p.y !== y) rowsOk = false;
+  });
+  check('Task66: walking west stops flush against the face on every row', rowsOk);
+  check('Task66: the player is never inside rock', !everInside);
+  check('Task66: no tick moves the player farther than one step (no bounce/teleport)', maxJump <= T66_STEP + 1e-9);
+  // Pushing into the face keeps the walk key held but stops movement -> idle pose, facing kept.
+  p.x = -3.2; p.y = 0;
+  win.setPlayerHeld('left', true); win.tickPlayer();
+  check('Task66: pushing straight into rock does not move the player', Math.abs(p.x - (-3.2)) < 1e-9 && p.facing === 'left' && p.pose === 'idle');
+  win.clearPlayerHeld(); win.tickPlayer();
+})();
+
+(function test_T66_slidingAlongTheFace() {
+  const win = newDom(makeMemoryStorage()).window;
+  const p = win.state.world.player;
+  let everInside = false;
+  p.x = -3.0; p.y = -0.5;
+  win.setPlayerHeld('left', true); win.setPlayerHeld('up', true);
+  const ys = [], poses = [];
+  for (let i = 0; i < 40; i++) { win.tickPlayer(); ys.push(p.y); poses.push(p.pose); if (!win.isWorldPointWalkable(p.x, p.y)) everInside = true; }
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task66: diagonal into the face keeps sliding north along it', p.y < -6 && ys.every((y, i) => i === 0 || y <= ys[i - 1]));
+  check('Task66: while sliding, x follows the face (ends flush at the y<-6 face)', Math.abs(p.x - (-4.5 + 0.3)) < 1e-3);
+  check('Task66: sliding never enters rock', !everInside);
+  check('Task66: sliding uses the walk pose', poses.every(ps => ps === 'walk'));
+  // South along the face too.
+  p.x = -3.0; p.y = 4;
+  win.setPlayerHeld('left', true); win.setPlayerHeld('down', true);
+  for (let i = 0; i < 30; i++) win.tickPlayer();
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task66: sliding south along the face also works', p.y > 7 && Math.abs(p.x - (-4.5 + 0.3)) < 1e-3);
+  // Diagonal speed in open ground is unchanged.
+  p.x = 5; p.y = 5;
+  win.setPlayerHeld('right', true); win.setPlayerHeld('down', true);
+  for (let i = 0; i < 10; i++) win.tickPlayer();
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task66: open-ground diagonal speed still normalised', Math.abs(Math.hypot(p.x - 5, p.y - 5) - 3) < 1e-9);
+})();
+
+(function test_T66_lockedTunnel() {
+  const win = newDom(makeMemoryStorage()).window;
+  const p = win.state.world.player;
+  p.x = 0; p.y = 1;
+  win.setPlayerHeld('left', true);
+  for (let i = 0; i < 60; i++) win.tickPlayer();
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task66: the player can walk into the tunnel mouth (past the face line)', p.x < -3.5);
+  check('Task66: the locked gate stops the player', Math.abs(p.x - (-4.5 + 0.3)) < 1e-3);
+  check('Task66: nothing beyond the gate is reachable', p.x > -4.5);
+  // Leaving the recess sideways into rock is blocked; walking back out works.
+  win.setPlayerHeld('up', true);
+  for (let i = 0; i < 10; i++) win.tickPlayer();
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task66: inside the recess, rock on the sides blocks movement', p.y >= 1 - 0.8 - 1e-9 && win.isWorldPointWalkable(p.x, p.y));
+  win.setPlayerHeld('right', true);
+  for (let i = 0; i < 10; i++) win.tickPlayer();
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task66: walking back out of the tunnel works', p.x > -2);
+  const doc = win.document;
+  const tunnel = doc.querySelector('#worldStage [data-tunnel]');
+  check('Task66: tunnel is drawn on the stage and marked locked', !!tunnel && tunnel.getAttribute('data-tunnel-locked') === 'true' && tunnel.classList.contains('is-locked'));
+  check('Task66: tunnel shows a locked label', doc.querySelector('#worldStage [data-tunnel-label]').textContent.includes('잠긴 터널'));
+  const tPos = win.worldToStagePercent(-4.5 + 0.15, 1.8);
+  check('Task66: tunnel is placed from terrain data via the stage projection', tunnel.style.left === tPos.left + '%' && tunnel.style.top === tPos.top + '%');
+})();
+
+(function test_T66_mountainRendering() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const peaks = stage.querySelectorAll('[data-terrain="peak"]');
+  check('Task66: mountain is drawn as many peaks', peaks.length === win.terrainPeaks().length && peaks.length > 30);
+  check('Task66: peaks carry depth scale and depth order', [...peaks].every(el => parseFloat(el.style.getPropertyValue('--depth-scale')) > 0 && parseInt(el.style.zIndex, 10) > 0));
+  check('Task66: peaks are not a single rectangle (two rows, varied sizes)', new Set([...peaks].map(el => el.style.width)).size > 4 && stage.querySelectorAll('.peak-back').length > 0 && stage.querySelectorAll('.peak-front').length > 0);
+  check('Task66: front peaks leave the tunnel mouth open', win.terrainPeaks().filter(pk => pk.row === 'front').every(pk => Math.abs(pk.y - 1) >= 1.6));
+  check('Task66: ground shows the rock footprint and the land beyond', !!stage.querySelector('.world-ground polygon.world-range-rock') && !!stage.querySelector('.world-ground polygon[data-terrain="beyond"]'));
+  check('Task66: peaks never cover the base or starter mines (all west of the face)', win.terrainPeaks().every(pk => pk.x < win.terrainRockFaceX(pk.y)) && win.state.world.mines.every(m => m.x > win.terrainRockFaceX(m.y)));
+  win.renderAll(); win.renderAll();
+  check('Task66: re-rendering does not duplicate terrain', stage.querySelectorAll('[data-terrain="peak"]').length === peaks.length && stage.querySelectorAll('[data-tunnel]').length === 1 && stage.querySelectorAll('.world-ground svg').length === 1);
+  const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+  check('Task66: terrain never blocks clicks', /\.world-terrain-layer\{[^}]*pointer-events:none/.test(css) && /\.world-mountain-peak\{[^}]*pointer-events:none/.test(css) && /\.world-tunnel\{[^}]*pointer-events:none/.test(css));
+  peaks[0].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  check('Task66: clicking terrain behaves like empty ground', win.getWorldSelection() === null);
+})();
+
+(function test_T66_explorationMap() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const map = win.document.getElementById('worldMap');
+  check('Task66: map shows the mountain', !!map.querySelector('[data-map-mountain]'));
+  check('Task66: map shows the tunnel', !!map.querySelector('[data-map-tunnel]'));
+  check('Task66: map still shows base and player', !!map.querySelector('[data-map-base]') && !!map.querySelector('#worldMapPlayer'));
+  check('Task66: map still hides undiscovered mines', win.state.world.hiddenMineIds.every(id => !map.querySelector('[data-map-mine="' + id + '"]')));
+  const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+  check('Task66: map size / position unchanged', /\.world-map\{[^}]*left:10px;[^}]*top:10px;[^}]*width:92px; height:92px;/.test(css) && /@media \(max-width: 520px\)\{ \.world-map\{width:68px; height:68px;/.test(css));
+})();
+
+(function test_T66_generationAvoidsTerrain() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = { x: 2, y: 0 };
+  let bad = 0, detail = '';
+  for (let seed = 1; seed <= 300; seed++) {
+    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+    const r = t64Problems(win, base, mines, { exactCounts: true, spacing: true });
+    const off = mines.filter(m => !win.isCellOpenForMines(m.x, m.y) || !win.isWorldPointWalkable(m.x, m.y) || m.x < T66_FACE(m.y) + 1 || Math.hypot(m.x - (-3.5), m.y - 1) < 2);
+    if (off.length || r.problems.length || !t65MidOk(base, mines)) { bad++; detail = 'seed ' + seed + ': ' + off.map(m => m.id + '@' + m.x + ',' + m.y).join(' ') + ' ' + r.problems.slice(0, 2).join('; '); }
+  }
+  check('Task66: 300 seeded worlds — no mine on/behind the mountain or at the tunnel mouth', bad === 0, detail);
+  check('Task66: ring counts 5/4/3/2, pools and the mid cap still hold with the mountain', bad === 0);
+  let realOk = true;
+  for (let i = 0; i < 4; i++) {
+    const w = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+    if (!w.state.world.mines.every(m => w.isWorldPointWalkable(m.x, m.y)) || w.state.world.mines.length !== 14) realOk = false;
+  }
+  check('Task66: real new games put every mine on walkable ground', realOk);
+  check('Task66: every expansion seed cell (relative to the base) is open ground', [[4,0],[0,4],[6,0],[0,6],[8,0],[0,8]].every(([dx, dy]) => win.isWorldPointWalkable(2 + dx, 0 + dy)));
+})();
+
+(function test_T66_saveLoad() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage, { fullWorld: true }).window;
+  const w = win.state.world;
+  w.player.x = -1.25; w.player.y = 3.5;
+  const first = w.mines.find(m => w.hiddenMineIds.includes(m.id));
+  win.discoverMine(first.id);
+  win.state.gold = 123;
+  const snap = JSON.stringify([w.mines.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]), w.hiddenMineIds, w.base]);
+  win.saveGame();
+  const raw = storage.getItem('gachaFactorySave');
+  check('Task66: terrain is not written to the save', !/terrain|mountain|tunnel|peak/i.test(raw));
+  check('Task66: saveVersion stays 1', JSON.parse(raw).saveVersion === 1);
+  const win2 = newDom(storage).window;
+  const w2 = win2.state.world;
+  check('Task66: mines, discovery and base survive save/load', JSON.stringify([w2.mines.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]), w2.hiddenMineIds, w2.base]) === snap);
+  check('Task66: a walkable player position survives save/load', w2.player.x === -1.25 && w2.player.y === 3.5 && win2.state.gold === 123);
+  check('Task66: terrain is rebuilt after load', win2.document.querySelectorAll('#worldStage [data-terrain="peak"]').length > 30 && !!win2.document.querySelector('#worldStage [data-tunnel]'));
+  // An older save: player standing where the mountain now is, mines beyond it.
+  const payload = JSON.parse(raw);
+  payload.run.world.player = { x: -7, y: 2, facing: 'left', pose: 'idle' };
+  payload.run.world.mines = payload.run.world.mines.concat([{ id: 'mine_old_beyond', x: -8, y: -3, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'secured' }]);
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const old = newDom(storage).window;
+  check('Task66: a saved position inside the mountain is moved onto the base', old.state.world.player.x === old.state.world.base.x && old.state.world.player.y === old.state.world.base.y);
+  check('Task66: older mines beyond the mountain are kept as saved (not regenerated or moved)', old.state.world.mines.some(m => m.id === 'mine_old_beyond' && m.x === -8 && m.y === -3) && old.state.world.mines.length === 15);
+  check('Task66: an older secured mine beyond the mountain can still be mined from the list', old.mineMine('mine_old_beyond') === true && old.state.resources.iron === 1);
+})();
+
+(function test_T66_coreLoop() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage, { fullWorld: true }).window;
+  const doc = win.document;
+  ['mine_start_iron', 'mine_start_coal'].forEach(id => doc.querySelector('[data-secure-mine="' + id + '"]').click());
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_coal"]').click();
+  doc.querySelector('[data-craft="steel"]').click();
+  doc.querySelector('[data-sell="steel"]').click();
+  check('Task66: secure / mine / craft / sell still work', win.state.gold > 0 && win.state.products.steel === 0);
+  const target = win.state.world.mines.find(m => win.state.world.hiddenMineIds.includes(m.id));
+  win.state.world.player.x = target.x; win.state.world.player.y = target.y;
+  win.tickLoop();
+  check('Task66: discovery still works (radius rule unchanged)', !win.state.world.hiddenMineIds.includes(target.id));
+  win.state.gold = 700;
+  check('Task66: expansion still works and its mines are on open ground', win.expandBase() === true && win.state.world.mines.filter(m => m.id.startsWith('mine_manaVein_')).every(m => win.isWorldPointWalkable(m.x, m.y)));
 })();
 
 // =============================================================================

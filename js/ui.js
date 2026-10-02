@@ -646,8 +646,70 @@ function renderWorldGround(){
     const edge = y === b.BOUNDS_MIN_Y || y === b.BOUNDS_MAX_Y;
     line(b.BOUNDS_MIN_X, y, b.BOUNDS_MAX_X, y, edge ? 'world-grid-edge' : 'world-grid-line');
   }
+  // Task 66: the mountain's footprint and the land beyond it, drawn over the
+  // grid from the same terrain data the movement code uses.
+  const top = b.BOUNDS_MIN_Y - pad, bottom = b.BOUNDS_MAX_Y + pad, west = b.BOUNDS_MIN_X - pad;
+  const faceLine = terrainFaceOutline(top, bottom);
+  const poly = (cls, pts) => { const el = document.createElementNS(SVG_NS, 'polygon'); el.setAttribute('class', cls); el.setAttribute('points', pts.map(p => pt(p.x, p.y)).join(' ')); svg.appendChild(el); return el; };
+  poly('world-range-rock', [{ x: west, y: top }, ...faceLine, { x: west, y: bottom }]);
+  const backLine = faceLine.map(p => ({ x: Math.max(west, terrainRockFaceX(p.y) - WORLD_TERRAIN.RANGE_WIDTH), y: p.y }));
+  poly('world-beyond', [{ x: west, y: top }, ...backLine, { x: west, y: bottom }]).setAttribute('data-terrain', 'beyond');
   ground.innerHTML = '';
   ground.appendChild(svg);
+  renderWorldTerrain();
+}
+
+// Task 66: points along the walk-stopping face from y=top to y=bottom
+// (rock face with the tunnel recess cut in), as straight segments.
+function terrainFaceOutline(top, bottom){
+  const ys = new Set([top, bottom]);
+  WORLD_TERRAIN.FACE.forEach(s => { [s.y0, s.y1].forEach(v => { if(v > top && v < bottom) ys.add(v); }); });
+  const t = WORLD_TERRAIN.TUNNEL;
+  [t.Y - t.HALF_WIDTH, t.Y + t.HALF_WIDTH].forEach(v => { if(v > top && v < bottom) ys.add(v); });
+  const sorted = [...ys].sort((a, c) => a - c);
+  const pts = [];
+  for(let i = 0; i < sorted.length - 1; i++){
+    const mid = (sorted[i] + sorted[i + 1]) / 2;
+    const x = terrainFaceX(mid);
+    pts.push({ x, y: sorted[i] }, { x, y: sorted[i + 1] });
+  }
+  return pts;
+}
+
+// Task 66: mountain peaks and the locked tunnel as depth-sorted stage objects
+// (placeOnStage), so they scale with distance and overlap correctly with the
+// player. Fixed terrain: rebuilt with the ground, never per tick. Click-through.
+function renderWorldTerrain(){
+  const layer = document.getElementById('worldTerrainLayer');
+  if(!layer) return;
+  layer.innerHTML = '';
+  terrainPeaks().forEach((pk, i) => {
+    const el = document.createElement('div');
+    el.className = 'world-mountain-peak peak-' + pk.row;
+    el.setAttribute('data-terrain', 'peak');
+    // Sized relative to the stage width (52px on the 820px desktop stage) so the
+    // range keeps its proportions on narrow screens.
+    el.style.width = (6.4 * pk.size).toFixed(2) + '%';
+    el.style.aspectRatio = pk.row === 'back' ? '52 / 50' : '52 / 38';
+    placeOnStage(el, pk.x, pk.y);
+    layer.appendChild(el);
+  });
+  const t = terrainTunnel();
+  const tunnel = document.createElement('div');
+  tunnel.className = 'world-tunnel' + (t.locked ? ' is-locked' : '');
+  tunnel.setAttribute('data-tunnel', '');
+  tunnel.setAttribute('data-tunnel-locked', t.locked ? 'true' : 'false');
+  tunnel.title = t.locked ? '터널 (잠김) — 아직 통과할 수 없습니다' : '터널';
+  placeOnStage(tunnel, t.gateX + 0.15, t.y + t.halfWidth);
+  layer.appendChild(tunnel);
+  // The label is its own element above the terrain so nearer peaks never hide it.
+  const label = document.createElement('div');
+  label.className = 'world-tunnel-label';
+  label.setAttribute('data-tunnel-label', '');
+  label.textContent = t.locked ? '🔒 잠긴 터널' : '터널';
+  placeOnStage(label, t.mouthX + 0.2, t.y + t.halfWidth);
+  label.style.zIndex = '4500';
+  layer.appendChild(label);
 }
 
 // Task 57: draws the base and every mine in state.world.mines onto the
@@ -712,6 +774,11 @@ function renderExplorationMap(){
   svg.setAttribute('aria-hidden', 'true');
   const el = (tag, attrs) => { const n = document.createElementNS(SVG_NS, tag); Object.keys(attrs).forEach(k => n.setAttribute(k, attrs[k])); svg.appendChild(n); return n; };
   el('rect', { class: 'world-map-frame', x: b.BOUNDS_MIN_X, y: b.BOUNDS_MIN_Y, width: b.BOUNDS_MAX_X - b.BOUNDS_MIN_X, height: b.BOUNDS_MAX_Y - b.BOUNDS_MIN_Y });
+  // Task 66: mountain (and the closed land beyond it) + the locked tunnel.
+  const faceLine = terrainFaceOutline(b.BOUNDS_MIN_Y, b.BOUNDS_MAX_Y);
+  el('polygon', { class: 'world-map-mountain', 'data-map-mountain': '', points: [{ x: b.BOUNDS_MIN_X, y: b.BOUNDS_MIN_Y }, ...faceLine, { x: b.BOUNDS_MIN_X, y: b.BOUNDS_MAX_Y }].map(p => p.x + ',' + p.y).join(' ') });
+  const tn = terrainTunnel();
+  el('rect', { class: 'world-map-tunnel', 'data-map-tunnel': '', x: tn.gateX, y: tn.y - tn.halfWidth, width: tn.mouthX - tn.gateX, height: tn.halfWidth * 2 });
   const base = state.world.base;
   el('rect', { class: 'world-map-base', 'data-map-base': '', x: base.x - 0.6, y: base.y - 0.6, width: 1.2, height: 1.2 });
   state.world.mines.forEach(mine => {

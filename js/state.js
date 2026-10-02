@@ -326,9 +326,14 @@ function clampPlayerAxis(v, min, max){
 function sanitizePlayer(raw, base){
   const fresh = freshPlayerState(base);
   if(!isPlainObject(raw)) return fresh;
+  let x = isFiniteNumber(raw.x) ? clampPlayerAxis(raw.x, BALANCE.world.BOUNDS_MIN_X, BALANCE.world.BOUNDS_MAX_X) : fresh.x;
+  let y = isFiniteNumber(raw.y) ? clampPlayerAxis(raw.y, BALANCE.world.BOUNDS_MIN_Y, BALANCE.world.BOUNDS_MAX_Y) : fresh.y;
+  // Task 66: a saved position inside the mountain / beyond it (only possible
+  // in saves from before the mountain existed) is moved onto the base.
+  if(!isWorldPointWalkable(x, y)){ x = fresh.x; y = fresh.y; }
   return {
-    x: isFiniteNumber(raw.x) ? clampPlayerAxis(raw.x, BALANCE.world.BOUNDS_MIN_X, BALANCE.world.BOUNDS_MAX_X) : fresh.x,
-    y: isFiniteNumber(raw.y) ? clampPlayerAxis(raw.y, BALANCE.world.BOUNDS_MIN_Y, BALANCE.world.BOUNDS_MAX_Y) : fresh.y,
+    x,
+    y,
     facing: PLAYER_FACINGS.includes(raw.facing) ? raw.facing : fresh.facing,
     pose: 'idle',
   };

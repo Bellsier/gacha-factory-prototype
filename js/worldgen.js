@@ -124,12 +124,16 @@ function makeGeneratedMine(id, cell, resource){
 //   rings          — ring table, default BALANCE.worldGen.RINGS ([] = starters only)
 //   extraCount     — Task 63 extra mines anywhere, default BALANCE.worldGen.EXTRA_MINES
 //   extraResources — resource keys for extra mines, default worldGenStartResources()
+//   walkable       — (x, y) => bool cell filter, default isCellOpenForMines (Task 66)
 function generateInitialWorldMines(base, options){
   const opts = options || {};
   const random = typeof opts.random === 'function' ? opts.random : Math.random;
   const g = BALANCE.worldGen;
   const rings = Array.isArray(opts.rings) ? opts.rings : g.RINGS;
-  const cells = worldGenAllCells();
+  // Task 66: only cells clear of the mountain / beyond / tunnel mouth, so every
+  // generated mine can be walked to. `walkable` overrides it (tests only).
+  const openCell = typeof opts.walkable === 'function' ? opts.walkable : isCellOpenForMines;
+  const cells = worldGenAllCells().filter(c => openCell(c.x, c.y));
   const key = (c) => c.x + ',' + c.y;
   const used = new Set([key(base)]);
   const reserved = worldGenExpansionSeedCells(base);
