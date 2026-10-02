@@ -34,11 +34,15 @@ function freshBasePosition(){
 // through here for a save that has a world — sanitizeWorldState keeps it.
 function freshWorldState(){
   const base = { ...freshBasePosition(), level: 1 };
+  const mines = generateInitialWorldMines(base);
   return {
     base,
-    mines: generateInitialWorldMines(base),
+    mines,
     workshops: [],
     player: freshPlayerState(base),
+    // Task 65: every generated mine except the starters begins undiscovered;
+    // walking near one reveals it (tickExploration in systems.js).
+    hiddenMineIds: mines.filter(m => !m.id.startsWith('mine_start_')).map(m => m.id),
   };
 }
 
@@ -343,12 +347,23 @@ function sanitizeWorldState(raw){
     y: isValidWorldY(baseRaw.y) ? baseRaw.y : baseFallback.y,
     level: isNonNegativeInt(baseRaw.level) && baseRaw.level >= 1 ? baseRaw.level : 1,
   };
+  const mines = sanitizeMines(raw.mines);
   return {
     base,
-    mines: sanitizeMines(raw.mines),
+    mines,
     workshops: sanitizeWorkshops(raw.workshops),
     player: sanitizePlayer(raw.player, base),
+    hiddenMineIds: sanitizeHiddenMineIds(raw.hiddenMineIds, mines),
   };
+}
+
+// Task 65: additive field (saveVersion unchanged). Missing (any older save) ->
+// [] = every mine already discovered, so older saves look exactly as before.
+// Keeps only unique ids of mines that exist.
+function sanitizeHiddenMineIds(raw, mines){
+  if(!Array.isArray(raw)) return [];
+  const ids = new Set(mines.map(m => m.id));
+  return [...new Set(raw.filter(id => typeof id === 'string' && ids.has(id)))];
 }
 
 function sanitizeFactoryState(raw){

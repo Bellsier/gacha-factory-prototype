@@ -57,6 +57,8 @@ const BALANCE = {
     BOUNDS_MAX_Y: 10,
     START_BASE_X: 2,
     START_BASE_Y: 0,
+    // Task 65: a hidden mine is discovered when the player comes this close (world units).
+    DISCOVERY_RADIUS: 2.5,
   },
   worldGen: {
     // Task 63: new-game mine layout (js/worldgen.js). Starter iron/coal are
@@ -74,7 +76,9 @@ const BALANCE = {
     MIN_SPACING: 2, // preferred minimum distance between mines (falls back if a ring is full)
     RINGS: [
       { key: 'near',  minDist: 2,  maxDist: 4,        count: 5, resources: { iron: 1, coal: 1 } },
-      { key: 'mid',   minDist: 4,  maxDist: 7,        count: 4, resources: { iron: 2, coal: 2, mana: 1, crystal: 1 } },
+      // Task 65: at most one mid-tier (mana/crystal) mine in the mid ring; the rest iron/coal.
+      { key: 'mid',   minDist: 4,  maxDist: 7,        count: 4, resources: { iron: 2, coal: 2, mana: 1, crystal: 1 },
+        limits: [{ resources: ['mana', 'crystal'], max: 1 }] },
       { key: 'far',   minDist: 7,  maxDist: 10,       count: 3, resources: { mana: 2, crystal: 2, rareMetal: 1, relic: 1 } },
       { key: 'outer', minDist: 10, maxDist: Infinity, count: 2, resources: { rareMetal: 2, relic: 2, cosmicShard: 1, plasma: 1 } },
     ],

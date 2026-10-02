@@ -1301,7 +1301,11 @@ function t64Problems(win, base, mines, opts) {
     layouts.add(w.mines.map(m => m.resource + '@' + m.x + ',' + m.y).join('|'));
     if (i === 0) {
       check('Task64: stage draws every generated mine', win.document.querySelectorAll('#worldStage [data-world-mine]').length === 14);
-      check('Task64: mine list shows every generated mine', win.document.querySelectorAll('#worldMines [data-secure-mine]').length === 14);
+      // Task 65: the list shows discovered mines and a count of the hidden ones; together they cover all 14.
+      const listed = win.document.querySelectorAll('#worldMines [data-secure-mine]').length;
+      const note = win.document.querySelector('#worldMines [data-hidden-mines]');
+      const hiddenNow = win.state.world.hiddenMineIds.length;
+      check('Task64: mine list accounts for every generated mine', listed + (note ? +note.getAttribute('data-hidden-mines') : 0) === 14 && listed === 14 - hiddenNow);
     }
   }
   check('Task64: five real new games all follow the ring rules', ok, detail);
@@ -1312,6 +1316,8 @@ function t64Problems(win, base, mines, opts) {
   const doc = win.document;
   const outer = win.state.world.mines.find(m => t64Ring(win.state.world.base, m) === 3); // tier >= 3, site locked at start
   check('Task64: a far rare mine exists from the start', !!outer && T64_TIER[outer.resource] >= 3);
+  // Task 65: far mines start undiscovered; discover it so the site lock is what's being tested.
+  win.discoverMine(outer.id); win.buildMines();
   check('Task64: a mine of a locked site cannot be secured', win.secureMine(outer.id) === false && outer.developmentState === 'unsecured');
   const btn = doc.querySelector('[data-secure-mine="' + outer.id + '"]');
   check('Task64: its list button is disabled and says the site must be unlocked', btn.disabled === true && btn.textContent.includes('해금 필요'));
@@ -1364,6 +1370,7 @@ function t64Problems(win, base, mines, opts) {
   const win = newDom(storage, { fullWorld: true }).window;
   const doc = win.document;
   const ring = win.state.world.mines.find(m => m.id.startsWith('mine_ring_'));
+  win.discoverMine(ring.id); win.renderAll(); // Task 65: ring mines may start undiscovered
   doc.querySelector('#worldStage [data-world-mine="' + ring.id + '"]').click();
   check('Task64: a ring mine can be selected on the stage', win.getWorldSelection() && win.getWorldSelection().id === ring.id);
   check('Task64: info shows its grade', doc.querySelector('#worldInfo [data-world-info="grade"]').textContent === '등급 ' + ring.grade);
@@ -1381,6 +1388,210 @@ function t64Problems(win, base, mines, opts) {
   win.saveGame();
   const win2 = newDom(storage).window;
   check('Task64: progress survives save/load', win2.state.world.base.level === 2 && win2.state.world.mines.length === 16);
+})();
+
+// =============================================================================
+// TASK 65 — (1) mid ring: at most one mana/crystal; (2) mine discovery +
+// exploration map. Deterministic (seeded / fixed random, placed player).
+// =============================================================================
+function t65Mid(base, mines) { return mines.filter(m => t64Ring(base, m) === 1); }
+function t65MidOk(base, mines) {
+  const mid = t65Mid(base, mines);
+  const midTier = mid.filter(m => m.resource === 'mana' || m.resource === 'crystal').length;
+  return mid.length === 4 && midTier <= 1 && mid.every(m => ['iron', 'coal', 'mana', 'crystal'].includes(m.resource));
+}
+
+(function test_T65_midRingCapSweep() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = { x: 2, y: 0 };
+  let bad = 0, detail = '', withOne = 0, withNone = 0, other = 0;
+  for (let seed = 1; seed <= 500; seed++) {
+    const mines = win.generateInitialWorldMines(base, { random: t63Lcg(seed) });
+    const r = t64Problems(win, base, mines, { exactCounts: true, spacing: true });
+    if (!t65MidOk(base, mines) || r.problems.length || mines.length !== 14) { bad++; detail = 'seed ' + seed + ': ' + t65Mid(base, mines).map(m => m.resource).join('/') + ' ' + r.problems.slice(0, 2).join('; '); }
+    const mt = t65Mid(base, mines).filter(m => m.resource === 'mana' || m.resource === 'crystal').length;
+    if (mt === 1) withOne++; else if (mt === 0) withNone++; else other++;
+  }
+  check('Task65: 500 seeded worlds — mid ring always 4 mines with mana+crystal <= 1', bad === 0, detail);
+  check('Task65: other Task 64 ring rules still hold in those worlds (counts, pools, grades, spacing)', bad === 0);
+  check('Task65: mid-tier mine is optional — some worlds have one, some none, never two', withOne > 0 && withNone > 0 && other === 0, 'one=' + withOne + ' none=' + withNone);
+})();
+
+(function test_T65_midRingCapForcedRandom() {
+  const win = newDom(makeMemoryStorage()).window;
+  const base = { x: 2, y: 0 };
+  // random ~1 always picks the last weighted entry: crystal in the mid ring.
+  // Before the cap that meant 4 crystals; now exactly one, the rest iron/coal.
+  const hi = t65Mid(base, win.generateInitialWorldMines(base, { random: () => 0.9999999 })).map(m => m.resource);
+  check('Task65: forced-high random gives exactly one mid-tier mine', hi.length === 4 && hi.filter(r => r === 'crystal' || r === 'mana').length === 1, hi.join('/'));
+  check('Task65: the rest of the mid ring is iron/coal', hi.filter(r => r === 'iron' || r === 'coal').length === 3);
+  const lo = t65Mid(base, win.generateInitialWorldMines(base, { random: () => 0 })).map(m => m.resource);
+  check('Task65: forced-low random gives an all-basic mid ring', lo.length === 4 && lo.every(r => r === 'iron'), lo.join('/'));
+  const outerHi = win.generateInitialWorldMines(base, { random: () => 0.9999999 }).filter(m => t64Ring(base, m) >= 2);
+  check('Task65: far/outer rings are not capped (forced-high still picks their last entry)', outerHi.filter(m => t64Ring(base, m) === 2).every(m => m.resource === 'relic') && outerHi.filter(m => t64Ring(base, m) === 3).every(m => m.resource === 'plasma'));
+})();
+
+(function test_T65_ringWeightsHelper() {
+  const win = newDom(makeMemoryStorage()).window;
+  const ring = { resources: { iron: 2, coal: 2, mana: 1, crystal: 1 }, limits: [{ resources: ['mana', 'crystal'], max: 1 }] };
+  check('Task65: limit not reached keeps every weight', JSON.stringify(win.worldGenRingWeights(ring, ['iron'])) === JSON.stringify({ iron: 2, coal: 2, mana: 1, crystal: 1 }));
+  check('Task65: limit reached removes the whole group', JSON.stringify(win.worldGenRingWeights(ring, ['iron', 'mana'])) === JSON.stringify({ iron: 2, coal: 2 }));
+  check('Task65: ring without limits is unchanged', JSON.stringify(win.worldGenRingWeights({ resources: { mana: 2, relic: 1 } }, ['mana', 'mana'])) === JSON.stringify({ mana: 2, relic: 1 }));
+  check('Task65: helper does not mutate the ring table', JSON.stringify(ring.resources) === JSON.stringify({ iron: 2, coal: 2, mana: 1, crystal: 1 }));
+})();
+
+(function test_T65_realGamesMidRing() {
+  let ok = true;
+  for (let i = 0; i < 6; i++) {
+    const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+    if (!t65MidOk(win.state.world.base, win.state.world.mines)) ok = false;
+  }
+  check('Task65: six real new games respect the mid-ring cap', ok);
+})();
+
+(function test_T65_discoveryStartState() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const w = win.state.world;
+  const ringIds = w.mines.filter(m => m.id.startsWith('mine_ring_')).map(m => m.id).sort();
+  check('Task65: a new world starts with every ring mine undiscovered', JSON.stringify([...w.hiddenMineIds].sort()) === JSON.stringify(ringIds) && ringIds.length === 12);
+  check('Task65: starter mines start discovered', win.isMineDiscovered(w.mines.find(m => m.id === 'mine_start_iron')) && win.isMineDiscovered(w.mines.find(m => m.id === 'mine_start_coal')));
+  const hiddenMine = w.mines.find(m => m.id === ringIds[0]);
+  const node = win.document.querySelector('#worldStage [data-world-mine="' + hiddenMine.id + '"]');
+  check('Task65: undiscovered mine is drawn as an unknown rock', node.classList.contains('is-undiscovered') && !node.hasAttribute('data-resource') && ![...node.classList].some(c => c.startsWith('res-')) && node.textContent === '?');
+  check('Task65: undiscovered mine is not in the mine list', !win.document.querySelector('#worldMines [data-secure-mine="' + hiddenMine.id + '"]'));
+  check('Task65: list notes how many are still hidden', +win.document.querySelector('#worldMines [data-hidden-mines]').getAttribute('data-hidden-mines') === 12);
+  check('Task65: undiscovered mine cannot be secured', win.secureMine(hiddenMine.id) === false);
+  node.click();
+  const lines = [...win.document.querySelectorAll('#worldInfo [data-world-info]')].map(e => e.textContent);
+  check('Task65: info hides an undiscovered mine\'s identity', JSON.stringify(lines) === JSON.stringify(['미발견 광맥', '정체 불명', '등급 ?', '가까이 가면 발견']));
+})();
+
+(function test_T65_walkingDiscovers() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const doc = win.document;
+  const w = win.state.world;
+  const target = w.mines.find(m => w.hiddenMineIds.includes(m.id) && t64Ring(w.base, m) === 2);
+  // (The exact 2.5 / 2.6 radius boundary is checked below on a fixed layout.)
+  w.player.x = target.x; w.player.y = target.y; // on top of it: certainly inside
+  const found = win.tickExploration();
+  check('Task65: walking within the radius discovers it', found.includes(target.id) && !w.hiddenMineIds.includes(target.id));
+  check('Task65: discovery is logged', doc.getElementById('log').textContent.includes('새 광맥 발견'));
+  const node = doc.querySelector('#worldStage [data-world-mine="' + target.id + '"]');
+  check('Task65: the stage now shows its resource', node.getAttribute('data-resource') === target.resource && node.classList.contains('res-' + target.resource) && !node.classList.contains('is-undiscovered'));
+  check('Task65: it now appears in the mine list', !!doc.querySelector('#worldMines [data-secure-mine="' + target.id + '"]'));
+  check('Task65: it now appears on the exploration map', !!doc.querySelector('#worldMap [data-map-mine="' + target.id + '"]'));
+  check('Task65: discovering again is a no-op', win.discoverMine(target.id) === false && win.tickExploration().length === 0);
+  // Exact radius boundary, independent of the generated layout.
+  win.addMine({ id: 't65_edge', x: -9, y: 9, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' });
+  w.hiddenMineIds.push('t65_edge');
+  w.player.x = -9; w.player.y = 6.5;  // distance 2.5 -> discovered (radius is inclusive)
+  check('Task65: distance exactly 2.5 discovers', win.tickExploration().includes('t65_edge'));
+  win.addMine({ id: 't65_far', x: 9, y: 9, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' });
+  w.hiddenMineIds.push('t65_far');
+  w.player.x = 9; w.player.y = 6.4;   // distance 2.6 -> stays hidden
+  check('Task65: distance 2.6 does not discover', win.tickExploration().length === 0 && w.hiddenMineIds.includes('t65_far'));
+})();
+
+(function test_T65_tickLoopDiscovers() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const w = win.state.world;
+  const target = w.mines.find(m => w.hiddenMineIds.includes(m.id));
+  w.player.x = target.x; w.player.y = target.y;
+  win.tickLoop();
+  check('Task65: the game tick runs discovery', !w.hiddenMineIds.includes(target.id));
+  const before = w.hiddenMineIds.length;
+  win.tickLoop();
+  check('Task65: standing still discovers nothing new', w.hiddenMineIds.length === before);
+})();
+
+(function test_T65_discoveredThenSecure() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const w = win.state.world;
+  const basic = w.mines.find(m => w.hiddenMineIds.includes(m.id) && (m.resource === 'iron' || m.resource === 'coal'));
+  check('Task65: an undiscovered basic mine cannot be secured', win.secureMine(basic.id) === false);
+  win.discoverMine(basic.id);
+  check('Task65: once discovered (open site) it can be secured', win.secureMine(basic.id) === true);
+  const rare = w.mines.find(m => w.hiddenMineIds.includes(m.id) && T64_TIER[m.resource] >= 3);
+  win.discoverMine(rare.id);
+  check('Task65: discovered but site-locked still cannot be secured (Task 64 rule kept)', win.secureMine(rare.id) === false);
+})();
+
+(function test_T65_explorationMap() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const doc = win.document;
+  const w = win.state.world;
+  const map = doc.getElementById('worldMap');
+  check('Task65: exploration map lives in the world stage', !!map && doc.getElementById('worldStage').contains(map));
+  check('Task65: map shows the base at its world position', (() => { const b = map.querySelector('[data-map-base]'); return !!b && +b.getAttribute('x') + 0.6 === w.base.x && +b.getAttribute('y') + 0.6 === w.base.y; })());
+  const mapIds = [...map.querySelectorAll('[data-map-mine]')].map(e => e.getAttribute('data-map-mine')).sort();
+  const discoveredIds = w.mines.filter(m => win.isMineDiscovered(m)).map(m => m.id).sort();
+  check('Task65: map shows exactly the discovered mines', JSON.stringify(mapIds) === JSON.stringify(discoveredIds) && mapIds.length === 2);
+  check('Task65: map never shows an undiscovered mine', w.hiddenMineIds.every(id => !map.querySelector('[data-map-mine="' + id + '"]')));
+  const dot = doc.getElementById('worldMapPlayer');
+  check('Task65: map shows the player', !!dot && +dot.getAttribute('cx') === w.player.x && +dot.getAttribute('cy') === w.player.y);
+  win.setPlayerHeld('left', true);
+  for (let i = 0; i < 5; i++) win.tickLoop();
+  win.clearPlayerHeld(); win.tickLoop();
+  check('Task65: the player dot follows movement', Math.abs(+doc.getElementById('worldMapPlayer').getAttribute('cx') - w.player.x) < 0.01 && w.player.x < 2);
+  const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+  check('Task65: map sits top-left and never blocks clicks', /\.world-map\{[^}]*left:10px;[^}]*top:10px;[^}]*pointer-events:none/.test(css));
+  check('Task65: map has a smaller mobile size', /@media \(max-width: 520px\)\{ \.world-map\{/.test(css));
+  map.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  check('Task65: clicking the map area behaves like empty stage (clears selection)', win.getWorldSelection() === null);
+})();
+
+(function test_T65_expansionMinesAreDiscovered() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  win.state.gold = 700;
+  win.expandBase();
+  win.renderAll();
+  const seeded = win.state.world.mines.filter(m => m.id.startsWith('mine_manaVein_'));
+  check('Task65: expansion seed mines appear already discovered', seeded.length === 2 && seeded.every(m => win.isMineDiscovered(m)));
+  check('Task65: and are on the map', seeded.every(m => !!win.document.querySelector('#worldMap [data-map-mine="' + m.id + '"]')));
+})();
+
+(function test_T65_saveLoadDiscovery() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage, { fullWorld: true }).window;
+  const w = win.state.world;
+  const first = w.mines.find(m => w.hiddenMineIds.includes(m.id));
+  win.discoverMine(first.id);
+  const hiddenSnap = JSON.stringify(w.hiddenMineIds);
+  const mineSnap = JSON.stringify(w.mines.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]));
+  win.saveGame();
+  const win2 = newDom(storage).window;
+  check('Task65: hidden list survives save/load exactly', JSON.stringify(win2.state.world.hiddenMineIds) === hiddenSnap);
+  check('Task65: a discovered mine stays discovered after reload', win2.isMineDiscovered(win2.state.world.mines.find(m => m.id === first.id)));
+  check('Task65: mines survive save/load exactly', JSON.stringify(win2.state.world.mines.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState])) === mineSnap);
+  check('Task65: saveVersion stays 1', JSON.parse(storage.getItem('gachaFactorySave')).saveVersion === 1);
+  // Older save without the field: every mine is treated as discovered.
+  const payload = JSON.parse(storage.getItem('gachaFactorySave'));
+  delete payload.run.world.hiddenMineIds;
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const old = newDom(storage).window;
+  check('Task65: older save loads with nothing hidden', Array.isArray(old.state.world.hiddenMineIds) && old.state.world.hiddenMineIds.length === 0 && old.state.world.mines.every(m => old.isMineDiscovered(m)));
+  check('Task65: older save shows every mine in the list', old.document.querySelectorAll('#worldMines [data-secure-mine]').length === old.state.world.mines.length);
+  // Garbage in the field is cleaned.
+  payload.run.world.hiddenMineIds = [first.id, first.id, 'no_such_mine', 42, null];
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const dirty = newDom(storage).window;
+  check('Task65: hidden list keeps only unique ids of existing mines', JSON.stringify(dirty.state.world.hiddenMineIds) === JSON.stringify([first.id]));
+})();
+
+(function test_T65_prestigeAndCoreLoop() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const fresh = win.freshRunState();
+  check('Task65: a new run starts with its ring mines undiscovered', fresh.world.hiddenMineIds.length === 12 && t65MidOk(fresh.world.base, fresh.world.mines));
+  const doc = win.document;
+  ['mine_start_iron', 'mine_start_coal'].forEach(id => doc.querySelector('[data-secure-mine="' + id + '"]').click());
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  doc.querySelector('[data-mine-mine="mine_start_coal"]').click();
+  doc.querySelector('[data-craft="steel"]').click();
+  doc.querySelector('[data-sell="steel"]').click();
+  check('Task65: secure / mine / craft / sell loop still works', win.state.products.steel === 0 && win.state.gold > 0 && win.state.resources.iron === 0);
+  win.state.gold = 700;
+  check('Task65: expansion still works', win.expandBase() === true);
 })();
 
 // =============================================================================

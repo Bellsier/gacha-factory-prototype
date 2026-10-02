@@ -117,6 +117,10 @@ function newDom(storage, opts) {
   });
   if (!options.fullWorld && !hadSave) {
     win.state.world.mines = win.state.world.mines.filter(m => !(m && typeof m.id === 'string' && m.id.startsWith('mine_ring_')));
+    // Task 65: drop the stripped mines' undiscovered entries too.
+    const keep = new Set(win.state.world.mines.map(m => m.id));
+    win.state.world.hiddenMineIds = (win.state.world.hiddenMineIds || []).filter(id => keep.has(id));
+    win.buildMines();
     win.renderAll();
   }
   allDoms.push(dom);

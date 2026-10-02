@@ -359,12 +359,57 @@ function tickAutoSell(){
   });
 }
 
+// ---------------------------------------------------------------------------
+// Task 65: mine discovery. A mine listed in state.world.hiddenMineIds is
+// undiscovered: it shows as an unknown rock, is left off the mine list and the
+// exploration map, and can't be secured. Walking within DISCOVERY_RADIUS of it
+// reveals it. Mines without an entry (starters, expansion seeds, any older
+// save) are discovered.
+// ---------------------------------------------------------------------------
+function isMineDiscovered(mine){
+  if(!mine) return false;
+  const hidden = state.world.hiddenMineIds;
+  return !Array.isArray(hidden) || !hidden.includes(mine.id);
+}
+
+function discoverMine(mineId){
+  const hidden = state.world.hiddenMineIds;
+  if(!Array.isArray(hidden) || !hidden.includes(mineId)) return false;
+  const mine = state.world.mines.find(m => m && m.id === mineId);
+  state.world.hiddenMineIds = hidden.filter(id => id !== mineId);
+  if(mine){
+    const res = RESOURCES.find(r => r.key === mine.resource);
+    log('새 광맥 발견: ' + (res ? res.name : mine.resource) + ' (' + mine.x + ', ' + mine.y + ')');
+  }
+  return true;
+}
+
+// Returns the ids discovered this tick. Re-renders the world views only when
+// something was found, so the normal tick stays cheap.
+function tickExploration(){
+  const hidden = state.world.hiddenMineIds;
+  if(!Array.isArray(hidden) || hidden.length === 0) return [];
+  const p = state.world.player;
+  const r = BALANCE.world.DISCOVERY_RADIUS;
+  const found = state.world.mines
+    .filter(m => m && hidden.includes(m.id) && Math.hypot(m.x - p.x, m.y - p.y) <= r)
+    .map(m => m.id);
+  found.forEach(discoverMine);
+  if(found.length && typeof renderWorldObjects === 'function'){
+    buildMines();
+    renderWorldObjects();
+    updateNumbers();
+  }
+  return found;
+}
+
 function tickLoop(){
   tickMining();
   tickCrafting();
   tickWorkshops();
   tickAutoSell();
   tickPlayer();
+  tickExploration(); // Task 65
   updateNumbers();
   updatePlayerSprite();
 }

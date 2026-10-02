@@ -316,6 +316,7 @@ function secureMine(mineId){
   if(typeof mineId !== 'string' || mineId.length === 0) return false;
   const mine = state.world.mines.find(m => m && m.id === mineId);
   if(!mine || mine.developmentState !== 'unsecured') return false;
+  if(!isMineDiscovered(mine)) return false; // Task 65: find it before securing it
   if(!isMineSiteUnlocked(mine)) return false;
   mine.developmentState = 'secured';
   return true;

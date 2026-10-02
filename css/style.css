@@ -186,6 +186,9 @@
     transform:translate(-50%, -70%);
   }
   .world-mine-node.is-unsecured{opacity:0.6; outline:1px dashed rgba(231,236,239,0.35); outline-offset:2px;}
+  /* Task 65: undiscovered mine — an unknown grey rock until the player walks near it. */
+  .world-mine-node.is-undiscovered{--ore:#5d666d; opacity:0.45; outline-style:dotted;}
+  .world-mine-node.is-undiscovered .world-mine-label{color:var(--dim); font-weight:700;}
   .world-mine-node.is-secured{opacity:1; box-shadow:0 3px 0 rgba(0,0,0,0.4), 0 5px 0 -1px var(--teal);}
   .world-mine-label{
     position:absolute; left:100%; top:50%; margin-left:6px; margin-top:-0.5em;
@@ -239,6 +242,28 @@
     pointer-events:none;
   }
   .world-info[hidden]{display:none;}
+  /* Task 65: exploration map (top-left). Discovered mines only; click-through. */
+  .world-map{
+    position:absolute; left:10px; top:10px; z-index:5000;
+    width:92px; height:92px; padding:3px;
+    background:rgba(20,24,28,0.82); border:1px solid var(--line); border-radius:6px;
+    pointer-events:none;
+  }
+  .world-map-svg{display:block; width:100%; height:100%;}
+  .world-map-frame{fill:#26332f; stroke:rgba(63,201,176,0.35); stroke-width:0.25;}
+  .world-map-base{fill:var(--teal);}
+  .world-map-mine{fill:#8b98a1; stroke:rgba(0,0,0,0.5); stroke-width:0.12;}
+  .world-map-mine.is-secured{stroke:var(--teal); stroke-width:0.25;}
+  .world-map-mine.res-iron{fill:#a0624a;}
+  .world-map-mine.res-coal{fill:#7a8087;}
+  .world-map-mine.res-mana{fill:#8a5cd6;}
+  .world-map-mine.res-crystal{fill:#5fd0e6;}
+  .world-map-mine.res-rareMetal{fill:#c3ccd4;}
+  .world-map-mine.res-relic{fill:#c9a24a;}
+  .world-map-mine.res-cosmicShard{fill:#e06fa8;}
+  .world-map-mine.res-plasma{fill:#ff5ad2;}
+  .world-map-player{fill:var(--amber); stroke:#fff; stroke-width:0.2;}
+  @media (max-width: 520px){ .world-map{width:68px; height:68px; left:6px; top:6px;} }
   .world-info .world-info-title{font-family:'Space Grotesk', sans-serif; font-weight:700; color:var(--legend); font-size:0.75rem;}
   .world-info .world-info-level, .world-info .world-info-position,
   .world-info .world-info-resource, .world-info .world-info-grade{color:var(--dim);}

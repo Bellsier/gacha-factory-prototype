@@ -71,8 +71,11 @@ function buildMines(){
   const wrap = document.getElementById('worldMines');
   if(!wrap) return;
   wrap.innerHTML = '';
-  if(state.world.mines.length === 0){ wrap.innerHTML = '<div class="rate">아직 발견된 광맥이 없습니다.</div>'; return; }
-  state.world.mines.forEach(mine=>{
+  // Task 65: the list shows discovered mines only, plus how many are still hidden.
+  const discovered = state.world.mines.filter(isMineDiscovered);
+  const hiddenCount = state.world.mines.length - discovered.length;
+  if(discovered.length === 0 && hiddenCount === 0){ wrap.innerHTML = '<div class="rate">아직 발견된 광맥이 없습니다.</div>'; return; }
+  discovered.forEach(mine=>{
     const resource = RESOURCES.find(r=>r.key===mine.resource);
     const secured = mine.developmentState === 'secured';
     // Task 64: a mine whose site is still locked can't be secured yet.
@@ -87,6 +90,13 @@ function buildMines(){
       '<button data-mine-mine="' + mine.id + '" ' + (mine.developmentState !== 'secured' ? 'disabled' : '') + '>채굴하기 (+' + mine.miningPower + ')</button>';
     wrap.appendChild(card);
   });
+  if(hiddenCount > 0){
+    const note = document.createElement('div');
+    note.className = 'rate world-mine-hidden-note';
+    note.setAttribute('data-hidden-mines', String(hiddenCount));
+    note.textContent = '미발견 광맥 ' + hiddenCount + '개 — 탐색 영역을 걸어 다니며 가까이 가면 발견됩니다.';
+    wrap.appendChild(note);
+  }
   wrap.querySelectorAll('[data-secure-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!secureMine(btn.dataset.secureMine)) return; buildMines(); renderWorldObjects(); updateNumbers(); }; });
   wrap.querySelectorAll('[data-mine-mine]').forEach(btn=>{ btn.onclick=()=>{ if(!mineMine(btn.dataset.mineMine)) return; updateNumbers(); }; });
 }
@@ -659,20 +669,66 @@ function renderWorldObjects(){
     const name = resource ? resource.name : mine.resource;
     const secured = mine.developmentState === 'secured';
     const node = document.createElement('div');
-    node.className = 'world-mine-node res-' + mine.resource + (secured ? ' is-secured' : ' is-unsecured');
     node.setAttribute('data-world-mine', mine.id);
-    node.setAttribute('data-resource', mine.resource);
     node.setAttribute('data-development-state', mine.developmentState);
-    node.title = name + ' 광맥 · ' + (secured ? '확보 완료' : '미확보') + ' (' + mine.x + ', ' + mine.y + ')';
     const label = document.createElement('span');
     label.className = 'world-mine-label';
-    label.textContent = name;
+    if(isMineDiscovered(mine)){
+      node.className = 'world-mine-node res-' + mine.resource + (secured ? ' is-secured' : ' is-unsecured');
+      node.setAttribute('data-resource', mine.resource);
+      node.title = name + ' 광맥 · ' + (secured ? '확보 완료' : '미확보') + ' (' + mine.x + ', ' + mine.y + ')';
+      label.textContent = name;
+    } else {
+      // Task 65: an undiscovered mine is an unknown rock — its resource stays hidden.
+      node.className = 'world-mine-node is-undiscovered is-unsecured';
+      node.setAttribute('data-discovered', 'false');
+      node.title = '미발견 광맥 (' + mine.x + ', ' + mine.y + ')';
+      label.textContent = '?';
+    }
     node.appendChild(label);
     placeOnStage(node, mine.x, mine.y);
     layer.appendChild(node);
   });
   renderWorldWorkshopMarkers();
+  renderExplorationMap();
   applyWorldSelection();
+}
+
+// ---------------------------------------------------------------------------
+// Task 65: exploration map — a small top-down map in the stage's top-left
+// corner. Shows the base, the player and DISCOVERED mines only (never hidden
+// ones). World units are used directly as SVG units (north up), so it reads
+// the same data as the stage. Rebuilt with renderWorldObjects(); only the
+// player dot moves per tick (updateExplorationMapPlayer).
+// ---------------------------------------------------------------------------
+function renderExplorationMap(){
+  const box = document.getElementById('worldMap');
+  if(!box || !box.ownerDocument.createElementNS) return;
+  const b = BALANCE.world;
+  const pad = 0.8;
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'world-map-svg');
+  svg.setAttribute('viewBox', [b.BOUNDS_MIN_X - pad, b.BOUNDS_MIN_Y - pad, (b.BOUNDS_MAX_X - b.BOUNDS_MIN_X) + pad * 2, (b.BOUNDS_MAX_Y - b.BOUNDS_MIN_Y) + pad * 2].join(' '));
+  svg.setAttribute('aria-hidden', 'true');
+  const el = (tag, attrs) => { const n = document.createElementNS(SVG_NS, tag); Object.keys(attrs).forEach(k => n.setAttribute(k, attrs[k])); svg.appendChild(n); return n; };
+  el('rect', { class: 'world-map-frame', x: b.BOUNDS_MIN_X, y: b.BOUNDS_MIN_Y, width: b.BOUNDS_MAX_X - b.BOUNDS_MIN_X, height: b.BOUNDS_MAX_Y - b.BOUNDS_MIN_Y });
+  const base = state.world.base;
+  el('rect', { class: 'world-map-base', 'data-map-base': '', x: base.x - 0.6, y: base.y - 0.6, width: 1.2, height: 1.2 });
+  state.world.mines.forEach(mine => {
+    if(!mine || !isMineDiscovered(mine)) return;
+    el('circle', { class: 'world-map-mine res-' + mine.resource + (mine.developmentState === 'secured' ? ' is-secured' : ''), 'data-map-mine': mine.id, cx: mine.x, cy: mine.y, r: 0.5 });
+  });
+  const p = state.world.player;
+  el('circle', { class: 'world-map-player', id: 'worldMapPlayer', cx: p.x.toFixed(2), cy: p.y.toFixed(2), r: 0.65 });
+  box.innerHTML = '';
+  box.appendChild(svg);
+}
+
+function updateExplorationMapPlayer(){
+  const dot = document.getElementById('worldMapPlayer');
+  if(!dot || !state.world.player) return;
+  dot.setAttribute('cx', state.world.player.x.toFixed(2));
+  dot.setAttribute('cy', state.world.player.y.toFixed(2));
 }
 
 // Task 60: draws one marker per existing state.world.workshops entry.
@@ -776,6 +832,15 @@ function worldInfoLines(sel){
   if(sel.type === 'mine'){
     const mine = state.world.mines.find(m => m && m.id === sel.id);
     if(!mine) return null;
+    if(!isMineDiscovered(mine)){
+      // Task 65: identity stays hidden until the player walks up to it.
+      return [
+        { key: 'title', text: '미발견 광맥' },
+        { key: 'resource', text: '정체 불명' },
+        { key: 'grade', text: '등급 ?' },
+        { key: 'state', text: '가까이 가면 발견' },
+      ];
+    }
     const resource = RESOURCES.find(r => r.key === mine.resource);
     const name = resource ? resource.name : mine.resource;
     return [
@@ -842,5 +907,6 @@ function updatePlayerSprite(){
   el.className = 'player-char pose-' + p.pose + ' facing-' + p.facing;
   el.setAttribute('data-player-pose', p.pose);
   el.setAttribute('data-player-facing', p.facing);
+  updateExplorationMapPlayer(); // Task 65
 }
 

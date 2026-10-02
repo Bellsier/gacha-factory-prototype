@@ -15,7 +15,8 @@
 // Task 64 — distance rings (BALANCE.worldGen.RINGS). Distance is measured from
 // the base. Each ring [minDist, maxDist) has a mine count and a weighted
 // resource pool: near rings hold iron/coal, far rings fewer mines but rarer
-// resources. The starters count toward the ring they fall in.
+// resources. The starters count toward the ring they fall in. A ring may cap
+// resource groups with `limits` (Task 65: mid ring mana+crystal <= 1).
 //
 // Soft rule: mines prefer to be at least MIN_SPACING apart (and from the
 // expansion seed cells) for readability; if a ring has no such cell left, any
@@ -94,6 +95,21 @@ function worldGenExpansionSeedCells(base){
   return cells;
 }
 
+// Task 65: a ring may cap groups of resources, e.g. { resources: ['mana',
+// 'crystal'], max: 1 }. Returns the ring's weights with every resource whose
+// group is already at its cap removed. `placed` = resource keys already in
+// this ring.
+function worldGenRingWeights(ring, placed){
+  const weights = { ...(ring.resources || {}) };
+  (Array.isArray(ring.limits) ? ring.limits : []).forEach(limit => {
+    const group = Array.isArray(limit.resources) ? limit.resources : [];
+    const max = Number.isInteger(limit.max) && limit.max >= 0 ? limit.max : Infinity;
+    const used = placed.filter(r => group.includes(r)).length;
+    if(used >= max) group.forEach(r => { delete weights[r]; });
+  });
+  return weights;
+}
+
 // Index of the ring a distance falls in, or -1.
 function worldGenRingIndex(distance, rings){
   return rings.findIndex(r => distance >= r.minDist && distance < r.maxDist);
@@ -141,13 +157,14 @@ function generateInitialWorldMines(base, options){
   // Task 64: distance rings. Starters already placed count toward their ring.
   rings.forEach((ring, ringIndex) => {
     const inRing = cells.filter(c => worldGenRingIndex(distOf(c), rings) === ringIndex);
-    const already = mines.filter(m => worldGenRingIndex(distOf(m), rings) === ringIndex).length;
-    const want = Math.max(0, (Number.isInteger(ring.count) ? ring.count : 0) - already);
+    const placed = mines.filter(m => worldGenRingIndex(distOf(m), rings) === ringIndex).map(m => m.resource);
+    const want = Math.max(0, (Number.isInteger(ring.count) ? ring.count : 0) - placed.length);
     for(let i = 0; i < want; i++){
       const cell = pickCell(inRing, g.MIN_SPACING);
       if(!cell) break;
-      const resource = worldGenPickWeighted(ring.resources, random);
+      const resource = worldGenPickWeighted(worldGenRingWeights(ring, placed), random);
       if(!resource) break;
+      placed.push(resource);
       take(cell);
       mines.push(makeGeneratedMine('mine_ring_' + ring.key + '_' + (i + 1), cell, resource));
     }
