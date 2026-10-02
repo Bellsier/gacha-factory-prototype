@@ -14,6 +14,19 @@
 //     player can walk into the recess up to the gate; the gate is locked, so
 //     nothing behind it is reachable. Unlocking is a later Task.
 //
+// Task 67: the world is split into regions (terrainRegionAt):
+//   open     — east of the face: the current exploration area
+//   tunnel   — the recess plus the passage through the range on the tunnel
+//              rows (only the part in front of the gate is walkable for now)
+//   mountain — the range itself (face .. face - RANGE_WIDTH)
+//   beyond   — the land west of the range ("산 너머"), inside the existing
+//              -10..10 bounds. Reached only through the tunnel; closed while
+//              the tunnel is locked.
+// "Beyond" is divided into environment zones by distance from the tunnel's
+// far exit (terrainBeyondZoneAt): deep forest -> rocky ground -> half-dug
+// mine -> far rare-vein area. Zones are data only: nothing is placed in them
+// yet and walkability is unchanged.
+//
 // Loaded after balance.js and before worldgen.js / state.js / player.js.
 // ---------------------------------------------------------------------------
 const WORLD_TERRAIN = {
@@ -34,6 +47,20 @@ const WORLD_TERRAIN = {
     DEPTH: 1,           // how far the recess cuts into the face
     LOCKED: true,       // gate closed — passing through is not possible yet
     KEEP_CLEAR: 2,      // new-game mines stay this far from the tunnel mouth
+  },
+  // Task 67: the land beyond the range. Environment zones, nearest the tunnel
+  // exit first, by distance from the exit [previous maxDist, maxDist).
+  // `features` name what the zone will be dressed with later (no objects are
+  // created yet). No NPCs, combat, dungeons or quests — scenery for
+  // exploring and mining only.
+  BEYOND: {
+    ZONES: [
+      { key: 'deepForest',    name: '깊은 산림',            maxDist: 3.5,      features: ['bigTree', 'grass', 'rock', 'clearing'] },
+      { key: 'rockyGround',   name: '암석 지대',            maxDist: 6.5,      features: ['rock', 'sparseTree', 'exposedVein'] },
+      // key differs from SITES' 'abandonedMine' (the starting site) on purpose
+      { key: 'halfDugMine',   name: '개발되다 만 광산',     maxDist: 9,        features: ['oldShaftEntrance', 'timberSupport', 'mineCart', 'diggingMarks', 'undevelopedVein'] },
+      { key: 'rareDeep',      name: '먼 희귀 광맥 지역',    maxDist: Infinity, features: ['rareVein'] },
+    ],
   },
 };
 
@@ -60,6 +87,45 @@ function terrainTunnel(){
   const t = WORLD_TERRAIN.TUNNEL;
   const faceX = terrainRockFaceX(t.Y);
   return { mouthX: faceX, gateX: faceX - t.DEPTH, y: t.Y, halfWidth: t.HALF_WIDTH, locked: t.LOCKED };
+}
+
+// Task 67: west (back) edge of the range at row y — where "beyond" starts.
+function terrainRangeBackX(y){
+  return terrainRockFaceX(y) - WORLD_TERRAIN.RANGE_WIDTH;
+}
+
+// Task 67: the tunnel's far exit, on the back edge of the range. The single
+// point where "beyond" will connect to the open area once the tunnel opens.
+function terrainTunnelExit(){
+  const t = WORLD_TERRAIN.TUNNEL;
+  return { x: terrainRangeBackX(t.Y), y: t.Y };
+}
+
+// Task 67: which part of the world (x, y) belongs to:
+//   'outside' | 'open' | 'tunnel' | 'mountain' | 'beyond'.
+// Describes the map only — walkability is still isWorldPointWalkable().
+function terrainRegionAt(x, y){
+  if(!Number.isFinite(x) || !Number.isFinite(y) || !terrainInBounds(x, y)) return 'outside';
+  const face = terrainRockFaceX(y);
+  if(x >= face) return 'open';
+  const back = terrainRangeBackX(y);
+  if(x >= back) return terrainInTunnelRows(y) ? 'tunnel' : 'mountain';
+  return 'beyond';
+}
+
+// Task 67: environment zone of a point beyond the range (null elsewhere),
+// by distance from the tunnel exit.
+function terrainBeyondZoneAt(x, y){
+  if(terrainRegionAt(x, y) !== 'beyond') return null;
+  const exit = terrainTunnelExit();
+  const d = Math.hypot(x - exit.x, y - exit.y);
+  const zone = WORLD_TERRAIN.BEYOND.ZONES.find(z => d < z.maxDist);
+  return zone ? zone.key : null;
+}
+
+// Task 67: "beyond" is open only once the tunnel is (a later Task).
+function isBeyondAccessible(){
+  return !WORLD_TERRAIN.TUNNEL.LOCKED;
 }
 
 function terrainInBounds(x, y){

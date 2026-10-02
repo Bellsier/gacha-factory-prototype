@@ -1840,6 +1840,135 @@ const T66_STEP = 3 / 10; // PLAYER_SPEED / TICKS_PER_SECOND
 })();
 
 // =============================================================================
+// TASK 67 — Structure of the land beyond the mountain (data only; tunnel still
+// locked, walkability / generation unchanged).
+// Reference: tunnel exit at the range's back edge (-6.1, 1); zones by distance
+// from it: deepForest <3.5, rockyGround <6.5, halfDugMine <9, rareDeep beyond.
+// =============================================================================
+const T67_ZONES = ['deepForest', 'rockyGround', 'halfDugMine', 'rareDeep'];
+function t67Sweep(win, fn) {
+  for (let y = -10; y <= 10; y += 0.25) for (let x = -10; x <= 10; x += 0.25) fn(+x.toFixed(2), +y.toFixed(2));
+}
+
+(function test_T67_regions() {
+  const win = newDom(makeMemoryStorage()).window;
+  const kinds = new Set(['open', 'tunnel', 'mountain', 'beyond']);
+  let allClassified = true, walkOk = true, sameAsT66 = true, regionShapeOk = true;
+  const seen = new Set();
+  t67Sweep(win, (x, y) => {
+    const r = win.terrainRegionAt(x, y);
+    seen.add(r);
+    if (!kinds.has(r)) allClassified = false;
+    const walk = win.isWorldPointWalkable(x, y);
+    if (walk && !(r === 'open' || r === 'tunnel')) walkOk = false;
+    if ((r === 'mountain' || r === 'beyond') && walk) walkOk = false;
+    // Walkability is exactly the Task 66 rule (unchanged by Task 67).
+    const inTunnel = Math.abs(y - 1) <= 0.8;
+    const stop = inTunnel ? T66_FACE(y) - 1 : T66_FACE(y);
+    if (walk !== (x >= stop + 0.3)) sameAsT66 = false;
+    // Region boundaries follow the face and the 2.6-wide range.
+    const expect = x >= T66_FACE(y) ? 'open' : x >= T66_FACE(y) - 2.6 ? (inTunnel ? 'tunnel' : 'mountain') : 'beyond';
+    if (r !== expect) regionShapeOk = false;
+  });
+  check('Task67: every in-bounds point is open / tunnel / mountain / beyond', allClassified && ['open', 'tunnel', 'mountain', 'beyond'].every(k => seen.has(k)));
+  check('Task67: region borders follow the rock face and the range width', regionShapeOk);
+  check('Task67: only open ground and the front of the tunnel are walkable', walkOk);
+  check('Task67: walkability is exactly the Task 66 rule (unchanged)', sameAsT66);
+  check('Task67: outside the world bounds is "outside"', win.terrainRegionAt(10.5, 0) === 'outside' && win.terrainRegionAt(0, -11) === 'outside' && win.terrainRegionAt(Number.NaN, 0) === 'outside');
+})();
+
+(function test_T67_tunnelConnectsToBeyond() {
+  const win = newDom(makeMemoryStorage()).window;
+  const exit = win.terrainTunnelExit();
+  const t = win.terrainTunnel();
+  check('Task67: tunnel exit is on the back edge of the range at the tunnel row', exit.x === -6.1 && exit.y === 1 && exit.x === win.terrainRangeBackX(1));
+  check('Task67: the passage runs from the gate to the exit through the range', win.terrainRegionAt(t.gateX - 0.1, 1) === 'tunnel' && win.terrainRegionAt(exit.x + 0.05, 1) === 'tunnel');
+  check('Task67: just past the exit is beyond, in the deep forest', win.terrainRegionAt(exit.x - 0.1, 1) === 'beyond' && win.terrainBeyondZoneAt(exit.x - 0.1, 1) === 'deepForest');
+  check('Task67: the passage behind the gate is not walkable while locked', !win.isWorldPointWalkable(t.gateX - 0.1, 1) && !win.isWorldPointWalkable(exit.x + 0.05, 1));
+  check('Task67: tunnel and beyond are both still locked', t.locked === true && win.isBeyondAccessible() === false);
+  // Beyond is only reachable through the tunnel: every beyond point touches
+  // open ground only via the range (no beyond point is next to open ground).
+  let sealed = true;
+  t67Sweep(win, (x, y) => {
+    if (win.terrainRegionAt(x, y) !== 'beyond') return;
+    [[0.25, 0], [-0.25, 0], [0, 0.25], [0, -0.25]].forEach(([dx, dy]) => { if (win.terrainRegionAt(x + dx, y + dy) === 'open') sealed = false; });
+  });
+  check('Task67: beyond never borders open ground directly (the range is between them)', sealed);
+})();
+
+(function test_T67_beyondZones() {
+  const win = newDom(makeMemoryStorage()).window;
+  const exit = win.terrainTunnelExit();
+  const zoneAt = {}, minBase = {}, okOrder = { v: true };
+  let everyBeyondZoned = true, nonBeyondNull = true;
+  t67Sweep(win, (x, y) => {
+    const z = win.terrainBeyondZoneAt(x, y);
+    const r = win.terrainRegionAt(x, y);
+    if (r === 'beyond') {
+      if (!T67_ZONES.includes(z)) everyBeyondZoned = false;
+      zoneAt[z] = (zoneAt[z] || 0) + 1;
+      const d = Math.hypot(x - 2, y);
+      minBase[z] = Math.min(minBase[z] === undefined ? Infinity : minBase[z], d);
+      const de = Math.hypot(x - exit.x, y - exit.y);
+      const expected = de < 3.5 ? 'deepForest' : de < 6.5 ? 'rockyGround' : de < 9 ? 'halfDugMine' : 'rareDeep';
+      if (z !== expected) okOrder.v = false;
+    } else if (z !== null) nonBeyondNull = false;
+  });
+  check('Task67: every beyond point has an environment zone', everyBeyondZoned);
+  check('Task67: zones run forest -> rocky -> abandoned mine -> rare, by distance from the tunnel exit', okOrder.v);
+  check('Task67: all four zones exist inside the current world bounds', T67_ZONES.every(z => zoneAt[z] > 0));
+  check('Task67: non-beyond points have no zone', nonBeyondNull);
+  check('Task67: zones walking away from the exit never go back to a nearer zone', (() => {
+    let last = -1;
+    for (let y = 1; y >= -10; y -= 0.25) { const z = win.terrainBeyondZoneAt(-8, y); if (z === null) continue; const i = T67_ZONES.indexOf(z); if (i < last) return false; last = i; }
+    return last === T67_ZONES.length - 1;
+  })());
+  // Distance rarity: all of beyond is far from the base (far ring starts at 7,
+  // outer at 10); the rare-vein zone lies entirely in the outer ring.
+  check('Task67: all of beyond is at far-ring distance or more from the base', Object.values(minBase).every(d => d >= 7));
+  check('Task67: abandoned mine and rare zones lie in the outer ring (>= 10 from the base)', minBase.halfDugMine >= 10 && minBase.rareDeep >= 10);
+})();
+
+(function test_T67_nothingPlacedYet() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const w = win.state.world;
+  check('Task67: new games still place no mine beyond or on the range', w.mines.every(m => win.terrainRegionAt(m.x, m.y) === 'open'));
+  check('Task67: generation rules unchanged (14 mines, starters, mid cap)', w.mines.length === 14 && t65MidOk(w.base, w.mines) && ['mine_start_iron', 'mine_start_coal'].every(id => w.mines.some(m => m.id === id)));
+  const stage = win.document.getElementById('worldStage');
+  check('Task67: no environment objects are created yet', !stage.querySelector('[data-zone], [data-beyond-feature]') && stage.querySelectorAll('[data-terrain="peak"]').length === win.terrainPeaks().length);
+})();
+
+(function test_T67_oldSaveBeyondDataKept() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage, { fullWorld: true }).window;
+  win.saveGame();
+  const payload = JSON.parse(storage.getItem('gachaFactorySave'));
+  const beyondMines = [
+    { id: 'mine_old_forest', x: -8, y: 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+    { id: 'mine_old_rare', x: -9, y: -9, resource: 'plasma', grade: 4, miningPower: 1, developmentState: 'unsecured' },
+    { id: 'mine_old_rock', x: -7, y: 6, resource: 'mana', grade: 2, miningPower: 3, developmentState: 'secured' },
+  ];
+  payload.run.world.mines = payload.run.world.mines.concat(beyondMines);
+  payload.run.world.hiddenMineIds = payload.run.world.hiddenMineIds.concat(['mine_old_forest', 'mine_old_rare']);
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const fields = (ms) => JSON.stringify(ms.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]));
+  const old = newDom(storage).window;
+  const kept = old.state.world.mines.filter(m => m.id.startsWith('mine_old_'));
+  check('Task67: older beyond-mountain mines keep coords / resource / grade / state', fields(kept) === fields(beyondMines));
+  check('Task67: older hidden ids for beyond mines are kept', ['mine_old_forest', 'mine_old_rare'].every(id => old.state.world.hiddenMineIds.includes(id)));
+  check('Task67: those mines sit in the beyond zones', old.terrainBeyondZoneAt(-8, 2) === 'deepForest' && old.terrainBeyondZoneAt(-9, -9) === 'rareDeep');
+  // Walking the whole face while the tunnel is locked can't reach them.
+  const p = old.state.world.player;
+  for (let y = -10; y <= 10; y += 0.5) { p.x = old.terrainFaceX(y) + 0.3; p.y = y; old.tickExploration(); }
+  check('Task67: they stay undiscovered while the tunnel is locked', ['mine_old_forest', 'mine_old_rare'].every(id => old.state.world.hiddenMineIds.includes(id)));
+  old.saveGame();
+  const again = newDom(storage).window;
+  check('Task67: a save/load round trip keeps them unchanged', fields(again.state.world.mines.filter(m => m.id.startsWith('mine_old_'))) === fields(beyondMines) && ['mine_old_forest', 'mine_old_rare'].every(id => again.state.world.hiddenMineIds.includes(id)));
+  const raw = storage.getItem('gachaFactorySave');
+  check('Task67: zones / regions are not written to the save; saveVersion 1', !/deepForest|rockyGround|halfDugMine|rareDeep|beyond/i.test(raw) && JSON.parse(raw).saveVersion === 1);
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 

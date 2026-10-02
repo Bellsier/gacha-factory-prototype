@@ -652,7 +652,7 @@ function renderWorldGround(){
   const faceLine = terrainFaceOutline(top, bottom);
   const poly = (cls, pts) => { const el = document.createElementNS(SVG_NS, 'polygon'); el.setAttribute('class', cls); el.setAttribute('points', pts.map(p => pt(p.x, p.y)).join(' ')); svg.appendChild(el); return el; };
   poly('world-range-rock', [{ x: west, y: top }, ...faceLine, { x: west, y: bottom }]);
-  const backLine = faceLine.map(p => ({ x: Math.max(west, terrainRockFaceX(p.y) - WORLD_TERRAIN.RANGE_WIDTH), y: p.y }));
+  const backLine = faceLine.map(p => ({ x: Math.max(west, terrainRangeBackX(p.y)), y: p.y }));
   poly('world-beyond', [{ x: west, y: top }, ...backLine, { x: west, y: bottom }]).setAttribute('data-terrain', 'beyond');
   ground.innerHTML = '';
   ground.appendChild(svg);
