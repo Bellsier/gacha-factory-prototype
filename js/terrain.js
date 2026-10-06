@@ -10,9 +10,14 @@
 //     new-game base at (2,0)).
 //   - Everything west of the face (the range itself and the land beyond it)
 //     is not walkable for now: "산 너머" is reserved for later exploration.
-//   - The tunnel is a recess cut into the east face around y = TUNNEL.Y. The
-//     player can walk into the recess up to the gate; the gate is locked, so
-//     nothing behind it is reachable. Unlocking is a later Task.
+//   - The tunnel is a recess cut into the east face around y = TUNNEL.Y. While
+//     the tunnel is closed the player can walk into the recess up to the gate;
+//     nothing behind it is reachable.
+//   - Task 68: once the tunnel is open (state.world.tunnelUnlocked) the gate is
+//     gone: the tunnel rows become a passage through the range to the land
+//     beyond, and all of "beyond" can be walked. The range itself stays solid.
+//     How the tunnel gets opened is a later Task (research); unlockTunnel() in
+//     factory.js is the single state change.
 //
 // Task 67: the world is split into regions (terrainRegionAt):
 //   open     — east of the face: the current exploration area
@@ -45,7 +50,6 @@ const WORLD_TERRAIN = {
     Y: 1,               // centre of the tunnel mouth
     HALF_WIDTH: 0.8,    // recess spans Y ± HALF_WIDTH
     DEPTH: 1,           // how far the recess cuts into the face
-    LOCKED: true,       // gate closed — passing through is not possible yet
     KEEP_CLEAR: 2,      // new-game mines stay this far from the tunnel mouth
   },
   // Task 67: the land beyond the range. Environment zones, nearest the tunnel
@@ -86,7 +90,7 @@ function terrainFaceX(y){
 function terrainTunnel(){
   const t = WORLD_TERRAIN.TUNNEL;
   const faceX = terrainRockFaceX(t.Y);
-  return { mouthX: faceX, gateX: faceX - t.DEPTH, y: t.Y, halfWidth: t.HALF_WIDTH, locked: t.LOCKED };
+  return { mouthX: faceX, gateX: faceX - t.DEPTH, y: t.Y, halfWidth: t.HALF_WIDTH, locked: !terrainTunnelOpen() };
 }
 
 // Task 67: west (back) edge of the range at row y — where "beyond" starts.
@@ -123,9 +127,21 @@ function terrainBeyondZoneAt(x, y){
   return zone ? zone.key : null;
 }
 
-// Task 67: "beyond" is open only once the tunnel is (a later Task).
+// Task 68: has the tunnel been opened in this game? The terrain itself is
+// fixed and never saved, but whether the player has opened the tunnel is
+// progress, so it lives in state.world.tunnelUnlocked (saved, additive field;
+// missing = closed). Safe to call before `state` exists (script load order).
+function terrainTunnelOpen(){
+  try{
+    return !!(state && state.world && state.world.tunnelUnlocked === true);
+  }catch(e){
+    return false;
+  }
+}
+
+// Task 67/68: "beyond" is reachable only once the tunnel is open.
 function isBeyondAccessible(){
-  return !WORLD_TERRAIN.TUNNEL.LOCKED;
+  return terrainTunnelOpen();
 }
 
 function terrainInBounds(x, y){
@@ -133,12 +149,23 @@ function terrainInBounds(x, y){
   return x >= b.BOUNDS_MIN_X && x <= b.BOUNDS_MAX_X && y >= b.BOUNDS_MIN_Y && y <= b.BOUNDS_MAX_Y;
 }
 
-// Can the player stand at (x, y)? Inside the world bounds and east of the
-// face (with the player margin). West of the face = mountain / beyond / gate.
-function isWorldPointWalkable(x, y){
+// Can the player stand at (x, y)? Inside the world bounds and either east of
+// the face (with the player margin) or, once the tunnel is open, in the tunnel
+// passage or on the land beyond the range. The mountain itself is never
+// walkable. `tunnelOpen` may be passed explicitly (save loading checks a
+// player position against the save's own tunnel state before `state` is
+// replaced); when omitted the current game's state is used.
+function isWorldPointWalkable(x, y, tunnelOpen){
   if(!Number.isFinite(x) || !Number.isFinite(y)) return false;
   if(!terrainInBounds(x, y)) return false;
-  return x >= terrainFaceX(y) + WORLD_TERRAIN.PLAYER_MARGIN;
+  if(x >= terrainFaceX(y) + WORLD_TERRAIN.PLAYER_MARGIN) return true;
+  const open = tunnelOpen === undefined ? terrainTunnelOpen() : tunnelOpen === true;
+  if(!open) return false;
+  // Open tunnel: the passage rows are walkable all the way through the range
+  // and out onto the land beyond; on every other row only the land west of
+  // the range's back edge (with the margin) is.
+  if(terrainInTunnelRows(y)) return true;
+  return x <= terrainRangeBackX(y) - WORLD_TERRAIN.PLAYER_MARGIN;
 }
 
 // May a new-game mine be generated on this cell? Clear of the rock (by
@@ -166,9 +193,11 @@ function terrainAdvance(from, to, ok){
 
 // Decorative peaks along the range (fixed, deterministic). Two rows: a front
 // row on the face and a taller back row behind it. The front row leaves the
-// tunnel mouth open.
-function terrainPeaks(){
+// tunnel mouth open; once the tunnel is open (Task 68) the back row also
+// leaves the passage clear so the way through the range can be seen.
+function terrainPeaks(tunnelOpen){
   const b = BALANCE.world;
+  const open = tunnelOpen === undefined ? terrainTunnelOpen() : tunnelOpen === true;
   const peaks = [];
   for(let y = b.BOUNDS_MIN_Y; y <= b.BOUNDS_MAX_Y; y += 1){
     const face = terrainRockFaceX(y);
@@ -176,7 +205,9 @@ function terrainPeaks(){
     if(!(Math.abs(y - WORLD_TERRAIN.TUNNEL.Y) < 1.6)){
       peaks.push({ x: face - 0.7, y, size: 0.75 + wobble * 0.35, row: 'front' });
     }
-    peaks.push({ x: face - 1.9, y: y + 0.5, size: 1 + (1 - wobble) * 0.45, row: 'back' });
+    const backY = y + 0.5;
+    if(open && Math.abs(backY - WORLD_TERRAIN.TUNNEL.Y) < 1.2) continue;
+    peaks.push({ x: face - 1.9, y: backY, size: 1 + (1 - wobble) * 0.45, row: 'back' });
   }
   return peaks;
 }

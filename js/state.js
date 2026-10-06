@@ -40,6 +40,9 @@ function freshWorldState(){
     mines,
     workshops: [],
     player: freshPlayerState(base),
+    // Task 68: the tunnel through the mountain starts closed. Opening it is
+    // progress (saved); the terrain itself is fixed and never saved.
+    tunnelUnlocked: false,
     // Task 65: every generated mine except the starters begins undiscovered;
     // walking near one reveals it (tickExploration in systems.js).
     hiddenMineIds: mines.filter(m => !m.id.startsWith('mine_start_')).map(m => m.id),
@@ -323,14 +326,17 @@ function clampPlayerAxis(v, min, max){
 }
 
 // Task 62: a missing/invalid player falls back to standing on the base.
-function sanitizePlayer(raw, base){
+// Task 68: `tunnelOpen` is the tunnel state of the save being loaded (the
+// global `state` is still the old game at that point), so a player saved
+// beyond the mountain stays there when the saved tunnel is open.
+function sanitizePlayer(raw, base, tunnelOpen){
   const fresh = freshPlayerState(base);
   if(!isPlainObject(raw)) return fresh;
   let x = isFiniteNumber(raw.x) ? clampPlayerAxis(raw.x, BALANCE.world.BOUNDS_MIN_X, BALANCE.world.BOUNDS_MAX_X) : fresh.x;
   let y = isFiniteNumber(raw.y) ? clampPlayerAxis(raw.y, BALANCE.world.BOUNDS_MIN_Y, BALANCE.world.BOUNDS_MAX_Y) : fresh.y;
   // Task 66: a saved position inside the mountain / beyond it (only possible
   // in saves from before the mountain existed) is moved onto the base.
-  if(!isWorldPointWalkable(x, y)){ x = fresh.x; y = fresh.y; }
+  if(!isWorldPointWalkable(x, y, tunnelOpen === true)){ x = fresh.x; y = fresh.y; }
   return {
     x,
     y,
@@ -353,11 +359,15 @@ function sanitizeWorldState(raw){
     level: isNonNegativeInt(baseRaw.level) && baseRaw.level >= 1 ? baseRaw.level : 1,
   };
   const mines = sanitizeMines(raw.mines);
+  // Task 68: additive field (saveVersion unchanged). Missing or invalid (any
+  // older save) = the tunnel is still closed.
+  const tunnelUnlocked = raw.tunnelUnlocked === true;
   return {
     base,
     mines,
     workshops: sanitizeWorkshops(raw.workshops),
-    player: sanitizePlayer(raw.player, base),
+    player: sanitizePlayer(raw.player, base, tunnelUnlocked),
+    tunnelUnlocked,
     hiddenMineIds: sanitizeHiddenMineIds(raw.hiddenMineIds, mines),
   };
 }

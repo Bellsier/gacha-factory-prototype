@@ -654,6 +654,16 @@ function renderWorldGround(){
   poly('world-range-rock', [{ x: west, y: top }, ...faceLine, { x: west, y: bottom }]);
   const backLine = faceLine.map(p => ({ x: Math.max(west, terrainRangeBackX(p.y)), y: p.y }));
   poly('world-beyond', [{ x: west, y: top }, ...backLine, { x: west, y: bottom }]).setAttribute('data-terrain', 'beyond');
+  // Task 68: once the tunnel is open, the passage through the range (mouth to
+  // the far exit) is drawn over the rock, joining the open ground to the land beyond.
+  if(terrainTunnelOpen()){
+    const tn = terrainTunnel();
+    const exit = terrainTunnelExit();
+    poly('world-tunnel-passage', [
+      { x: tn.mouthX, y: tn.y - tn.halfWidth }, { x: exit.x, y: tn.y - tn.halfWidth },
+      { x: exit.x, y: tn.y + tn.halfWidth }, { x: tn.mouthX, y: tn.y + tn.halfWidth },
+    ]).setAttribute('data-terrain', 'tunnel-passage');
+  }
   ground.innerHTML = '';
   ground.appendChild(svg);
   renderWorldTerrain();
@@ -696,11 +706,13 @@ function renderWorldTerrain(){
   });
   const t = terrainTunnel();
   const tunnel = document.createElement('div');
-  tunnel.className = 'world-tunnel' + (t.locked ? ' is-locked' : '');
+  tunnel.className = 'world-tunnel ' + (t.locked ? 'is-locked' : 'is-open');
   tunnel.setAttribute('data-tunnel', '');
   tunnel.setAttribute('data-tunnel-locked', t.locked ? 'true' : 'false');
-  tunnel.title = t.locked ? '터널 (잠김) — 아직 통과할 수 없습니다' : '터널';
-  placeOnStage(tunnel, t.gateX + 0.15, t.y + t.halfWidth);
+  tunnel.title = t.locked ? '터널 (잠김) — 아직 통과할 수 없습니다' : '터널 — 산 너머로 이어집니다';
+  // Closed: the arch stands at the gate at the back of the recess. Open: the
+  // gate is gone, so the arch marks the mouth on the rock face.
+  placeOnStage(tunnel, t.locked ? t.gateX + 0.15 : t.mouthX - 0.1, t.y + t.halfWidth);
   layer.appendChild(tunnel);
   // The label is its own element above the terrain so nearer peaks never hide it.
   const label = document.createElement('div');
@@ -778,7 +790,9 @@ function renderExplorationMap(){
   const faceLine = terrainFaceOutline(b.BOUNDS_MIN_Y, b.BOUNDS_MAX_Y);
   el('polygon', { class: 'world-map-mountain', 'data-map-mountain': '', points: [{ x: b.BOUNDS_MIN_X, y: b.BOUNDS_MIN_Y }, ...faceLine, { x: b.BOUNDS_MIN_X, y: b.BOUNDS_MAX_Y }].map(p => p.x + ',' + p.y).join(' ') });
   const tn = terrainTunnel();
-  el('rect', { class: 'world-map-tunnel', 'data-map-tunnel': '', x: tn.gateX, y: tn.y - tn.halfWidth, width: tn.mouthX - tn.gateX, height: tn.halfWidth * 2 });
+  // Task 68: closed = the recess up to the gate; open = the whole passage to the far exit.
+  const tnWestX = tn.locked ? tn.gateX : terrainTunnelExit().x;
+  el('rect', { class: 'world-map-tunnel' + (tn.locked ? '' : ' is-open'), 'data-map-tunnel': '', x: tnWestX, y: tn.y - tn.halfWidth, width: tn.mouthX - tnWestX, height: tn.halfWidth * 2 });
   const base = state.world.base;
   el('rect', { class: 'world-map-base', 'data-map-base': '', x: base.x - 0.6, y: base.y - 0.6, width: 1.2, height: 1.2 });
   state.world.mines.forEach(mine => {

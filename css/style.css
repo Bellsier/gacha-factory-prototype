@@ -168,6 +168,8 @@
      (depth-sorted stage objects). All click-through. */
   .world-range-rock{fill:#3a3b3a; stroke:rgba(0,0,0,0.35); stroke-width:1; vector-effect:non-scaling-stroke;}
   .world-beyond{fill:#14191d; opacity:0.85;}
+  /* Task 68: the passage through the range once the tunnel is open. */
+  .world-tunnel-passage{fill:#2b332f; stroke:rgba(63,201,176,0.25); stroke-width:1; vector-effect:non-scaling-stroke;}
   .world-terrain-layer{position:absolute; inset:0; pointer-events:none;}
   .world-mountain-peak{
     position:absolute; pointer-events:none;
@@ -191,6 +193,9 @@
       radial-gradient(ellipse at 50% 100%, #050607 0 55%, #1b1c1d 56% 70%, transparent 71%);
     -webkit-mask:radial-gradient(ellipse at 50% 100%, #000 0 70%, transparent 71%);
             mask:radial-gradient(ellipse at 50% 100%, #000 0 70%, transparent 71%);
+  }
+  .world-tunnel.is-open{
+    background:radial-gradient(ellipse at 50% 100%, #2d3b36 0 55%, #1b1c1d 56% 70%, transparent 71%);
   }
   .world-tunnel-label{
     position:absolute; pointer-events:none;
@@ -289,6 +294,7 @@
   .world-map-base{fill:var(--teal);}
   .world-map-mountain{fill:#4a4944; opacity:0.9;}
   .world-map-tunnel{fill:var(--amber);}
+  .world-map-tunnel.is-open{fill:var(--teal);}
   .world-map-mine{fill:#8b98a1; stroke:rgba(0,0,0,0.5); stroke-width:0.12;}
   .world-map-mine.is-secured{stroke:var(--teal); stroke-width:0.25;}
   .world-map-mine.res-iron{fill:#a0624a;}

@@ -1802,7 +1802,8 @@ const T66_STEP = 3 / 10; // PLAYER_SPEED / TICKS_PER_SECOND
   const snap = JSON.stringify([w.mines.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]), w.hiddenMineIds, w.base]);
   win.saveGame();
   const raw = storage.getItem('gachaFactorySave');
-  check('Task66: terrain is not written to the save', !/terrain|mountain|tunnel|peak/i.test(raw));
+  // Task 68: the terrain is never saved; only the player's tunnelUnlocked progress flag is.
+  check('Task66: terrain is not written to the save', !/terrain|mountain|tunnel|peak/i.test(raw.replace('"tunnelUnlocked":false', '')));
   check('Task66: saveVersion stays 1', JSON.parse(raw).saveVersion === 1);
   const win2 = newDom(storage).window;
   const w2 = win2.state.world;
@@ -1966,6 +1967,221 @@ function t67Sweep(win, fn) {
   check('Task67: a save/load round trip keeps them unchanged', fields(again.state.world.mines.filter(m => m.id.startsWith('mine_old_'))) === fields(beyondMines) && ['mine_old_forest', 'mine_old_rare'].every(id => again.state.world.hiddenMineIds.includes(id)));
   const raw = storage.getItem('gachaFactorySave');
   check('Task67: zones / regions are not written to the save; saveVersion 1', !/deepForest|rockyGround|halfDugMine|rareDeep|beyond/i.test(raw) && JSON.parse(raw).saveVersion === 1);
+})();
+
+// =============================================================================
+// TASK 68 — Opening the tunnel (state, movement, drawing, save). How the tunnel
+// gets opened (research) is a later Task: these tests call unlockTunnel().
+// Reference: gate x -4.5, mouth x -3.5 at y 1 (±0.8), range back edge x -6.1
+// at the tunnel row, player margin 0.3, saveVersion 1.
+// =============================================================================
+
+function t68Hold(win, keys, ticks) {
+  keys.forEach(k => win.setPlayerHeld(k, true));
+  for (let i = 0; i < ticks; i++) win.tickPlayer();
+  win.clearPlayerHeld();
+  win.tickPlayer();
+}
+
+(function test_T68_closedByDefault() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task68: a new game starts with the tunnel closed', win.state.world.tunnelUnlocked === false);
+  check('Task68: closed tunnel reports locked and beyond inaccessible', win.terrainTunnel().locked === true && win.isBeyondAccessible() === false);
+  check('Task68: closed — the passage and beyond are not walkable', !win.isWorldPointWalkable(-5, 1) && !win.isWorldPointWalkable(-8, 1) && !win.isWorldPointWalkable(-8, 5));
+  check('Task68: walkability can be asked about a given tunnel state', win.isWorldPointWalkable(-8, 1, true) === true && win.isWorldPointWalkable(-8, 1, false) === false);
+  check('Task68: no "LOCKED" constant is left in the terrain data', win.WORLD_TERRAIN === undefined || win.WORLD_TERRAIN.TUNNEL.LOCKED === undefined);
+})();
+
+(function test_T68_unlockTunnel() {
+  const win = newDom(makeMemoryStorage()).window;
+  const logBefore = win.document.getElementById('log').children.length;
+  check('Task68: unlockTunnel opens a closed tunnel', win.unlockTunnel() === true && win.state.world.tunnelUnlocked === true);
+  check('Task68: unlockTunnel writes one log line', win.document.getElementById('log').children.length === logBefore + 1 && win.document.getElementById('log').firstChild.textContent.includes('터널'));
+  check('Task68: unlocked tunnel reports open and beyond accessible', win.terrainTunnel().locked === false && win.isBeyondAccessible() === true);
+  const logAfter = win.document.getElementById('log').children.length;
+  check('Task68: opening twice is rejected and changes nothing', win.unlockTunnel() === false && win.state.world.tunnelUnlocked === true && win.document.getElementById('log').children.length === logAfter);
+  check('Task68: opening costs nothing (gold and resources untouched)', win.state.gold === 0 && Object.values(win.state.resources).every(v => v === 0));
+})();
+
+(function test_T68_walkThroughTunnel() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.unlockTunnel();
+  const p = win.state.world.player;
+  p.x = 0; p.y = 1;
+  let allWalkable = true, sawTunnel = false, sawBeyond = false, neverMountain = true;
+  win.setPlayerHeld('left', true);
+  for (let i = 0; i < 80; i++) {
+    win.tickPlayer();
+    if (!win.isWorldPointWalkable(p.x, p.y)) allWalkable = false;
+    const r = win.terrainRegionAt(p.x, p.y);
+    if (r === 'tunnel') sawTunnel = true;
+    if (r === 'beyond') sawBeyond = true;
+    if (r === 'mountain') neverMountain = false;
+  }
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task68: the player walks from open ground through the tunnel', sawTunnel);
+  check('Task68: ...and out onto the land beyond', sawBeyond && win.terrainRegionAt(p.x, p.y) === 'beyond');
+  check('Task68: every step on the way is walkable and never inside the mountain', allWalkable && neverMountain);
+  check('Task68: the player reaches the west edge of the world', p.x <= -9.99 && p.y === 1);
+  check('Task68: beyond the tunnel exit is the deep forest zone first', win.terrainBeyondZoneAt(-6.5, 1) === 'deepForest');
+  t68Hold(win, ['right'], 100);
+  check('Task68: the player can walk back out through the tunnel to open ground', win.terrainRegionAt(p.x, p.y) === 'open' && p.x > -2);
+})();
+
+(function test_T68_mountainStaysSolid() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.unlockTunnel();
+  let mountainBlocked = true, passageOpen = true, beyondOpen = true, nearEdgeBlocked = true, openGroundSame = true;
+  t67Sweep(win, (x, y) => {
+    const r = win.terrainRegionAt(x, y);
+    const walk = win.isWorldPointWalkable(x, y);
+    const inRows = Math.abs(y - 1) <= 0.8;
+    if (r === 'mountain' && walk) mountainBlocked = false;
+    if (r === 'tunnel' && !walk) passageOpen = false;
+    if (r === 'beyond') {
+      const edgeOk = x <= win.terrainRangeBackX(y) - 0.3;
+      if (inRows ? !walk : walk !== edgeOk) beyondOpen = false;
+      if (!inRows && !edgeOk && walk) nearEdgeBlocked = false;
+    }
+    if (r === 'open') { const was = x >= win.terrainFaceX(y) + 0.3; if (walk !== was) openGroundSame = false; }
+  });
+  check('Task68: with the tunnel open, no point of the mountain itself is walkable', mountainBlocked);
+  check('Task68: the whole passage through the range is walkable', passageOpen);
+  check('Task68: all of the land beyond is walkable (keeping the margin from the rock)', beyondOpen && nearEdgeBlocked);
+  check('Task68: open ground east of the face behaves exactly as before', openGroundSame);
+  check('Task68: outside the world bounds is still not walkable', !win.isWorldPointWalkable(-10.5, 1) && !win.isWorldPointWalkable(0, 10.5) && !win.isWorldPointWalkable(Number.NaN, 1));
+})();
+
+(function test_T68_movementAtTheEdges() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.unlockTunnel();
+  const p = win.state.world.player;
+  // Pushing into the passage wall slides to a stop flush against it.
+  p.x = -5; p.y = 1;
+  t68Hold(win, ['up'], 20);
+  check('Task68: inside the passage the rock on the side stops the player', p.y >= 0.2 - 1e-9 && p.y < 0.2 + 1e-3 && p.x === -5);
+  p.x = -5; p.y = 1;
+  t68Hold(win, ['down'], 20);
+  check('Task68: ...on the other side too', p.y <= 1.8 + 1e-9 && p.y > 1.8 - 1e-3);
+  // From the land beyond, pushing east at a non-tunnel row stops at the back edge.
+  p.x = -8; p.y = 5;
+  t68Hold(win, ['right'], 40);
+  check('Task68: from beyond, the mountain cannot be crossed back to open ground', Math.abs(p.x - (-6.6 - 0.3)) < 1e-3 && win.terrainRegionAt(p.x, p.y) === 'beyond');
+  // Sliding along the back edge of the range keeps the walk pose and never enters rock.
+  p.x = -7.2; p.y = 6;
+  win.setPlayerHeld('right', true); win.setPlayerHeld('up', true);
+  let inside = false, poses = [];
+  for (let i = 0; i < 25; i++) { win.tickPlayer(); poses.push(p.pose); if (!win.isWorldPointWalkable(p.x, p.y)) inside = true; }
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task68: sliding along the range from beyond never enters rock', !inside && poses.every(ps => ps === 'walk'));
+  check('Task68: ...and ends up in the tunnel rows after sliding north', p.y < 1.8);
+  // Diagonal speed on the land beyond is unchanged (3 units/second, normalised).
+  p.x = -9; p.y = -2;
+  win.setPlayerHeld('up', true); win.setPlayerHeld('right', true);
+  for (let i = 0; i < 4; i++) win.tickPlayer();
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task68: beyond is walked at the normal speed', Math.abs(Math.hypot(p.x - (-9), p.y - (-2)) - 1.2) < 1e-9);
+})();
+
+(function test_T68_tunnelDrawing() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const doc = win.document;
+  const stage = doc.getElementById('worldStage');
+  const closedPeaks = stage.querySelectorAll('[data-terrain="peak"]').length;
+  check('Task68: closed — the tunnel is drawn locked with the locked label', stage.querySelector('[data-tunnel]').classList.contains('is-locked') && stage.querySelector('[data-tunnel-label]').textContent.includes('잠긴 터널') && !stage.querySelector('[data-terrain="tunnel-passage"]'));
+  check('Task68: closed — the map tunnel is the recess only', (() => { const r = doc.querySelector('[data-map-tunnel]'); return !r.classList.contains('is-open') && Math.abs(parseFloat(r.getAttribute('x')) - (-4.5)) < 1e-9; })());
+  win.unlockTunnel();
+  win.renderAll(); win.renderAll();
+  const tunnel = stage.querySelector('[data-tunnel]');
+  check('Task68: open — the tunnel is drawn open, not locked', tunnel.getAttribute('data-tunnel-locked') === 'false' && tunnel.classList.contains('is-open') && !tunnel.classList.contains('is-locked'));
+  check('Task68: open — the label no longer says locked', stage.querySelector('[data-tunnel-label]').textContent === '터널' && !tunnel.title.includes('잠김'));
+  const t = win.terrainTunnel();
+  const pos = win.worldToStagePercent(t.mouthX - 0.1, t.y + t.halfWidth);
+  check('Task68: open — the arch moves to the mouth, placed through the stage projection', tunnel.style.left === pos.left + '%' && tunnel.style.top === pos.top + '%');
+  check('Task68: re-rendering draws exactly one tunnel, one passage and one ground', stage.querySelectorAll('[data-tunnel]').length === 1 && stage.querySelectorAll('[data-terrain="tunnel-passage"]').length === 1 && stage.querySelectorAll('.world-ground svg').length === 1);
+  check('Task68: peaks follow terrainPeaks() and leave the passage clear', stage.querySelectorAll('[data-terrain="peak"]').length === win.terrainPeaks().length && win.terrainPeaks().every(pk => pk.row === 'front' || Math.abs(pk.y - 1) >= 1.2) && win.terrainPeaks().length < closedPeaks + 1);
+  check('Task68: the mountain footprint is still drawn', !!stage.querySelector('.world-ground polygon.world-range-rock') && !!stage.querySelector('.world-ground polygon[data-terrain="beyond"]'));
+  const mapTunnel = doc.querySelector('[data-map-tunnel]');
+  const exit = win.terrainTunnelExit();
+  check('Task68: open — the map tunnel runs from the mouth through to the far exit', mapTunnel.classList.contains('is-open') && Math.abs(parseFloat(mapTunnel.getAttribute('x')) - exit.x) < 1e-9 && Math.abs(parseFloat(mapTunnel.getAttribute('width')) - (t.mouthX - exit.x)) < 1e-9);
+  const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+  check('Task68: the open tunnel and passage are styled and click-through', /\.world-tunnel\.is-open\{/.test(css) && /\.world-tunnel-passage\{/.test(css) && /\.world-map-tunnel\.is-open\{/.test(css) && /\.world-tunnel\{[^}]*pointer-events:none/.test(css));
+  stage.querySelector('[data-terrain="tunnel-passage"]').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  check('Task68: clicking the passage behaves like empty ground', win.getWorldSelection() === null);
+})();
+
+(function test_T68_saveLoad() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage, { fullWorld: true }).window;
+  win.unlockTunnel();
+  const w = win.state.world;
+  w.player.x = -8; w.player.y = 1;
+  win.saveGame();
+  const raw = storage.getItem('gachaFactorySave');
+  const saved = JSON.parse(raw);
+  check('Task68: the open tunnel is saved as an additive boolean; saveVersion stays 1', saved.run.world.tunnelUnlocked === true && saved.saveVersion === 1);
+  check('Task68: only that flag is saved — no terrain data', !/terrain|mountain|peak|passage|gate/i.test(raw.replace('"tunnelUnlocked":true', '')));
+  const win2 = newDom(storage).window;
+  check('Task68: the tunnel is still open after loading', win2.state.world.tunnelUnlocked === true && win2.terrainTunnel().locked === false);
+  check('Task68: a player saved beyond the mountain stays there', win2.state.world.player.x === -8 && win2.state.world.player.y === 1);
+  check('Task68: the loaded game draws the open tunnel', win2.document.querySelector('#worldStage [data-tunnel]').classList.contains('is-open') && !!win2.document.querySelector('#worldStage [data-terrain="tunnel-passage"]'));
+  // Closed tunnel + player beyond (hand-edited or corrupt) -> back on the base.
+  const closed = JSON.parse(raw);
+  closed.run.world.tunnelUnlocked = false;
+  storage.setItem('gachaFactorySave', JSON.stringify(closed));
+  const win3 = newDom(storage).window;
+  const base = win3.state.world.base;
+  check('Task68: a saved closed tunnel stays closed', win3.state.world.tunnelUnlocked === false);
+  check('Task68: ...and a player beyond a closed tunnel is moved onto the base', win3.state.world.player.x === base.x && win3.state.world.player.y === base.y);
+  // Older saves have no field at all; invalid values count as closed.
+  [undefined, 'yes', 1, null, {}].forEach((bad, i) => {
+    const old = JSON.parse(raw);
+    if (bad === undefined) delete old.run.world.tunnelUnlocked; else old.run.world.tunnelUnlocked = bad;
+    old.run.world.player.x = 0; old.run.world.player.y = 3;
+    storage.setItem('gachaFactorySave', JSON.stringify(old));
+    const w4 = newDom(storage).window;
+    check('Task68: older/invalid tunnel value #' + i + ' loads as closed, everything else kept', w4.state.world.tunnelUnlocked === false && w4.state.world.player.x === 0 && w4.state.world.player.y === 3 && w4.state.world.mines.length === saved.run.world.mines.length);
+  });
+  // A world without any "world" field still loads with a closed tunnel.
+  const noWorld = JSON.parse(raw);
+  delete noWorld.run.world;
+  storage.setItem('gachaFactorySave', JSON.stringify(noWorld));
+  const w5 = newDom(storage).window;
+  check('Task68: a save without a world loads with a closed tunnel', w5.state.world.tunnelUnlocked === false);
+  // Corrupt player coordinates in an open-tunnel save fall back safely.
+  const badPlayer = JSON.parse(raw);
+  badPlayer.run.world.player.x = 'west'; badPlayer.run.world.player.y = null;
+  storage.setItem('gachaFactorySave', JSON.stringify(badPlayer));
+  const w6 = newDom(storage).window;
+  check('Task68: an open tunnel with corrupt player coordinates falls back to the base', w6.state.world.tunnelUnlocked === true && w6.state.world.player.x === w6.state.world.base.x);
+})();
+
+(function test_T68_exploreBeyondAndPrestige() {
+  const storage = makeMemoryStorage();
+  const seed = newDom(storage, { fullWorld: true }).window;
+  seed.unlockTunnel();
+  seed.saveGame();
+  const payload = JSON.parse(storage.getItem('gachaFactorySave'));
+  payload.run.world.mines.push({ id: 'mine_t68_beyond', x: -8, y: 1, resource: 'plasma', grade: 4, miningPower: 1, developmentState: 'unsecured' });
+  payload.run.world.hiddenMineIds.push('mine_t68_beyond');
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const win = newDom(storage).window;
+  check('Task68: an older mine beyond the mountain is still hidden at first', win.state.world.hiddenMineIds.includes('mine_t68_beyond'));
+  const p = win.state.world.player;
+  p.x = 0; p.y = 1;
+  win.setPlayerHeld('left', true);
+  for (let i = 0; i < 30; i++) { win.tickPlayer(); win.tickExploration(); }
+  win.clearPlayerHeld(); win.tickPlayer();
+  check('Task68: walking through the open tunnel discovers it by the usual rule', !win.state.world.hiddenMineIds.includes('mine_t68_beyond') && win.isMineDiscovered(win.state.world.mines.find(m => m.id === 'mine_t68_beyond')));
+  check('Task68: it is drawn on the exploration map once discovered', !!win.document.querySelector('[data-map-mine="mine_t68_beyond"]'));
+  check('Task68: it still cannot be secured while its site is locked (existing rule)', win.secureMine('mine_t68_beyond') === false);
+  // Prestige never leaves the player standing somewhere unwalkable.
+  win.state.characters.push({ id: 'w_t68', rarity: 'common', resource: 'iron', mining: 1, carry: 1, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 });
+  win.state.runGold = 5000;
+  let threw = false;
+  try { win.document.getElementById('prestigeBtn').click(); } catch (e) { threw = true; }
+  const pp = win.state.world.player;
+  check('Task68: prestige after opening the tunnel does not break the world', !threw && win.isWorldPointWalkable(pp.x, pp.y) && win.permanent.runCount === 2);
 })();
 
 // =============================================================================

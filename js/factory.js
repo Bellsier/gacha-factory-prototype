@@ -335,3 +335,19 @@ function mineMine(mineId){
   state.resources[mine.resource] += mine.miningPower;
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Task 68: Tunnel opening.
+// Opening the tunnel is a one-way state change: it lets the player walk
+// through the mountain to the land beyond (js/terrain.js). This function is
+// the only place that changes it and has no condition of its own — what makes
+// the tunnel openable (research, a later Task) decides when it is called.
+// Returns true when the tunnel was closed and is now open, false when it was
+// already open. Callers re-render (renderAll) like they do after expandBase().
+// ---------------------------------------------------------------------------
+function unlockTunnel(){
+  if(state.world.tunnelUnlocked === true) return false;
+  state.world.tunnelUnlocked = true;
+  log('터널이 열렸습니다. 산 너머로 갈 수 있어요.');
+  return true;
+}
