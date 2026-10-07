@@ -96,6 +96,7 @@ function newDom(storage, opts) {
   RARITY: () => RARITY,
   SITES: () => SITES,
   RESEARCH: () => RESEARCH,
+  RESEARCH_BRANCHES: () => RESEARCH_BRANCHES,
   TICK_MS: () => TICK_MS,
   TICKS_PER_SECOND: () => TICKS_PER_SECOND,
 };
@@ -114,6 +115,7 @@ function newDom(storage, opts) {
     RARITY: { get: () => win.__expose.RARITY(), configurable: true },
     SITES: { get: () => win.__expose.SITES(), configurable: true },
     RESEARCH: { get: () => win.__expose.RESEARCH(), configurable: true },
+    RESEARCH_BRANCHES: { get: () => win.__expose.RESEARCH_BRANCHES(), configurable: true },
     TICK_MS: { get: () => win.__expose.TICK_MS(), configurable: true },
     TICKS_PER_SECOND: { get: () => win.__expose.TICKS_PER_SECOND(), configurable: true },
   });

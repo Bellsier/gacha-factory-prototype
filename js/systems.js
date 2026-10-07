@@ -93,7 +93,7 @@ function checkDualAutomation(){
   if(state.autoLineLogged) return;
   if(hasWorkerOn('iron') && hasWorkerOn('coal')){
     state.autoLineLogged = true;
-    log('🏭 철광석/석탄 자동화 완료! 이제 강철 생산을 자동화할 수 있습니다.');
+    log('🏭 철광석/석탄 자동화 완료! 연구 탭의 자동 제작 장치로 강철 생산도 자동화할 수 있어요.');
   }
 }
 
@@ -347,7 +347,7 @@ function tickCrafting(){
         state.craftQueue[r.key] = null;
         state.products[r.key] += r.out;
       }
-    } else if(state.autoCraft[r.key]){
+    } else if(state.autoCraft[r.key] && isAutoCraftUnlocked()){
       startCraft(r);
     }
   });

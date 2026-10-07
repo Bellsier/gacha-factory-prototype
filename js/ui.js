@@ -7,13 +7,13 @@ function updateNextHint(){
     el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     el.textContent = permanent.tickets >= 1
-      ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 자동 제작과 프레스티지가 열립니다.'
+      ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 프레스티지가 열립니다. 자동 제작은 연구 탭의 장치로 열어요.'
       : '인부 탭에서 일꾼을 뽑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
   } else if(ironHas !== coalHas){
     const missing = ironHas ? 'coal' : 'iron';
     el.textContent = `${resName(missing)}은 아직 수동입니다. 일꾼을 한 명 더 뽑으면 강철도 완전 자동화할 수 있어요.`;
   } else if(ironHas && coalHas && !state.autoCraft.steel){
-    el.textContent = '철광석/석탄 자동화 완료! 자동 제작을 켜면 강철도 자동으로 만들어져요.';
+    el.textContent = (isAutoCraftUnlocked() ? '철광석/석탄 자동화 완료! 자동 제작을 켜면 강철도 자동으로 만들어져요.' : '철광석/석탄 자동화 완료! 연구 탭에서 자동 제작 장치를 연구하면 강철도 자동으로 만들 수 있어요.');
   } else if(prestigeGain() <= 0){
     el.textContent = '일꾼을 채굴장에 배치하고 공방을 굴리세요. 이번 회차 200G부터 명성 1점을 얻습니다.';
   } else {
@@ -196,6 +196,32 @@ function workshopProgressLabel(workshop, recipe){
   if(recipe) return workshop.auto ? '자동 제작 중' : '대기 중';
   return '레시피를 선택하세요';
 }
+function workshopBuildLabel(){
+  return '제작소 짓기 (' + fmt(workshopBuildCost()) + 'G)';
+}
+function renderWorkshopBuild(){
+  const wrap = document.getElementById('workshopBuild');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  if(!isWorkshopBuildUnlocked()){
+    wrap.innerHTML = '<div class="rate">제작소를 지으려면 연구 탭에서 "제작소 건설"을 연구하세요.</div>';
+    return;
+  }
+  if(state.world.workshops.length >= BALANCE.workshop.MAX_COUNT){
+    wrap.innerHTML = '<div class="rate">제작소를 더 지을 수 없습니다. (최대 ' + BALANCE.workshop.MAX_COUNT + '곳)</div>';
+    return;
+  }
+  const btn = document.createElement('button');
+  btn.setAttribute('data-build-workshop', '');
+  btn.textContent = workshopBuildLabel();
+  btn.disabled = !canBuildWorkshop();
+  btn.onclick = () => {
+    if(!buildWorkshop()) return;
+    renderAll();
+  };
+  wrap.appendChild(btn);
+}
+
 function renderWorkshops(){
   const wrap = document.getElementById('workshops');
   if(!wrap) return;
@@ -221,7 +247,7 @@ function renderWorkshops(){
         '<button data-workshop-craft="' + workshop.id + '" ' + dis(!recipe || workshop.progress !== null || !canCraft(recipe)) + '>제작</button>' +
       '</div>' +
       '<label class="toggle-auto">' +
-        '<input type="checkbox" data-workshop-auto="' + workshop.id + '"' + (workshop.auto ? ' checked' : '') + ' ' + dis(!recipe) + '>자동 제작' +
+        '<input type="checkbox" data-workshop-auto="' + workshop.id + '"' + (workshop.auto ? ' checked' : '') + ' ' + dis(!recipe || !isAutoCraftUnlocked()) + '>' + (isAutoCraftUnlocked() ? '자동 제작' : '자동 제작 (연구: 자동 제작 장치)') +
       '</label>';
     wrap.appendChild(card);
   });
@@ -271,7 +297,14 @@ function renderResearch(){
   const wrap = document.getElementById('researchList');
   if(!wrap) return;
   wrap.innerHTML = '';
-  RESEARCH.forEach(def => {
+  RESEARCH_BRANCHES.forEach(branch => {
+   const defs = RESEARCH.filter(def => def.branch === branch.key);
+   if(defs.length === 0) return;
+   const title = document.createElement('div');
+   title.className = 'research-branch-title';
+   title.textContent = branch.name;
+   wrap.appendChild(title);
+   defs.forEach(def => {
     const status = researchStatus(def.key);
     const card = document.createElement('div');
     card.className = 'line research-card is-' + status;
@@ -285,6 +318,7 @@ function renderResearch(){
       (needs.length && status === 'locked' ? '<div class="rate">먼저 필요한 연구: ' + needs.join(', ') + '</div>' : '') +
       '<button data-research="' + def.key + '" ' + dis(!canResearch(def.key)) + '>' + researchButtonLabel(status) + '</button>';
     wrap.appendChild(card);
+   });
   });
   wrap.querySelectorAll('[data-research]').forEach(btn => {
     btn.onclick = () => {
@@ -299,7 +333,7 @@ function renderResearch(){
 function buildRecipes(){
   const wrap = document.getElementById('recipes');
   wrap.innerHTML = '';
-  const autoUnlocked = state.characters.length >= BALANCE.worker.MIN_REQUIRED;
+  const autoUnlocked = isAutoCraftUnlocked();
   RECIPES.forEach(r=>{
     // Hide recipes whose raw resource inputs aren't unlocked yet, to avoid clutter.
     const needsLockedResource = recipeNeedsLockedResource(r);
@@ -320,7 +354,7 @@ function buildRecipes(){
       </div>
       <label class="toggle-auto">
         <input type="checkbox" data-autocraft="${r.key}" ${state.autoCraft[r.key]?'checked':''} ${dis(!autoUnlocked)}>
-        ${autoUnlocked ? '자동 제작' : '자동 제작 (일꾼 1명 이상 필요)'}
+        ${autoUnlocked ? '자동 제작' : '자동 제작 (연구: 자동 제작 장치)'}
       </label>
       ${state.autoSell[r.key] ? `
       <label class="toggle-auto">
@@ -524,12 +558,14 @@ function updateNumbers(){
       btn.textContent = workshop.progress !== null ? '제작 중...' : '제작';
     }
     const chk = document.querySelector('[data-workshop-auto="' + workshop.id + '"]');
-    if(chk) chk.disabled = !workshop.recipeKey;
+    if(chk) chk.disabled = !workshop.recipeKey || !isAutoCraftUnlocked();
     const select = document.querySelector('[data-workshop-recipe="' + workshop.id + '"]');
     if(select) select.disabled = workshop.progress !== null;
     const progressEl = document.querySelector('[data-workshop-progress="' + workshop.id + '"]');
     if(progressEl) progressEl.textContent = workshopProgressLabel(workshop, recipe);
   });
+  const buildBtn = document.querySelector('[data-build-workshop]');
+  if(buildBtn){ buildBtn.disabled = !canBuildWorkshop(); buildBtn.textContent = workshopBuildLabel(); }
   RESEARCH.forEach(def=>{
     const btn = document.querySelector('[data-research="' + def.key + '"]');
     if(btn) btn.disabled = !canResearch(def.key);
@@ -571,6 +607,7 @@ function renderAll(){
   buildRecipes();
   buildWorkers();
   renderResearch();
+  renderWorkshopBuild();
   renderLastPull();
   updateNumbers();
   renderWorldGround();

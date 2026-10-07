@@ -141,6 +141,7 @@
 
   .world-mine{display:flex; flex-direction:column; gap:4px; margin-bottom:10px;}
   /* Task 70: research cards. */
+  .research-branch-title{font-weight:700; color:var(--teal); margin:12px 0 6px;}
   .research-card{display:flex; flex-direction:column; gap:4px; margin-bottom:10px;}
   .research-card .research-cost{color:var(--dim);}
   .research-card.is-done{border-color:var(--teal);}

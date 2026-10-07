@@ -38,6 +38,13 @@ const BALANCE = {
   selling: {
     AUTO_SELL_COST_MULTIPLIER: 20, // autoSellCost(): recipe.sell * AUTO_SELL_COST_MULTIPLIER
   },
+  // Task 71: building a workshop (research 'workshopBuild' opens it). Cost in
+  // gold: BUILD_COST_BASE * BUILD_COST_GROWTH^(workshops already built).
+  workshop: {
+    BUILD_COST_BASE: 100,
+    BUILD_COST_GROWTH: 1.6,
+    MAX_COUNT: 6,
+  },
   crafting: {
     WORKSHOP_LEVEL_SPEED_PER_LEVEL: 0.25,
     FACILITY_COST_BASE: 100,          // craftFacilityCost(): base gold cost of the first upgrade (level 1 → 2)

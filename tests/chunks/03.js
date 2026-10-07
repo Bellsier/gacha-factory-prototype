@@ -206,6 +206,7 @@ function stockCrystalAlloyInputs(win) {
   const win = newDom(makeMemoryStorage()).window;
   win.state.resources.iron = 20;
   win.state.resources.coal = 10;
+  win.state.research.autoCraftDevice = true;
   win.state.autoCraft.steel = true;
   win.tickLoop();
   check('Task16: autoCraft still produces instant steel on a tick', win.state.products.steel >= 1);
@@ -214,6 +215,7 @@ function stockCrystalAlloyInputs(win) {
   const timed = newDom(makeMemoryStorage()).window;
   timed.state.products.steel = 20;
   timed.state.resources.crystal = 10;
+  timed.state.research.autoCraftDevice = true;
   timed.state.autoCraft.crystalAlloy = true;
   timed.tickLoop();
   check('Task16: autoCraft still starts a timed recipe into craftQueue', timed.state.craftQueue.crystalAlloy === 3 && timed.state.products.crystalAlloy === 0);

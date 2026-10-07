@@ -40,16 +40,25 @@ const WORLD_MINE_SEEDS = {
     {x:0, y:8, resource:'plasma', grade:4, miningPower:1},
   ],
 };
-// Task 70: research — "무엇을 할 수 있는가" (Blueprint 11). Content data like
+// Task 70/71: research — "무엇을 할 수 있는가" (Blueprint 11). Content data like
 // SITES: each entry unlocks a possibility once, for a one-time cost. Research
 // is instant and has no random parts.
+//   branch   key into RESEARCH_BRANCHES — which group of the 연구 tab it is in
 //   effect   key into RESEARCH_EFFECTS (js/research.js) — what it unlocks
 //   cost     { gold, products: { recipeKey: count } } — all paid at once
 //   requires keys of research that must be done first
-// For now the only item opens the tunnel (3.1); delivery items and partner
-// companies (15.1) will be added here when they exist.
+// Delivery items and partner companies (15.1) will be added when they exist.
+const RESEARCH_BRANCHES = [
+  {key:'craft',      name:'제작'},
+  {key:'automation', name:'자동화'},
+  {key:'explore',    name:'탐험'},
+];
 const RESEARCH = [
-  {key:'tunnelWork', name:'터널 굴착', desc:'산을 가로지르는 터널을 뚫어 산 너머로 가는 길을 엽니다. 산 너머에는 더 희귀한 광맥이 있어요.',
+  {key:'workshopBuild', branch:'craft', name:'제작소 건설', desc:'기지 주변에 제작소를 지을 수 있게 됩니다. 제작소는 레시피를 정해 두고 따로 물건을 만들어요.',
+   effect:'unlockWorkshopBuild', cost:{gold:100, products:{steel:5}}, requires:[]},
+  {key:'autoCraftDevice', branch:'automation', name:'자동 제작 장치', desc:'제작을 스스로 반복하는 기계 장치입니다. 레시피 카드와 제작소에서 "자동 제작"을 켤 수 있게 돼요.',
+   effect:'unlockAutoCraft', cost:{gold:150, products:{steel:10}}, requires:[]},
+  {key:'tunnelWork', branch:'explore', name:'터널 굴착', desc:'산을 가로지르는 터널을 뚫어 산 너머로 가는 길을 엽니다. 산 너머에는 더 희귀한 광맥이 있어요.',
    effect:'unlockTunnel', cost:{gold:1500, products:{alloy:5}}, requires:[]},
 ];
 const RARITY = [

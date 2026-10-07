@@ -155,6 +155,7 @@
 (function test_T9E_autoCraftAndCraftQueueStaysNull() {
   const win = newDom(makeMemoryStorage()).window;
   win.state.resources.coal = 30;
+  win.state.research.autoCraftDevice = true; // Task 71: the device research gates auto-craft
   win.state.autoCraft.coalBrick = true;
   win.tickLoop();
   check('Task9-E: auto-craft produced coalBrick on a tick with enough coal', win.state.products.coalBrick >= 1);

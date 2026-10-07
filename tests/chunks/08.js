@@ -49,6 +49,7 @@
   const win = newDom(storage).window;
   win.state.resources.iron = 2;
   win.state.resources.coal = 1;
+  win.state.research.autoCraftDevice = true;
   const workshop = win.addWorkshop({id:'loop_save',x:10,y:1,level:1,recipeKey:'steel',auto:true});
   win.tickWorkshops();
   check('Task54: full loop state saves', win.saveGame() === true);
@@ -2438,7 +2439,7 @@ function t70Afford(win) {
   check('Task70: the tunnel research exists with its name', !!def && def.name === '터널 굴착');
   check('Task70: it costs 1500 gold and 5 magic alloy and needs no other research', def.cost.gold === 1500 && Object.keys(def.cost.products).join() === 'alloy' && def.cost.products.alloy === 5 && def.requires.length === 0);
   check('Task70: it opens the tunnel', def.effect === 'unlockTunnel');
-  check('Task70: a new game has the research map with nothing done', JSON.stringify(win.state.research) === '{"tunnelWork":false}');
+  check('Task70: a new game has the research map with nothing done', Object.keys(win.state.research).every(k => win.state.research[k] === false) && win.state.research.tunnelWork === false);
   check('Task70: status of a new game is available, not done', win.researchStatus('tunnelWork') === 'available' && win.isResearchDone('tunnelWork') === false);
   check('Task70: unknown / non-string keys have no definition', win.researchDef('nope') === null && win.researchDef(null) === null && win.researchDef(5) === null && win.researchStatus('nope') === null);
 })();
@@ -2535,7 +2536,7 @@ function t70Afford(win) {
   const stage = doc.getElementById('worldStage');
   check('Task70: the world is redrawn with the open tunnel and the new unknown rocks', stage.querySelector('[data-tunnel]').getAttribute('data-tunnel-locked') === 'false' && stage.querySelectorAll('[data-world-mine].is-undiscovered').length >= 8 && !!doc.querySelector('[data-map-tunnel].is-open'));
   win.renderAll(); win.renderAll();
-  check('Task70: re-rendering never duplicates the research card', doc.querySelectorAll('[data-research-card]').length === 1);
+  check('Task70: re-rendering never duplicates the research card', doc.querySelectorAll('[data-research-card="tunnelWork"]').length === 1 && doc.querySelectorAll('[data-research-card]').length === win.RESEARCH.length);
 })();
 
 (function test_T70_lockedTunnelPointsToResearch() {
@@ -2551,7 +2552,7 @@ function t70Afford(win) {
   win.doResearch('tunnelWork');
   win.saveGame();
   const saved = JSON.parse(storage.getItem('gachaFactorySave'));
-  check('Task70: research is saved in the run as an additive map; saveVersion stays 1', JSON.stringify(saved.run.research) === '{"tunnelWork":true}' && saved.saveVersion === 1);
+  check('Task70: research is saved in the run as an additive map; saveVersion stays 1', saved.run.research.tunnelWork === true && saved.run.research.workshopBuild === false && saved.run.research.autoCraftDevice === false && saved.saveVersion === 1);
   const loaded = newDom(storage).window;
   check('Task70: it is still done after loading and its card shows it', loaded.state.research.tunnelWork === true && loaded.state.world.tunnelUnlocked === true && loaded.document.querySelector('[data-research-card="tunnelWork"]').getAttribute('data-research-status') === 'done');
   check('Task70: loading does not generate the beyond mines again', loaded.state.world.mines.length === 22);
@@ -2567,7 +2568,7 @@ function t70Afford(win) {
   const lying = edit((p) => { p.run.research = { tunnelWork: true }; p.run.world.tunnelUnlocked = false; });
   check('Task70: a research flag that disagrees with a closed tunnel is not trusted (the world decides)', lying.state.research.tunnelWork === false && lying.researchStatus('tunnelWork') === 'available');
   const unknown = edit((p) => { p.run.research = { tunnelWork: false, mystery: true }; p.run.world.tunnelUnlocked = false; });
-  check('Task70: unknown research keys in a save are dropped', JSON.stringify(unknown.state.research) === '{"tunnelWork":false}');
+  check('Task70: unknown research keys in a save are dropped', unknown.state.research.mystery === undefined && Object.keys(unknown.state.research).sort().join() === unknown.RESEARCH.map(r => r.key).sort().join());
 })();
 
 (function test_T70_prestigeResetsResearch() {
@@ -2589,6 +2590,124 @@ function t70Afford(win) {
 })();
 
 // =============================================================================
+// ---------------------------------------------------------------------------
+// Task 71: auto-craft device research, workshop construction, research branches
+// ---------------------------------------------------------------------------
+(function test_T71_autoCraftDevice() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  check('Task71: auto-craft is locked in a new game', win.isAutoCraftUnlocked() === false && win.state.research.autoCraftDevice === false);
+  win.state.resources.coal = 30;
+  win.state.autoCraft.coalBrick = true;
+  win.tickLoop();
+  check('Task71: the flag alone does not auto-craft without the device', win.state.products.coalBrick === 0);
+  win.state.workforce = win.state.workforce || {};
+  win.state.characters.push({ id:'w1', name:'A', rarity:'common', resource:'iron', mining:1, carry:1, move:1 });
+  win.tickLoop();
+  check('Task71: a worker no longer unlocks auto-craft', win.state.products.coalBrick === 0 && win.isAutoCraftUnlocked() === false);
+  win.renderAll();
+  const chk = doc.querySelector('[data-autocraft="coalBrick"]');
+  check('Task71: the recipe checkbox is disabled and names the research', chk && chk.disabled === true && /연구/.test(chk.parentNode.textContent));
+  win.state.gold = 150; win.state.products.steel = 10;
+  check('Task71: researching the device costs 150G + 10 steel', win.doResearch('autoCraftDevice') === true && win.state.gold === 0 && win.state.products.steel === 0);
+  check('Task71: auto-craft opens', win.isAutoCraftUnlocked() === true);
+  win.tickLoop();
+  check('Task71: the stored auto flag now crafts', win.state.products.coalBrick >= 1);
+  win.renderAll(); // the research button does this after a click
+  const chk2 = win.document.querySelector('[data-autocraft="coalBrick"]');
+  check('Task71: the checkbox is enabled after the research', chk2 && chk2.disabled === false);
+})();
+
+(function test_T71_workshopAutoGate() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.addWorkshop({ id:'ws', x:4, y:2, level:1, recipeKey:'steel', auto:true });
+  win.state.resources.iron = 2; win.state.resources.coal = 1;
+  win.tickWorkshops();
+  check('Task71: an auto workshop waits for the device', win.state.products.steel === 0);
+  win.state.research.autoCraftDevice = true;
+  win.tickWorkshops();
+  check('Task71: ...and works once the device is researched', win.state.products.steel === 1);
+})();
+
+(function test_T71_workshopBuild() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  check('Task71: building is locked at first', win.isWorkshopBuildUnlocked() === false && win.canBuildWorkshop() === false && win.buildWorkshop() === null);
+  check('Task71: the build area points to the research', /제작소 건설/.test(doc.getElementById('workshopBuild').textContent) && !doc.querySelector('[data-build-workshop]'));
+  win.state.gold = 100; win.state.products.steel = 5;
+  check('Task71: the research is paid and done', win.doResearch('workshopBuild') === true && win.state.gold === 0 && win.state.products.steel === 0);
+  win.renderAll();
+  const btn = doc.querySelector('[data-build-workshop]');
+  check('Task71: a build button appears, disabled without gold', btn && btn.disabled === true && /100G/.test(btn.textContent));
+  check('Task71: the cost grows with each workshop', win.workshopBuildCost() === 100);
+  win.state.gold = 1000;
+  win.updateNumbers();
+  check('Task71: the per-tick refresh enables the button', doc.querySelector('[data-build-workshop]') === btn && btn.disabled === false);
+  btn.click();
+  const w = win.state.world.workshops;
+  check('Task71: clicking builds one workshop and spends the gold', w.length === 1 && win.state.gold === 900 && w[0].level === 1 && w[0].recipeKey === null && w[0].auto === false);
+  check('Task71: it stands next to the base on open ground', Math.max(Math.abs(w[0].x - win.state.world.base.x), Math.abs(w[0].y - win.state.world.base.y)) === 1 && win.isCellOpenForMines(w[0].x, w[0].y));
+  check('Task71: the card is listed and the map shows it', doc.querySelectorAll('#workshops .line').length === 1 && win.workshopBuildCost() === 160);
+  const taken = new Set([win.state.world.base.x + ',' + win.state.world.base.y]);
+  win.state.world.mines.forEach(m => taken.add(m.x + ',' + m.y));
+  win.state.gold = 1e9;
+  for (let i = 0; i < 5; i++) win.buildWorkshop();
+  const all = win.state.world.workshops;
+  const keys = all.map(s => s.x + ',' + s.y);
+  check('Task71: workshops never share a cell with each other, mines or the base', new Set(keys).size === keys.length && keys.every(k => !taken.has(k)));
+  check('Task71: the number of workshops is capped', all.length === 6 && win.canBuildWorkshop() === false && win.buildWorkshop() === null);
+  win.renderAll();
+  check('Task71: at the cap the button gives way to a note', !doc.querySelector('[data-build-workshop]') && /최대/.test(doc.getElementById('workshopBuild').textContent));
+})();
+
+(function test_T71_workshopAutoCheckbox() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.addWorkshop({ id:'ws', x:4, y:2, level:1, recipeKey:'steel' });
+  win.renderAll();
+  const chk = win.document.querySelector('[data-workshop-auto="ws"]');
+  check('Task71: the workshop auto checkbox is locked until the device exists', chk.disabled === true && /연구/.test(chk.parentNode.textContent));
+  win.state.research.autoCraftDevice = true;
+  win.updateNumbers();
+  check('Task71: ...and the refresh unlocks it', win.document.querySelector('[data-workshop-auto="ws"]').disabled === false);
+})();
+
+(function test_T71_researchBranches() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  check('Task71: every research belongs to a known branch', win.RESEARCH.every(r => win.RESEARCH_BRANCHES.some(b => b.key === r.branch)));
+  check('Task71: the tab shows one title per branch with its cards', doc.querySelectorAll('.research-branch-title').length === 3 && doc.querySelectorAll('[data-research-card]').length === 3);
+  const titles = Array.from(doc.querySelectorAll('.research-branch-title')).map(e => e.textContent).join();
+  check('Task71: branches are 제작/자동화/탐험', titles === '제작,자동화,탐험');
+  win.renderAll(); win.renderAll();
+  check('Task71: re-rendering never duplicates titles', doc.querySelectorAll('.research-branch-title').length === 3);
+  const css = require('fs').readFileSync('css/style.css', 'utf8');
+  check('Task71: branch titles are styled', /\.research-branch-title/.test(css));
+})();
+
+(function test_T71_saveCompat() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  win.state.gold = 250; win.state.products.steel = 15;
+  win.doResearch('workshopBuild'); win.doResearch('autoCraftDevice');
+  win.saveGame();
+  const saved = JSON.parse(storage.getItem('gachaFactorySave'));
+  check('Task71: both researches are saved in the same additive map', saved.run.research.workshopBuild === true && saved.run.research.autoCraftDevice === true && saved.saveVersion === 1);
+  const loaded = newDom(storage).window;
+  check('Task71: they are still done after loading', loaded.isWorkshopBuildUnlocked() && loaded.isAutoCraftUnlocked());
+  const edit = (fn) => { const p = JSON.parse(storage.getItem('gachaFactorySave')); fn(p); storage.setItem('gachaFactorySave', JSON.stringify(p)); return newDom(storage).window; };
+  const old = edit((p) => { delete p.run.research; });
+  check('Task71: an old save without research keeps nothing it never used', old.isWorkshopBuildUnlocked() === false && old.isAutoCraftUnlocked() === false);
+  const usedAuto = edit((p) => { delete p.run.research; p.run.autoCraft.steel = true; });
+  check('Task71: an old save that had auto-craft on keeps auto-craft', usedAuto.isAutoCraftUnlocked() === true && usedAuto.state.autoCraft.steel === true);
+  const usedWs = edit((p) => { delete p.run.research; p.run.world.workshops = [{ id:'workshop_old', x:4, y:2, level:1, recipeKey:'steel', auto:true, progress:null }]; });
+  check('Task71: an old save with a workshop keeps building and auto-craft', usedWs.isWorkshopBuildUnlocked() === true && usedWs.isAutoCraftUnlocked() === true);
+  [1, 'yes', null, [], { workshopBuild: 'yes', autoCraftDevice: 1 }].forEach((bad, i) => {
+    const w = edit((p) => { p.run.research = bad; p.run.autoCraft = {}; p.run.world.workshops = []; });
+    check('Task71: invalid research value #' + i + ' loads as not done', w.isWorkshopBuildUnlocked() === false && w.isAutoCraftUnlocked() === false);
+  });
+})();
+
+
 // SUMMARY
 // =============================================================================
 

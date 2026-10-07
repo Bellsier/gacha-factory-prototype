@@ -402,6 +402,7 @@ function sanitizeRunState(raw){
   const resKeys = RESOURCES.map(r=>r.key);
   const recipeKeys = RECIPES.map(r=>r.key);
   const world = sanitizeWorldState(raw.world);
+  const autoCraft = sanitizeBoolMap(raw.autoCraft, recipeKeys, false);
   return {
     resources: sanitizeNumberMap(raw.resources, resKeys, 0, isNonNegativeFinite),
     products: sanitizeNumberMap(raw.products, recipeKeys, 0, isNonNegativeFinite),
@@ -412,8 +413,8 @@ function sanitizeRunState(raw){
     facility: sanitizeNumberMap(raw.facility, resKeys, 0, isNonNegativeFinite),
     workforce: sanitizeNumberMap(raw.workforce, resKeys, 0, isNonNegativeFinite),
     unlockedSites: sanitizeUnlockedSites(raw.unlockedSites),
-    research: researchSyncWorldEffects(sanitizeBoolMap(raw.research, RESEARCH.map(r=>r.key), false), world), // Task 70: additive field; missing -> all false
-    autoCraft: sanitizeBoolMap(raw.autoCraft, recipeKeys, false),
+    research: researchSyncFromState(sanitizeBoolMap(raw.research, RESEARCH.map(r=>r.key), false), world, autoCraft), // Task 70/71: additive field; missing -> all false (usage grandfathers old saves)
+    autoCraft,
     autoSell: sanitizeBoolMap(raw.autoSell, recipeKeys, false),
     autoSellOn: sanitizeBoolMap(raw.autoSellOn, recipeKeys, true),
     craftQueue: sanitizeCraftQueueMap(raw.craftQueue, recipeKeys), // paused countdowns restored as-is

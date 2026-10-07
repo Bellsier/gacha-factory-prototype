@@ -10,9 +10,17 @@
 // Paying and applying happen in doResearch() only. Nothing here touches the
 // DOM except log() (through doResearch), so the UI stays in ui.js.
 // ---------------------------------------------------------------------------
+// Task 71: unlockWorkshopBuild / unlockAutoCraft only mark the research done
+// (state.research); the rest of the game asks isWorkshopBuildUnlocked() and
+// isAutoCraftUnlocked().
 const RESEARCH_EFFECTS = {
   unlockTunnel: () => unlockTunnel(),
+  unlockWorkshopBuild: () => { log('제작소를 지을 수 있게 되었습니다.'); },
+  unlockAutoCraft: () => { log('자동 제작 장치가 완성되었습니다.'); },
 };
+
+function isAutoCraftUnlocked(){ return isResearchDone('autoCraftDevice'); }
+function isWorkshopBuildUnlocked(){ return isResearchDone('workshopBuild'); }
 
 function researchDef(key){
   if(typeof key !== 'string') return null;
@@ -63,12 +71,22 @@ function doResearch(key){
   return true;
 }
 
-// Research whose effect is a state the world already holds (the tunnel being
-// open) is done exactly when that state is set: keeps `research` and the
-// world consistent after loading a save and when the effect runs by itself.
-function researchSyncWorldEffects(research, world){
+// Research whose effect is a state the game already holds is done exactly
+// when that state is set: keeps `research` consistent with the world after
+// loading a save and when the effect runs by itself (tunnel open). Old saves
+// (before Task 71) have no research for workshops / auto-craft, so what they
+// already used is grandfathered: a workshop that exists, an auto-craft that was on.
+function researchSyncFromState(research, world, autoCraft){
   RESEARCH.forEach(def => {
-    if(def.effect === 'unlockTunnel') research[def.key] = !!world && world.tunnelUnlocked === true;
+    if(def.effect === 'unlockTunnel'){
+      research[def.key] = !!world && world.tunnelUnlocked === true;
+    } else if(def.effect === 'unlockWorkshopBuild'){
+      if(world && Array.isArray(world.workshops) && world.workshops.length > 0) research[def.key] = true;
+    } else if(def.effect === 'unlockAutoCraft'){
+      const used = (autoCraft && Object.keys(autoCraft).some(k => autoCraft[k] === true)) ||
+        (world && Array.isArray(world.workshops) && world.workshops.some(w => w && w.auto === true));
+      if(used) research[def.key] = true;
+    }
   });
   return research;
 }

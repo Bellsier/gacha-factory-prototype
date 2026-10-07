@@ -233,6 +233,52 @@ function addWorkshop(rawWorkshop){
   return workshop;
 }
 
+// Task 71: building a workshop. Needs the 'workshopBuild' research, a free
+// spot near the base, and gold. The spot is the first open cell of the rings
+// around the base (clear of rock, mines, the base and other workshops).
+function workshopBuildCost(){
+  const b = BALANCE.workshop;
+  return Math.ceil(b.BUILD_COST_BASE * Math.pow(b.BUILD_COST_GROWTH, state.world.workshops.length));
+}
+
+function workshopBuildSpot(){
+  const base = state.world.base;
+  const taken = (x, y) =>
+    (x === base.x && y === base.y) ||
+    state.world.mines.some(m => m.x === x && m.y === y) ||
+    state.world.workshops.some(w => w.x === x && w.y === y);
+  for(let r = 1; r <= 4; r++){
+    for(let dy = -r; dy <= r; dy++){
+      for(let dx = -r; dx <= r; dx++){
+        if(Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = base.x + dx, y = base.y + dy;
+        if(!isValidWorldX(x) || !isValidWorldY(y)) continue;
+        if(!isCellOpenForMines(x, y) || taken(x, y)) continue;
+        return { x, y };
+      }
+    }
+  }
+  return null;
+}
+
+function canBuildWorkshop(){
+  if(!isWorkshopBuildUnlocked()) return false;
+  if(state.world.workshops.length >= BALANCE.workshop.MAX_COUNT) return false;
+  if(state.gold < workshopBuildCost()) return false;
+  return workshopBuildSpot() !== null;
+}
+
+function buildWorkshop(){
+  if(!canBuildWorkshop()) return null;
+  const spot = workshopBuildSpot();
+  const cost = workshopBuildCost();
+  const workshop = addWorkshop({ x: spot.x, y: spot.y, level: 1 });
+  if(!workshop) return null;
+  state.gold -= cost;
+  log('제작소를 지었습니다. (' + spot.x + ', ' + spot.y + ')');
+  return workshop;
+}
+
 function workshopRecipe(workshopId){
   if(typeof workshopId !== 'string' || workshopId.length === 0) return null;
   const workshop = state.world.workshops.find(item => item && item.id === workshopId);
@@ -283,6 +329,7 @@ function tickWorkshops(){
   });
   state.world.workshops.forEach(workshop=>{
     if(!workshop || !workshop.auto || workshop.progress !== null) return;
+    if(!isAutoCraftUnlocked()) return; // Task 71: the device research gates auto-craft
     craftWorkshop(workshop.id);
   });
 }
@@ -365,7 +412,7 @@ function populateBeyondMines(options){
 function unlockTunnel(options){
   if(state.world.tunnelUnlocked === true) return false;
   state.world.tunnelUnlocked = true;
-  if(state.research) researchSyncWorldEffects(state.research, state.world); // Task 70: the tunnel research counts as done
+  if(state.research) researchSyncFromState(state.research, state.world, state.autoCraft); // Task 70: the tunnel research counts as done
   populateBeyondMines(options);
   log('터널이 열렸습니다. 산 너머로 갈 수 있어요.');
   return true;

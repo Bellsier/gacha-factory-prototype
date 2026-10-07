@@ -267,6 +267,7 @@
 
 (function test_T43_workshopAutoCraft() {
   const win = newDom(makeMemoryStorage()).window;
+  win.state.research.autoCraftDevice = true;
   const workshop = win.addWorkshop({ id:'workshop_auto', x:4, y:2, level:1, recipeKey:'steel', auto:true });
   win.state.resources.iron = 2;
   win.state.resources.coal = 1;
