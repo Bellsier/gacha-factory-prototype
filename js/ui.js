@@ -249,6 +249,51 @@ function renderWorkshops(){
   });
 }
 
+// Task 70: research cards (연구 tab). Rebuilt with renderAll() and after a
+// research is done; the per-tick refresh (updateNumbers) only toggles the
+// button and rewrites the cost line, so buttons keep their identity.
+function researchCostText(def){
+  const cost = def.cost || {};
+  const parts = [];
+  if(cost.gold) parts.push(fmt(cost.gold) + 'G (보유 ' + fmt(state.gold) + 'G)');
+  Object.keys(cost.products || {}).forEach(k => {
+    const recipe = RECIPES.find(r => r.key === k);
+    parts.push((recipe ? recipe.name : k) + ' ' + cost.products[k] + '개 (보유 ' + fmt(state.products[k] || 0) + '개)');
+  });
+  return '비용: ' + (parts.length ? parts.join(' + ') : '없음');
+}
+
+function researchButtonLabel(status){
+  return status === 'done' ? '연구 완료' : status === 'locked' ? '선행 연구 필요' : '연구하기';
+}
+
+function renderResearch(){
+  const wrap = document.getElementById('researchList');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  RESEARCH.forEach(def => {
+    const status = researchStatus(def.key);
+    const card = document.createElement('div');
+    card.className = 'line research-card is-' + status;
+    card.setAttribute('data-research-card', def.key);
+    card.setAttribute('data-research-status', status);
+    const needs = (def.requires || []).filter(k => !isResearchDone(k)).map(k => (researchDef(k) || { name: k }).name);
+    card.innerHTML =
+      '<div class="res-name">' + def.name + '</div>' +
+      '<div class="rate">' + def.desc + '</div>' +
+      (status === 'done' ? '' : '<div class="rate research-cost" data-research-cost="' + def.key + '">' + researchCostText(def) + '</div>') +
+      (needs.length && status === 'locked' ? '<div class="rate">먼저 필요한 연구: ' + needs.join(', ') + '</div>' : '') +
+      '<button data-research="' + def.key + '" ' + dis(!canResearch(def.key)) + '>' + researchButtonLabel(status) + '</button>';
+    wrap.appendChild(card);
+  });
+  wrap.querySelectorAll('[data-research]').forEach(btn => {
+    btn.onclick = () => {
+      if(!doResearch(btn.dataset.research)) return;
+      renderAll();
+    };
+  });
+}
+
 // Full rebuild: only called after structural changes (auto-craft unlock
 // toggling, site unlock, prestige reset). Buttons keep their identity between ticks.
 function buildRecipes(){
@@ -485,6 +530,12 @@ function updateNumbers(){
     const progressEl = document.querySelector('[data-workshop-progress="' + workshop.id + '"]');
     if(progressEl) progressEl.textContent = workshopProgressLabel(workshop, recipe);
   });
+  RESEARCH.forEach(def=>{
+    const btn = document.querySelector('[data-research="' + def.key + '"]');
+    if(btn) btn.disabled = !canResearch(def.key);
+    const costEl = document.querySelector('[data-research-cost="' + def.key + '"]');
+    if(costEl) costEl.textContent = researchCostText(def);
+  });
   const expandBtn = document.querySelector('[data-expand-base]');
   if(expandBtn){
     const nextKey = BALANCE.world.EXPANSION_SITE_ORDER.find(key => !state.unlockedSites[key]);
@@ -519,6 +570,7 @@ function renderAll(){
   buildLines();
   buildRecipes();
   buildWorkers();
+  renderResearch();
   renderLastPull();
   updateNumbers();
   renderWorldGround();
@@ -709,7 +761,7 @@ function renderWorldTerrain(){
   tunnel.className = 'world-tunnel ' + (t.locked ? 'is-locked' : 'is-open');
   tunnel.setAttribute('data-tunnel', '');
   tunnel.setAttribute('data-tunnel-locked', t.locked ? 'true' : 'false');
-  tunnel.title = t.locked ? '터널 (잠김) — 아직 통과할 수 없습니다' : '터널 — 산 너머로 이어집니다';
+  tunnel.title = t.locked ? '터널 (잠김) — 연구 탭의 "터널 굴착"으로 열 수 있습니다' : '터널 — 산 너머로 이어집니다';
   // Closed: the arch stands at the gate at the back of the recess. Open: the
   // gate is gone, so the arch marks the mouth on the rock face.
   placeOnStage(tunnel, t.locked ? t.gateX + 0.15 : t.mouthX - 0.1, t.y + t.halfWidth);

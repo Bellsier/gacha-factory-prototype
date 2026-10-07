@@ -81,6 +81,8 @@ function freshRunState(){
   RESOURCES.forEach(r=>{ resources[r.key]=0; facility[r.key]=0; workforce[r.key]=0; });
   const unlockedSites = {};
   SITES.forEach(s=>{ unlockedSites[s.key] = s.unlockCost === 0; });
+  const research = {};
+  RESEARCH.forEach(r=>{ research[r.key] = false; });
   const products = {}, autoCraft = {}, autoSell = {}, autoSellOn = {}, craftQueue = {};
   RECIPES.forEach(r=>{ products[r.key]=0; autoCraft[r.key]=false; autoSell[r.key]=false; autoSellOn[r.key]=true; craftQueue[r.key]=null; });
   return {
@@ -90,6 +92,7 @@ function freshRunState(){
     facility,   // resource-funded manual-yield upgrade levels (per line)
     workforce,  // resource-funded auto-rate upgrade levels (per line)
     unlockedSites, // which mining sites are unlocked
+    research,   // Task 70: research key -> bool (run-scoped, see js/research.js)
     autoCraft,
     autoSell,   // recipe key -> bool, gold-purchased
     autoSellOn, // recipe key -> bool, toggle while owned
@@ -398,6 +401,7 @@ function sanitizeRunState(raw){
   if(!isPlainObject(raw)) return fresh;
   const resKeys = RESOURCES.map(r=>r.key);
   const recipeKeys = RECIPES.map(r=>r.key);
+  const world = sanitizeWorldState(raw.world);
   return {
     resources: sanitizeNumberMap(raw.resources, resKeys, 0, isNonNegativeFinite),
     products: sanitizeNumberMap(raw.products, recipeKeys, 0, isNonNegativeFinite),
@@ -408,6 +412,7 @@ function sanitizeRunState(raw){
     facility: sanitizeNumberMap(raw.facility, resKeys, 0, isNonNegativeFinite),
     workforce: sanitizeNumberMap(raw.workforce, resKeys, 0, isNonNegativeFinite),
     unlockedSites: sanitizeUnlockedSites(raw.unlockedSites),
+    research: researchSyncWorldEffects(sanitizeBoolMap(raw.research, RESEARCH.map(r=>r.key), false), world), // Task 70: additive field; missing -> all false
     autoCraft: sanitizeBoolMap(raw.autoCraft, recipeKeys, false),
     autoSell: sanitizeBoolMap(raw.autoSell, recipeKeys, false),
     autoSellOn: sanitizeBoolMap(raw.autoSellOn, recipeKeys, true),
@@ -416,7 +421,7 @@ function sanitizeRunState(raw){
     craftFacility: (isNonNegativeInt(raw.craftFacility) && raw.craftFacility >= 1) ? raw.craftFacility : 1, // Task 16: additive field, missing/invalid → default 1 (preserves current craft times)
     autoLineLogged: typeof raw.autoLineLogged === 'boolean' ? raw.autoLineLogged : false, // Task 6: additive field, no saveVersion bump needed
     factory: sanitizeFactoryState(raw.factory), // Task 21: additive field; missing (legacy save) → fresh default Factory state
-    world: sanitizeWorldState(raw.world), // Task 27: additive field; missing (legacy save) -> fresh world state
+    world, // Task 27: additive field; missing (legacy save) -> fresh world state
   };
 }
 function sanitizePermanent(raw){

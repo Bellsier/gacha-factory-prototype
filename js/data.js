@@ -40,6 +40,18 @@ const WORLD_MINE_SEEDS = {
     {x:0, y:8, resource:'plasma', grade:4, miningPower:1},
   ],
 };
+// Task 70: research — "무엇을 할 수 있는가" (Blueprint 11). Content data like
+// SITES: each entry unlocks a possibility once, for a one-time cost. Research
+// is instant and has no random parts.
+//   effect   key into RESEARCH_EFFECTS (js/research.js) — what it unlocks
+//   cost     { gold, products: { recipeKey: count } } — all paid at once
+//   requires keys of research that must be done first
+// For now the only item opens the tunnel (3.1); delivery items and partner
+// companies (15.1) will be added here when they exist.
+const RESEARCH = [
+  {key:'tunnelWork', name:'터널 굴착', desc:'산을 가로지르는 터널을 뚫어 산 너머로 가는 길을 엽니다. 산 너머에는 더 희귀한 광맥이 있어요.',
+   effect:'unlockTunnel', cost:{gold:1500, products:{alloy:5}}, requires:[]},
+];
 const RARITY = [
   {key:'common', label:'일반', chance:60, mining:1, carry:2, move:1, cls:'common'},
   {key:'rare',   label:'희귀', chance:25, mining:2, carry:3, move:2, cls:'rare'},

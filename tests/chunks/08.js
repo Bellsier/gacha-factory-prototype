@@ -1803,7 +1803,7 @@ const T66_STEP = 3 / 10; // PLAYER_SPEED / TICKS_PER_SECOND
   win.saveGame();
   const raw = storage.getItem('gachaFactorySave');
   // Task 68: the terrain is never saved; only the player's tunnelUnlocked progress flag is.
-  check('Task66: terrain is not written to the save', !/terrain|mountain|tunnel|peak/i.test(raw.replace('"tunnelUnlocked":false', '')));
+  check('Task66: terrain is not written to the save', !/terrain|mountain|tunnel|peak/i.test(raw.replace('"tunnelUnlocked":false', '').replace('"tunnelWork":false', '')));
   check('Task66: saveVersion stays 1', JSON.parse(raw).saveVersion === 1);
   const win2 = newDom(storage).window;
   const w2 = win2.state.world;
@@ -2120,7 +2120,7 @@ function t68Hold(win, keys, ticks) {
   const raw = storage.getItem('gachaFactorySave');
   const saved = JSON.parse(raw);
   check('Task68: the open tunnel is saved as an additive boolean; saveVersion stays 1', saved.run.world.tunnelUnlocked === true && saved.saveVersion === 1);
-  check('Task68: only that flag is saved — no terrain data', !/terrain|mountain|peak|passage|gate/i.test(raw.replace('"tunnelUnlocked":true', '')));
+  check('Task68: only that flag is saved — no terrain data', !/terrain|mountain|peak|passage|gate/i.test(raw.replace('"tunnelUnlocked":true', '').replace('"tunnelWork":true', '')));
   const win2 = newDom(storage).window;
   check('Task68: the tunnel is still open after loading', win2.state.world.tunnelUnlocked === true && win2.terrainTunnel().locked === false);
   check('Task68: a player saved beyond the mountain stays there', win2.state.world.player.x === -8 && win2.state.world.player.y === 1);
@@ -2418,6 +2418,174 @@ function t69Problems(win, before, after) {
   win.state.runGold = 5000;
   win.document.getElementById('prestigeBtn').click();
   check('Task69: after prestige the new world is closed again with no beyond mines (until reopened)', win.state.world.tunnelUnlocked === false && t69Beyond(win, win.state.world.mines).length === 0 && win.state.world.mines.length === 14);
+})();
+
+// =============================================================================
+// TASK 70 — Research. One item for now: "터널 굴착" (tunnelWork) costs 1500 gold
+// + 5 마법 합금 (alloy) and opens the tunnel (Task 68/69). Research is instant,
+// run-scoped (resets with a new run) and saved in state.research.
+// Reference values are hard-coded here, not read back from the game.
+// =============================================================================
+
+function t70Afford(win) {
+  win.state.gold = 1500;
+  win.state.products.alloy = 5;
+}
+
+(function test_T70_dataAndNewGame() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const def = win.researchDef('tunnelWork');
+  check('Task70: the tunnel research exists with its name', !!def && def.name === '터널 굴착');
+  check('Task70: it costs 1500 gold and 5 magic alloy and needs no other research', def.cost.gold === 1500 && Object.keys(def.cost.products).join() === 'alloy' && def.cost.products.alloy === 5 && def.requires.length === 0);
+  check('Task70: it opens the tunnel', def.effect === 'unlockTunnel');
+  check('Task70: a new game has the research map with nothing done', JSON.stringify(win.state.research) === '{"tunnelWork":false}');
+  check('Task70: status of a new game is available, not done', win.researchStatus('tunnelWork') === 'available' && win.isResearchDone('tunnelWork') === false);
+  check('Task70: unknown / non-string keys have no definition', win.researchDef('nope') === null && win.researchDef(null) === null && win.researchDef(5) === null && win.researchStatus('nope') === null);
+})();
+
+(function test_T70_affordability() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  check('Task70: nothing owned — cannot research', win.canResearch('tunnelWork') === false);
+  win.state.gold = 1500;
+  check('Task70: gold alone is not enough', win.canResearch('tunnelWork') === false);
+  win.state.gold = 1499; win.state.products.alloy = 5;
+  check('Task70: one gold short is not enough', win.canResearch('tunnelWork') === false);
+  win.state.gold = 1500; win.state.products.alloy = 4;
+  check('Task70: one alloy short is not enough', win.canResearch('tunnelWork') === false);
+  win.state.products.alloy = 5;
+  check('Task70: exactly the cost is enough', win.canResearch('tunnelWork') === true);
+  check('Task70: invalid keys can never be researched', win.canResearch('nope') === false && win.canResearch(undefined) === false && win.canResearch({}) === false);
+})();
+
+(function test_T70_failureChangesNothing() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  win.state.gold = 1499; win.state.products.alloy = 9; win.state.products.steel = 3; win.state.resources.mana = 2;
+  const snap = JSON.stringify([win.state.gold, win.state.products, win.state.resources, win.state.research, win.state.world.tunnelUnlocked, win.state.world.mines.length]);
+  const logs = win.document.getElementById('log').children.length;
+  check('Task70: a failed research returns false', win.doResearch('tunnelWork') === false && win.doResearch('nope') === false);
+  check('Task70: ...and spends and changes nothing (no log, tunnel still closed)', JSON.stringify([win.state.gold, win.state.products, win.state.resources, win.state.research, win.state.world.tunnelUnlocked, win.state.world.mines.length]) === snap && win.document.getElementById('log').children.length === logs);
+})();
+
+(function test_T70_researchTheTunnel() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  win.state.gold = 2000; win.state.products.alloy = 7; win.state.products.steel = 3; win.state.resources.mana = 2;
+  const logEl = win.document.getElementById('log');
+  const logs = logEl.children.length;
+  check('Task70: researching with enough succeeds', win.doResearch('tunnelWork') === true);
+  check('Task70: it costs exactly 1500 gold and 5 alloy', win.state.gold === 500 && win.state.products.alloy === 2);
+  check('Task70: nothing else is spent', win.state.products.steel === 3 && win.state.resources.mana === 2);
+  check('Task70: it is marked done and stays done', win.isResearchDone('tunnelWork') === true && win.researchStatus('tunnelWork') === 'done' && win.state.research.tunnelWork === true);
+  check('Task70: the tunnel is open and its mines were generated (14 + 8)', win.state.world.tunnelUnlocked === true && win.state.world.mines.length === 22 && win.isBeyondAccessible() === true);
+  check('Task70: two log lines, the research first and the tunnel on top', logEl.children.length === logs + 2 && logEl.children[1].textContent === '연구 완료: 터널 굴착' && logEl.children[0].textContent.includes('터널이 열렸습니다'));
+  const afterGold = win.state.gold;
+  win.state.products.alloy = 10; win.state.gold = 5000;
+  check('Task70: a finished research cannot be bought again (nothing spent)', win.canResearch('tunnelWork') === false && win.doResearch('tunnelWork') === false && win.state.gold === 5000 && win.state.products.alloy === 10 && win.state.world.mines.length === 22);
+  check('Task70: the player can now walk through the tunnel', (() => { const p = win.state.world.player; p.x = 0; p.y = 1; t68Hold(win, ['left'], 60); return win.terrainRegionAt(p.x, p.y) === 'beyond'; })());
+  void afterGold;
+})();
+
+(function test_T70_effectOpensItsOwnResearch() {
+  // The tunnel opened without paying (Task 68 tests call unlockTunnel directly) counts as researched.
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  win.unlockTunnel();
+  check('Task70: opening the tunnel directly marks the research done', win.state.research.tunnelWork === true && win.researchStatus('tunnelWork') === 'done');
+  t70Afford(win);
+  check('Task70: ...so it cannot be paid for afterwards', win.canResearch('tunnelWork') === false && win.doResearch('tunnelWork') === false && win.state.gold === 1500 && win.state.products.alloy === 5);
+})();
+
+(function test_T70_prerequisites() {
+  // Add a second research that requires the first, to check the prerequisite rule.
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  win.RESEARCH.push({ key: 't70_second', name: '테스트 연구', desc: '', effect: 'unlockTunnel', cost: { gold: 10 }, requires: ['tunnelWork'] });
+  win.state.gold = 10;
+  check('Task70: a research whose requirement is missing is locked and cannot be bought', win.researchStatus('t70_second') === 'locked' && win.canResearch('t70_second') === false && win.doResearch('t70_second') === false && win.state.gold === 10);
+  win.state.research.tunnelWork = true;
+  check('Task70: once the requirement is done it becomes available', win.researchStatus('t70_second') === 'available' && win.canResearch('t70_second') === true);
+  check('Task70: a state without the research key still works (treated as not done)', win.state.research.t70_second === undefined && win.isResearchDone('t70_second') === false);
+  check('Task70: buying it spends its cost and marks it done', win.doResearch('t70_second') === true && win.state.gold === 0 && win.state.research.t70_second === true);
+  win.RESEARCH.pop();
+})();
+
+(function test_T70_ui() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const doc = win.document;
+  const tab = doc.querySelector('.tab-btn[data-tab="research"]');
+  check('Task70: the tab bar has a 연구 tab and its panel', !!tab && tab.textContent === '연구' && !!doc.getElementById('tab-research') && !!doc.getElementById('researchList'));
+  tab.click();
+  check('Task70: clicking the tab shows the research panel', doc.getElementById('tab-research').classList.contains('active') && !doc.getElementById('tab-mining').classList.contains('active'));
+  const card = doc.querySelector('[data-research-card="tunnelWork"]');
+  const btn = doc.querySelector('[data-research="tunnelWork"]');
+  check('Task70: one card with name, description, cost line and a button', !!card && card.textContent.includes('터널 굴착') && card.textContent.includes('산을 가로지르는') && card.getAttribute('data-research-status') === 'available' && !!btn);
+  const cost = doc.querySelector('[data-research-cost="tunnelWork"]');
+  check('Task70: the cost line shows gold and alloy with what the player has', cost.textContent.includes('1,500G') && cost.textContent.includes('마법 합금 5개') && cost.textContent.includes('보유 0G') && cost.textContent.includes('보유 0개'));
+  check('Task70: the button is disabled while the cost is not met', btn.disabled === true && btn.textContent === '연구하기');
+  btn.click();
+  check('Task70: clicking a disabled button does nothing', win.state.research.tunnelWork === false && win.state.world.tunnelUnlocked === false);
+  t70Afford(win);
+  win.updateNumbers();
+  check('Task70: the per-tick refresh enables the button without rebuilding it', doc.querySelector('[data-research="tunnelWork"]') === btn && btn.disabled === false && doc.querySelector('[data-research-cost="tunnelWork"]').textContent.includes('보유 1,500G') && doc.querySelector('[data-research-cost="tunnelWork"]').textContent.includes('보유 5개'));
+  win.state.gold = 1499;
+  win.updateNumbers();
+  check('Task70: ...and disables it again when the cost is no longer met', btn.disabled === true);
+  win.state.gold = 1500;
+  win.updateNumbers();
+  btn.click();
+  const done = doc.querySelector('[data-research="tunnelWork"]');
+  check('Task70: clicking it researches, spends the cost and rebuilds the card as done', win.state.research.tunnelWork === true && win.state.gold === 0 && win.state.products.alloy === 0 && doc.querySelector('[data-research-card="tunnelWork"]').getAttribute('data-research-status') === 'done' && done.disabled === true && done.textContent === '연구 완료' && !doc.querySelector('[data-research-cost="tunnelWork"]'));
+  const stage = doc.getElementById('worldStage');
+  check('Task70: the world is redrawn with the open tunnel and the new unknown rocks', stage.querySelector('[data-tunnel]').getAttribute('data-tunnel-locked') === 'false' && stage.querySelectorAll('[data-world-mine].is-undiscovered').length >= 8 && !!doc.querySelector('[data-map-tunnel].is-open'));
+  win.renderAll(); win.renderAll();
+  check('Task70: re-rendering never duplicates the research card', doc.querySelectorAll('[data-research-card]').length === 1);
+})();
+
+(function test_T70_lockedTunnelPointsToResearch() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const tunnel = win.document.querySelector('#worldStage [data-tunnel]');
+  check('Task70: the locked tunnel tells the player where to open it', tunnel.title.includes('연구') && tunnel.title.includes('터널 굴착'));
+})();
+
+(function test_T70_saveLoad() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage, { fullWorld: true }).window;
+  t70Afford(win);
+  win.doResearch('tunnelWork');
+  win.saveGame();
+  const saved = JSON.parse(storage.getItem('gachaFactorySave'));
+  check('Task70: research is saved in the run as an additive map; saveVersion stays 1', JSON.stringify(saved.run.research) === '{"tunnelWork":true}' && saved.saveVersion === 1);
+  const loaded = newDom(storage).window;
+  check('Task70: it is still done after loading and its card shows it', loaded.state.research.tunnelWork === true && loaded.state.world.tunnelUnlocked === true && loaded.document.querySelector('[data-research-card="tunnelWork"]').getAttribute('data-research-status') === 'done');
+  check('Task70: loading does not generate the beyond mines again', loaded.state.world.mines.length === 22);
+  const edit = (fn) => { const p = JSON.parse(storage.getItem('gachaFactorySave')); fn(p); storage.setItem('gachaFactorySave', JSON.stringify(p)); return newDom(storage).window; };
+  const older = edit((p) => { delete p.run.research; });
+  check('Task70: an older save without the field loads; the open tunnel counts as researched', older.state.research.tunnelWork === true && older.state.world.tunnelUnlocked === true);
+  const olderClosed = edit((p) => { delete p.run.research; p.run.world.tunnelUnlocked = false; });
+  check('Task70: an older save with a closed tunnel loads as not researched', olderClosed.state.research.tunnelWork === false && olderClosed.researchStatus('tunnelWork') === 'available');
+  [1, 'yes', null, [], { tunnelWork: 'yes' }].forEach((bad, i) => {
+    const w = edit((p) => { p.run.research = bad; p.run.world.tunnelUnlocked = false; });
+    check('Task70: invalid research value #' + i + ' loads as not done and playable', w.state.research.tunnelWork === false && w.canResearch('tunnelWork') === false && w.state.world.tunnelUnlocked === false);
+  });
+  const lying = edit((p) => { p.run.research = { tunnelWork: true }; p.run.world.tunnelUnlocked = false; });
+  check('Task70: a research flag that disagrees with a closed tunnel is not trusted (the world decides)', lying.state.research.tunnelWork === false && lying.researchStatus('tunnelWork') === 'available');
+  const unknown = edit((p) => { p.run.research = { tunnelWork: false, mystery: true }; p.run.world.tunnelUnlocked = false; });
+  check('Task70: unknown research keys in a save are dropped', JSON.stringify(unknown.state.research) === '{"tunnelWork":false}');
+})();
+
+(function test_T70_prestigeResetsResearch() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  t70Afford(win);
+  win.doResearch('tunnelWork');
+  win.state.characters.push({ id: 'w_t70', rarity: 'common', resource: 'iron', mining: 1, carry: 1, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 });
+  win.state.runGold = 5000;
+  win.document.getElementById('prestigeBtn').click();
+  check('Task70: a new run starts with research not done, tunnel closed and 14 mines (until prestige is overhauled)', win.state.research.tunnelWork === false && win.state.world.tunnelUnlocked === false && win.state.world.mines.length === 14 && win.document.querySelector('[data-research-card="tunnelWork"]').getAttribute('data-research-status') === 'available');
+})();
+
+(function test_T70_researchFilesAndStyles() {
+  const root = path.join(__dirname, '..');
+  const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(root, 'css', 'style.css'), 'utf8');
+  check('Task70: index.html loads research.js after factory.js and before ui.js', index.indexOf('js/factory.js') < index.indexOf('js/research.js') && index.indexOf('js/research.js') < index.indexOf('js/ui.js'));
+  check('Task70: research cards are styled', /\.research-card\{/.test(css) && /\.research-card\.is-done/.test(css));
 })();
 
 // =============================================================================

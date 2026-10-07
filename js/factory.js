@@ -343,8 +343,8 @@ function mineMine(mineId){
 // that land's mines into the world: generateBeyondMines() runs once here and
 // the new mines are added undiscovered (the player finds them by walking, as
 // with every ring mine). This function is the only place that opens the
-// tunnel and has no condition of its own — what makes the tunnel openable
-// (research, js/research.js) decides when it is called.
+// tunnel and has no condition of its own — the research "tunnelWork"
+// (js/research.js, Task 70) is what makes it openable in play.
 // Returns true when the tunnel was closed and is now open, false when it was
 // already open. Callers re-render (renderAll) like they do after expandBase().
 // `options.random` is for tests (a () => [0,1) source).
@@ -365,6 +365,7 @@ function populateBeyondMines(options){
 function unlockTunnel(options){
   if(state.world.tunnelUnlocked === true) return false;
   state.world.tunnelUnlocked = true;
+  if(state.research) researchSyncWorldEffects(state.research, state.world); // Task 70: the tunnel research counts as done
   populateBeyondMines(options);
   log('터널이 열렸습니다. 산 너머로 갈 수 있어요.');
   return true;
