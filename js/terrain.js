@@ -177,6 +177,15 @@ function isCellOpenForMines(x, y){
   return Math.hypot(x - t.mouthX, y - t.y) >= WORLD_TERRAIN.TUNNEL.KEEP_CLEAR;
 }
 
+// Task 69: may a mine be generated on this cell of the land beyond? It must
+// be beyond the range and clear of the range's back edge by MINE_MARGIN, so it
+// can be walked to once the tunnel is open (terrainTunnelExit() is the only way in).
+function isCellOpenForBeyondMines(x, y){
+  if(!terrainInBounds(x, y)) return false;
+  if(terrainRegionAt(x, y) !== 'beyond') return false;
+  return x <= terrainRangeBackX(y) - WORLD_TERRAIN.MINE_MARGIN;
+}
+
 // Moves along one axis from `from` toward `to` as far as `ok` allows
 // (bisection), so the player ends flush against the rock instead of stopping
 // a whole step short. Never moves past `to` and never jumps anywhere else.

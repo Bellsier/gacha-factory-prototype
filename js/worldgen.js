@@ -25,6 +25,9 @@
 // Positions/resources are picked with `random` (defaults to Math.random) from
 // enumerated candidate lists, so generation never loops and tests can inject a
 // random source.
+//
+// Task 69 — the land beyond the mountain (generateBeyondMines, at the end of
+// this file) is generated later, once, when the tunnel is opened.
 // ---------------------------------------------------------------------------
 
 const STARTER_MINE_IDS = { iron: 'mine_start_iron', coal: 'mine_start_coal' };
@@ -184,4 +187,58 @@ function generateInitialWorldMines(base, options){
     mines.push(makeGeneratedMine('mine_gen_' + (i + 1), cell, worldGenPick(pool, random)));
   }
   return mines;
+}
+
+// ---------------------------------------------------------------------------
+// Task 69: mines for the land beyond the mountain.
+//
+// Called once when the tunnel opens (populateBeyondMines in factory.js); a
+// new game places nothing beyond the range. It is the distance-ring rule
+// extended, not a separate system: every environment zone beyond the range
+// (deepForest -> rockyGround -> halfDugMine -> rareDeep, by distance from the
+// tunnel exit) has a mine count and borrows the resource pool of a ring
+// (BALANCE.worldGen.BEYOND.ZONES), so farther zones hold fewer, rarer mines.
+//
+// Existing mines are never touched. A zone that already holds mines (an older
+// save made before the tunnel existed) is only topped up to its count, and a
+// second call adds nothing. Cells are open ground beyond the range
+// (isCellOpenForBeyondMines), never occupied, and prefer to be MIN_SPACING
+// apart. Returns the NEW mines only (unsecured, grade by resource site tier).
+// options: random (default Math.random), zones (override, tests only).
+// ---------------------------------------------------------------------------
+function generateBeyondMines(existingMines, options){
+  const opts = options || {};
+  const random = typeof opts.random === 'function' ? opts.random : Math.random;
+  const g = BALANCE.worldGen;
+  const zones = Array.isArray(opts.zones) ? opts.zones : g.BEYOND.ZONES;
+  const existing = Array.isArray(existingMines) ? existingMines.filter(m => m) : [];
+  const cellKey = (c) => c.x + ',' + c.y;
+  const used = new Set(existing.map(cellKey));
+  const usedIds = new Set(existing.map(m => m.id));
+  const all = worldGenAllCells().filter(c => isCellOpenForBeyondMines(c.x, c.y));
+  const created = [];
+  zones.forEach(cfg => {
+    const ring = g.RINGS.find(r => r.key === cfg.ring);
+    if(!ring) return;
+    const inZone = existing.filter(m => terrainBeyondZoneAt(m.x, m.y) === cfg.zone).length;
+    const want = Math.max(0, (Number.isInteger(cfg.count) ? cfg.count : 0) - inZone);
+    const candidates = all.filter(c => terrainBeyondZoneAt(c.x, c.y) === cfg.zone);
+    const placed = [];
+    for(let i = 0; i < want; i++){
+      const open = candidates.filter(c => !used.has(cellKey(c)));
+      const spaced = open.filter(c => existing.concat(created).every(o => worldGenDistance(c.x, c.y, o.x, o.y) >= g.BEYOND.MIN_SPACING));
+      const cell = worldGenPick(spaced.length ? spaced : open, random);
+      if(!cell) break;
+      const resource = worldGenPickWeighted(worldGenRingWeights(ring, placed), random);
+      if(!resource) break;
+      placed.push(resource);
+      used.add(cellKey(cell));
+      let n = i + 1;
+      while(usedIds.has('mine_beyond_' + cfg.zone + '_' + n)) n++;
+      const id = 'mine_beyond_' + cfg.zone + '_' + n;
+      usedIds.add(id);
+      created.push(makeGeneratedMine(id, cell, resource));
+    }
+  });
+  return created;
 }

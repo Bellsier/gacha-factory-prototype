@@ -2185,6 +2185,242 @@ function t68Hold(win, keys, ticks) {
 })();
 
 // =============================================================================
+// TASK 69 — Mines for the land beyond the mountain. Generated once, when the
+// tunnel opens (unlockTunnel); a new game still places nothing beyond the range.
+// Reference table (independent of BALANCE): zone -> count, ring pool.
+//   deepForest 3 (far)   rockyGround 2 (far)   halfDugMine 2 (outer)   rareDeep 1 (outer)
+//   far:   mana, crystal, rareMetal, relic         outer: rareMetal, relic, cosmicShard, plasma
+// Grades: mana/crystal 2, rareMetal/relic 3, cosmicShard/plasma 4.
+// =============================================================================
+
+const T69_ZONE_COUNT = { deepForest: 3, rockyGround: 2, halfDugMine: 2, rareDeep: 1 };
+const T69_ZONE_POOL = {
+  deepForest: ['mana', 'crystal', 'rareMetal', 'relic'],
+  rockyGround: ['mana', 'crystal', 'rareMetal', 'relic'],
+  halfDugMine: ['rareMetal', 'relic', 'cosmicShard', 'plasma'],
+  rareDeep: ['rareMetal', 'relic', 'cosmicShard', 'plasma'],
+};
+const T69_GRADE = { mana: 2, crystal: 2, rareMetal: 3, relic: 3, cosmicShard: 4, plasma: 4 };
+
+function t69Beyond(win, mines) {
+  return mines.filter(m => win.terrainRegionAt(m.x, m.y) === 'beyond');
+}
+
+// Flood fill over a 0.25 grid from the base, true if the point can be walked to
+// (tunnel state as currently set in the game).
+function t69Reachable(win, tx, ty) {
+  const b = win.state.world.base;
+  const step = 0.25;
+  const key = (x, y) => Math.round(x / step) + ',' + Math.round(y / step);
+  const seen = new Set([key(b.x, b.y)]);
+  const queue = [[b.x, b.y]];
+  const target = key(tx, ty);
+  while (queue.length) {
+    const [x, y] = queue.shift();
+    if (key(x, y) === target) return true;
+    for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+      const nx = x + dx, ny = y + dy;
+      const k = key(nx, ny);
+      if (seen.has(k) || !win.isWorldPointWalkable(nx, ny)) continue;
+      seen.add(k);
+      queue.push([nx, ny]);
+    }
+  }
+  return false;
+}
+
+function t69Problems(win, before, after) {
+  const problems = [];
+  const added = after.filter(m => !before.some(o => o.id === m.id));
+  const coords = new Set(before.map(m => m.x + ',' + m.y));
+  const perZone = {};
+  added.forEach(m => {
+    const zone = win.terrainBeyondZoneAt(m.x, m.y);
+    perZone[zone] = (perZone[zone] || 0) + 1;
+    if (!Number.isInteger(m.x) || !Number.isInteger(m.y) || !win.isValidWorldX(m.x) || !win.isValidWorldY(m.y)) problems.push('bounds ' + m.id);
+    if (win.terrainRegionAt(m.x, m.y) !== 'beyond' || m.x > win.terrainRangeBackX(m.y) - 1 + 1e-9) problems.push('cell ' + m.id);
+    if (coords.has(m.x + ',' + m.y)) problems.push('overlap ' + m.id);
+    coords.add(m.x + ',' + m.y);
+    if (!T69_ZONE_POOL[zone] || !T69_ZONE_POOL[zone].includes(m.resource)) problems.push('pool ' + m.id + ' ' + zone + ' ' + m.resource);
+    if (m.grade !== T69_GRADE[m.resource] || m.miningPower !== 1 || m.developmentState !== 'unsecured') problems.push('fields ' + m.id);
+    if (!win.state.world.hiddenMineIds.includes(m.id)) problems.push('not hidden ' + m.id);
+  });
+  Object.keys(T69_ZONE_COUNT).forEach(z => { if ((perZone[z] || 0) !== T69_ZONE_COUNT[z]) problems.push('count ' + z + ' ' + (perZone[z] || 0)); });
+  if (new Set(after.map(m => m.id)).size !== after.length) problems.push('duplicate ids');
+  return problems;
+}
+
+(function test_T69_newGamePlacesNothingBeyond() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  check('Task69: a new game places no mine beyond the mountain', t69Beyond(win, win.state.world.mines).length === 0 && win.state.world.mines.length === 14);
+})();
+
+(function test_T69_unlockGeneratesBeyondMines() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const before = win.state.world.mines.map(m => ({ ...m }));
+  const hiddenBefore = win.state.world.hiddenMineIds.slice();
+  check('Task69: opening the tunnel succeeds', win.unlockTunnel() === true);
+  const after = win.state.world.mines;
+  check('Task69: 8 mines are added (3 forest, 2 rock, 2 half-dug mine, 1 rare)', after.length === 22);
+  check('Task69: every new mine obeys the zone / cell / pool / grade / hidden rules', t69Problems(win, before, after).length === 0, t69Problems(win, before, after).join('; '));
+  check('Task69: the first 14 mines are untouched', JSON.stringify(after.slice(0, 14)) === JSON.stringify(before));
+  check('Task69: earlier hidden ids are kept and the new ones are appended', JSON.stringify(win.state.world.hiddenMineIds.slice(0, hiddenBefore.length)) === JSON.stringify(hiddenBefore) && win.state.world.hiddenMineIds.length === hiddenBefore.length + 8);
+  check('Task69: new mines are all in the beyond region and none on the open side', t69Beyond(win, after).length === 8 && after.slice(0, 14).every(m => win.terrainRegionAt(m.x, m.y) === 'open'));
+  check('Task69: opening again changes nothing (no second batch)', win.unlockTunnel() === false && win.state.world.mines.length === 22);
+  check('Task69: populating again adds nothing (every zone is full)', win.populateBeyondMines().length === 0 && win.state.world.mines.length === 22);
+})();
+
+(function test_T69_sweepEveryRule() {
+  let bad = 0, firstDetail = '';
+  for (let seed = 1; seed <= 150; seed++) {
+    const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+    const before = win.state.world.mines.map(m => ({ ...m }));
+    win.unlockTunnel({ random: t63Lcg(seed * 7919) });
+    const problems = t69Problems(win, before, win.state.world.mines);
+    if (problems.length) { bad++; if (!firstDetail) firstDetail = 'seed ' + seed + ': ' + problems.join('; '); }
+    win.close();
+  }
+  check('Task69: 150 seeded openings obey every rule', bad === 0, firstDetail);
+})();
+
+(function test_T69_reachableAndDiscoverable() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  win.unlockTunnel({ random: t63Lcg(42) });
+  const beyond = t69Beyond(win, win.state.world.mines);
+  const hiddenCount = () => beyond.filter(m => win.state.world.hiddenMineIds.includes(m.id)).length;
+  check('Task69: every new mine can be walked to through the open tunnel', beyond.length === 8 && beyond.every(m => t69Reachable(win, m.x, m.y)));
+  check('Task69: all of them start undiscovered', hiddenCount() === 8);
+  // Walk the real route: through the tunnel to the west edge, then north and south along the land.
+  const p = win.state.world.player;
+  p.x = 0; p.y = 1;
+  const walk = (key, ticks) => {
+    win.setPlayerHeld(key, true);
+    for (let i = 0; i < ticks; i++) { win.tickPlayer(); win.tickExploration(); }
+    win.clearPlayerHeld(); win.tickPlayer();
+  };
+  walk('left', 60);
+  check('Task69: the player gets through the tunnel to the west edge of the world', p.x === -10 && p.y === 1);
+  walk('up', 80);
+  walk('down', 160);
+  check('Task69: the whole route stayed on walkable ground and ended at the south edge', win.isWorldPointWalkable(p.x, p.y) && p.y === 10);
+  check('Task69: walking the land beyond discovers every one of them by the usual rule', hiddenCount() === 0);
+})();
+
+(function test_T69_hiddenUntilFound() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  win.unlockTunnel({ random: t63Lcg(7) });
+  win.renderAll();
+  const beyond = t69Beyond(win, win.state.world.mines);
+  const stage = win.document.getElementById('worldStage');
+  check('Task69: new mines are drawn as unknown rocks on the stage', beyond.every(m => { const n = stage.querySelector('[data-world-mine="' + m.id + '"]'); return n && n.classList.contains('is-undiscovered'); }));
+  check('Task69: they stay off the exploration map and the mine list', beyond.every(m => !win.document.querySelector('[data-map-mine="' + m.id + '"]') && !win.document.querySelector('[data-secure-mine="' + m.id + '"]')));
+  check('Task69: the list says how many are still hidden', win.document.querySelector('[data-hidden-mines]') && parseInt(win.document.querySelector('[data-hidden-mines]').getAttribute('data-hidden-mines'), 10) === win.state.world.hiddenMineIds.length);
+  const near = beyond[0];
+  win.state.world.player.x = near.x; win.state.world.player.y = near.y;
+  win.tickExploration();
+  check('Task69: walking up to one discovers it with the usual rule', !win.state.world.hiddenMineIds.includes(near.id) && !!win.document.querySelector('[data-map-mine="' + near.id + '"]'));
+  check('Task69: a discovered mine still cannot be secured before its site is unlocked (existing rule)', win.secureMine(near.id) === false);
+  const res = win.RESOURCES.find(r => r.key === near.resource);
+  win.state.unlockedSites[res.site] = true;
+  check('Task69: ...and can once its site is unlocked', win.secureMine(near.id) === true && win.mineMine(near.id) === true && win.state.resources[near.resource] === 1);
+})();
+
+(function test_T69_deterministicWithInjectedRandom() {
+  const a = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const b = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  const base = a.state.world.mines.filter(m => t69Beyond(a, [m]).length === 0);
+  const ma = a.generateBeyondMines(base, { random: t63Lcg(99) });
+  const mb = b.generateBeyondMines(base, { random: t63Lcg(99) });
+  const mc = b.generateBeyondMines(base, { random: t63Lcg(100) });
+  const f = (ms) => JSON.stringify(ms.map(m => [m.id, m.x, m.y, m.resource]));
+  check('Task69: the same random source gives the same layout', f(ma) === f(mb));
+  check('Task69: a different random source gives a different layout', f(ma) !== f(mc));
+  check('Task69: the generator does not modify the mines it is given', base.length === 14 && a.state.world.mines.length === 14);
+  check('Task69: ids are readable and unique', new Set(ma.map(m => m.id)).size === 8 && ma.every(m => /^mine_beyond_(deepForest|rockyGround|halfDugMine|rareDeep)_\d+$/.test(m.id)));
+  check('Task69: a broken random source never throws or loops', (() => { try { return a.generateBeyondMines(base, { random: () => NaN }).length === 8; } catch (e) { return false; } })());
+  check('Task69: an empty zone table generates nothing', a.generateBeyondMines(base, { zones: [] }).length === 0 && a.generateBeyondMines(base, { zones: [{ zone: 'deepForest', ring: 'missing', count: 3 }] }).length === 0);
+  check('Task69: farther zones hold fewer mines than nearer ones (forest > rock > mine > rare)', ma.length === 8 && ['deepForest', 'rockyGround', 'halfDugMine', 'rareDeep'].map(z => ma.filter(m => a.terrainBeyondZoneAt(m.x, m.y) === z).length).join() === '3,2,2,1');
+})();
+
+(function test_T69_rarityRisesWithDistance() {
+  // Over many openings the mines in the outer-ring zones are rarer on average than in the far-ring zones.
+  const tier = { mana: 1, crystal: 1, rareMetal: 2, relic: 2, cosmicShard: 3, plasma: 3 };
+  let nearSum = 0, nearN = 0, farSum = 0, farN = 0, sawTop = false;
+  for (let seed = 1; seed <= 80; seed++) {
+    const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+    win.unlockTunnel({ random: t63Lcg(seed * 104729) });
+    win.state.world.mines.filter(m => win.terrainRegionAt(m.x, m.y) === 'beyond').forEach(m => {
+      const z = win.terrainBeyondZoneAt(m.x, m.y);
+      if (z === 'deepForest' || z === 'rockyGround') { nearSum += tier[m.resource]; nearN++; } else { farSum += tier[m.resource]; farN++; }
+      if (tier[m.resource] === 3) sawTop = true;
+    });
+    win.close();
+  }
+  check('Task69: outer-zone mines are rarer on average than far-zone mines', farN > 0 && nearN > 0 && farSum / farN > nearSum / nearN + 0.5);
+  check('Task69: the rarest resources (cosmic shard / plasma) can appear beyond the mountain', sawTop);
+  check('Task69: far zones never roll the rarest resources', (() => { const win = newDom(makeMemoryStorage(), { fullWorld: true }).window; let ok = true; for (let seed = 1; seed <= 60; seed++) { win.generateBeyondMines([], { random: t63Lcg(seed) }).forEach(m => { const z = win.terrainBeyondZoneAt(m.x, m.y); if ((z === 'deepForest' || z === 'rockyGround') && (m.resource === 'cosmicShard' || m.resource === 'plasma')) ok = false; }); } return ok; })());
+})();
+
+(function test_T69_saveLoad() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage, { fullWorld: true }).window;
+  win.unlockTunnel({ random: t63Lcg(5) });
+  win.saveGame();
+  const raw = storage.getItem('gachaFactorySave');
+  const saved = JSON.parse(raw);
+  const f = (w) => JSON.stringify([w.state.world.mines.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]), w.state.world.hiddenMineIds]);
+  const loaded = newDom(storage).window;
+  check('Task69: the generated mines and hidden ids survive save/load unchanged', f(loaded) === f(win) && loaded.state.world.mines.length === 22);
+  check('Task69: loading never generates again', loaded.state.world.tunnelUnlocked === true && loaded.unlockTunnel() === false && loaded.state.world.mines.length === 22);
+  check('Task69: saveVersion stays 1 and zones are not written to the save', saved.saveVersion === 1 && !/deepForest|rockyGround|halfDugMine|rareDeep/.test(raw.replace(/mine_beyond_(deepForest|rockyGround|halfDugMine|rareDeep)_\d+/g, '')));
+  // Save + load while standing beyond the mountain and then discover.
+  const mine = win.state.world.mines.find(m => m.id.startsWith('mine_beyond_deepForest_'));
+  win.state.world.player.x = mine.x; win.state.world.player.y = mine.y;
+  win.tickExploration();
+  win.saveGame();
+  const again = newDom(storage).window;
+  check('Task69: a discovered beyond mine stays discovered after reload', !again.state.world.hiddenMineIds.includes(mine.id) && again.state.world.player.x === mine.x && again.state.world.player.y === mine.y);
+})();
+
+(function test_T69_oldSaveWithBeyondMines() {
+  // An older save made before the tunnel existed, with beyond mines already in it.
+  const storage = makeMemoryStorage();
+  const seed = newDom(storage, { fullWorld: true }).window;
+  seed.saveGame();
+  const payload = JSON.parse(storage.getItem('gachaFactorySave'));
+  const old = [
+    { id: 'mine_old_forest', x: -8, y: 2, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' },
+    { id: 'mine_old_rock', x: -7, y: 6, resource: 'mana', grade: 2, miningPower: 3, developmentState: 'secured' },
+    { id: 'mine_old_rare', x: -9, y: -9, resource: 'plasma', grade: 4, miningPower: 1, developmentState: 'unsecured' },
+  ];
+  payload.run.world.mines = payload.run.world.mines.concat(old);
+  payload.run.world.hiddenMineIds = payload.run.world.hiddenMineIds.concat(['mine_old_forest', 'mine_old_rare']);
+  storage.setItem('gachaFactorySave', JSON.stringify(payload));
+  const win = newDom(storage).window;
+  const fields = (ms) => JSON.stringify(ms.map(m => [m.id, m.x, m.y, m.resource, m.grade, m.miningPower, m.developmentState]));
+  const before = win.state.world.mines.map(m => ({ ...m }));
+  check('Task69: loading the older save does not generate anything', win.state.world.mines.length === 17 && win.state.world.tunnelUnlocked === false);
+  win.unlockTunnel({ random: t63Lcg(11) });
+  const after = win.state.world.mines;
+  const beyondNow = t69Beyond(win, after);
+  const zoneCount = (z) => beyondNow.filter(m => win.terrainBeyondZoneAt(m.x, m.y) === z).length;
+  check('Task69: the older beyond mines are kept exactly (coords, resource, grade, power, state)', fields(after.filter(m => m.id.startsWith('mine_old_'))) === fields(old));
+  check('Task69: nothing else is moved or changed', fields(after.slice(0, 17)) === fields(before));
+  check('Task69: each zone is only topped up to its count (3 / 2 / 2 / 1 in total)', zoneCount('deepForest') === 3 && zoneCount('rockyGround') === 2 && zoneCount('halfDugMine') === 2 && zoneCount('rareDeep') === 1);
+  check('Task69: only the missing 5 are added; older hidden ids are kept', after.length === 17 + 5 && ['mine_old_forest', 'mine_old_rare'].every(id => win.state.world.hiddenMineIds.includes(id)) && !win.state.world.hiddenMineIds.includes('mine_old_rock'));
+  check('Task69: no new mine shares a cell with an older one', new Set(after.map(m => m.x + ',' + m.y)).size === after.length);
+})();
+
+(function test_T69_prestigeStartsClosedAgain() {
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  win.unlockTunnel({ random: t63Lcg(3) });
+  win.state.characters.push({ id: 'w_t69', rarity: 'common', resource: 'iron', mining: 1, carry: 1, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 });
+  win.state.runGold = 5000;
+  win.document.getElementById('prestigeBtn').click();
+  check('Task69: after prestige the new world is closed again with no beyond mines (until reopened)', win.state.world.tunnelUnlocked === false && t69Beyond(win, win.state.world.mines).length === 0 && win.state.world.mines.length === 14);
+})();
+
+// =============================================================================
 // SUMMARY
 // =============================================================================
 

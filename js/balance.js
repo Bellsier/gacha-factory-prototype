@@ -82,6 +82,21 @@ const BALANCE = {
       { key: 'far',   minDist: 7,  maxDist: 10,       count: 3, resources: { mana: 2, crystal: 2, rareMetal: 1, relic: 1 } },
       { key: 'outer', minDist: 10, maxDist: Infinity, count: 2, resources: { rareMetal: 2, relic: 2, cosmicShard: 1, plasma: 1 } },
     ],
+    // Task 69: the land beyond the mountain. It is not a separate generator:
+    // each environment zone (WORLD_TERRAIN.BEYOND.ZONES) borrows the resource
+    // pool of a distance ring above — the whole land is far from the base, the
+    // mine/rare zones are in the outermost ring. Farther from the tunnel exit =
+    // fewer mines. These mines are generated once, when the tunnel is opened
+    // (unlockTunnel), and are saved like any other mine.
+    BEYOND: {
+      MIN_SPACING: 2, // preferred minimum distance between mines (falls back if a zone is full)
+      ZONES: [
+        { zone: 'deepForest',  ring: 'far',   count: 3 },
+        { zone: 'rockyGround', ring: 'far',   count: 2 },
+        { zone: 'halfDugMine', ring: 'outer', count: 2 },
+        { zone: 'rareDeep',    ring: 'outer', count: 1 },
+      ],
+    },
   },
   gacha: {
     FIRST_TICKET_GOLD_THRESHOLD: 50, // one-time gold milestone that grants the first ticket

@@ -337,17 +337,35 @@ function mineMine(mineId){
 }
 
 // ---------------------------------------------------------------------------
-// Task 68: Tunnel opening.
+// Task 68/69: Tunnel opening.
 // Opening the tunnel is a one-way state change: it lets the player walk
-// through the mountain to the land beyond (js/terrain.js). This function is
-// the only place that changes it and has no condition of its own — what makes
-// the tunnel openable (research, a later Task) decides when it is called.
+// through the mountain to the land beyond (js/terrain.js) and, Task 69, brings
+// that land's mines into the world: generateBeyondMines() runs once here and
+// the new mines are added undiscovered (the player finds them by walking, as
+// with every ring mine). This function is the only place that opens the
+// tunnel and has no condition of its own — what makes the tunnel openable
+// (research, js/research.js) decides when it is called.
 // Returns true when the tunnel was closed and is now open, false when it was
 // already open. Callers re-render (renderAll) like they do after expandBase().
+// `options.random` is for tests (a () => [0,1) source).
 // ---------------------------------------------------------------------------
-function unlockTunnel(){
+function populateBeyondMines(options){
+  const world = state.world;
+  if(!Array.isArray(world.hiddenMineIds)) world.hiddenMineIds = [];
+  const added = [];
+  generateBeyondMines(world.mines, options).forEach(raw => {
+    const mine = addMine(raw);
+    if(!mine) return;
+    world.hiddenMineIds.push(mine.id);
+    added.push(mine);
+  });
+  return added;
+}
+
+function unlockTunnel(options){
   if(state.world.tunnelUnlocked === true) return false;
   state.world.tunnelUnlocked = true;
+  populateBeyondMines(options);
   log('터널이 열렸습니다. 산 너머로 갈 수 있어요.');
   return true;
 }
