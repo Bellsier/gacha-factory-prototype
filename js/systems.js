@@ -407,6 +407,7 @@ function tickLoop(){
   tickMining();
   tickCrafting();
   tickWorkshops();
+  tickTrades(); // Task 73: regular trade with partner companies
   tickAutoSell();
   tickPlayer();
   tickExploration(); // Task 65

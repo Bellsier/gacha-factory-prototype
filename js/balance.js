@@ -23,6 +23,9 @@ const BALANCE = {
     REPEAT_MIN_WEIGHT: 0.25,
     ORDER_VALUE_DIVISOR: 100,      // order reputation = floor(sqrt(order value / this))
     ORDER_REPUTATION_CAP: 4,       // most reputation one order can give
+    TRADE_INTERVAL_SEC: 60,        // regular trade: one purchase per company every this many seconds (waits for stock)
+    TRADE_QTY: 5,                  // regular trade: units bought per purchase
+    TRADE_PRICE_MULT: 1.3,         // regular trade: price paid = sell price * this * mult()
   },
   hq: {
     MULTIPLIER_PER_LEVEL: 0.08, // hqMult(): run-scoped multiplier gained per HQ level

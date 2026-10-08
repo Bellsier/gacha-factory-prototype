@@ -9,8 +9,8 @@
 // the spending is a later Task). Nothing here touches the DOM except log().
 //
 // Progress per company lives in permanent.companies (see state.js).
-// Regular trade (score >= company.regularScore) is only reported here
-// (isRegularTrade); the trade itself is a later Task.
+// Regular trade (score >= company.regularScore): tickTrades() buys the
+// company's favorite products at a better price on a fixed interval (Task 73).
 // ---------------------------------------------------------------------------
 function companyDef(key){
   if(typeof key !== 'string') return null;
@@ -128,4 +128,33 @@ function completeOrder(key){
   if(!wasRegular && isRegularTrade(key)) log(def.name + '과(와) 정기 거래를 시작합니다!');
   if(companySlots() > slotsBefore) log('명성이 올라 새 회사와 거래할 수 있게 되었습니다.');
   return rep;
+}
+
+// Task 73: regular trade. Every TRADE_INTERVAL_SEC a company with a regular
+// trade buys up to TRADE_QTY units of the first favorite product in stock and
+// pays above the normal price. With nothing in stock it simply waits (no
+// penalty); the purchase happens as soon as stock exists.
+function tradeProduct(key){
+  const def = companyDef(key);
+  if(!def) return null;
+  return def.favorites.find(k => (state.products[k] || 0) >= 1) || null;
+}
+
+function tickTrades(){
+  const b = BALANCE.delivery;
+  COMPANIES.forEach(def => {
+    if(!isRegularTrade(def.key)) return;
+    const p = companyProgress(def.key);
+    p.tradeTimer = Math.min(b.TRADE_INTERVAL_SEC, p.tradeTimer + 1 / TICKS_PER_SECOND);
+    if(p.tradeTimer < b.TRADE_INTERVAL_SEC) return;
+    const productKey = tradeProduct(def.key);
+    if(!productKey) return;
+    const qty = Math.min(b.TRADE_QTY, Math.floor(state.products[productKey]));
+    const recipe = recipeByKey(productKey);
+    const earned = qty * recipe.sell * b.TRADE_PRICE_MULT * mult();
+    state.products[productKey] -= qty;
+    state.gold += earned;
+    p.tradeTimer = 0;
+    log(def.name + '과(와) 정기 거래: ' + recipe.name + ' ' + qty + '개 → +' + fmt(earned) + 'G');
+  });
 }

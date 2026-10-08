@@ -430,12 +430,13 @@ function sanitizeRunState(raw){
 //   score       delivery score (regular trade starts at company.regularScore)
 //   orderIndex  how many of the company's orders were completed
 //   sent        units delivered per product (scoring decay for repeats)
+//   tradeTimer  seconds since the last regular-trade purchase (Task 73)
 function freshCompaniesState(){
   const out = {};
   COMPANIES.forEach(c => {
     const sent = {};
     RECIPES.forEach(r => { sent[r.key] = 0; });
-    out[c.key] = { score: 0, orderIndex: 0, sent };
+    out[c.key] = { score: 0, orderIndex: 0, sent, tradeTimer: 0 };
   });
   return out;
 }
@@ -447,6 +448,7 @@ function sanitizeCompaniesState(raw){
     if(!isPlainObject(r)) return;
     out[c.key].score = isNonNegativeFinite(r.score) ? r.score : 0;
     out[c.key].orderIndex = (Number.isInteger(r.orderIndex) && r.orderIndex >= 0) ? Math.min(r.orderIndex, c.orders.length) : 0;
+    out[c.key].tradeTimer = isNonNegativeFinite(r.tradeTimer) ? Math.min(r.tradeTimer, BALANCE.delivery.TRADE_INTERVAL_SEC) : 0;
     out[c.key].sent = sanitizeNumberMap(r.sent, RECIPES.map(x => x.key), 0, isNonNegativeFinite);
   });
   return out;

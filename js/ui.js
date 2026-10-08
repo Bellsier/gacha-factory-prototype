@@ -328,6 +328,129 @@ function renderResearch(){
   });
 }
 
+// Task 73: delivery tab (납품). renderDelivery() rebuilds the cards after
+// structural changes (renderAll, an order completed); the per-tick refresh in
+// updateNumbers only rewrites texts and disabled flags, so the product select
+// and the quantity box keep what the player typed.
+function companyClosedReason(def){
+  if(!isDeliveryUnlocked()) return '연구 탭에서 "납품 계약"을 연구하면 만날 수 있어요.';
+  const index = COMPANIES.indexOf(def);
+  if(index >= companySlots()){
+    const need = BALANCE.delivery.SLOT_THRESHOLDS[index];
+    return '명성 ' + need + '점이 되면 거래할 수 있어요. (현재 ' + fmt(permanent.totalPrestige) + '점)';
+  }
+  const missing = (def.requires || []).filter(k => !isResearchDone(k)).map(k => (researchDef(k) || { name: k }).name);
+  return missing.length ? '먼저 "' + missing.join(', ') + '" 연구가 필요해요.' : '';
+}
+
+function companyScoreText(def){
+  const p = companyProgress(def.key);
+  const base = '점수 ' + fmt(p.score) + ' / ' + fmt(def.regularScore);
+  return isRegularTrade(def.key) ? base + ' · 정기 거래 중 (' + tradeStatusText(def.key) + ')' : base;
+}
+
+function tradeStatusText(key){
+  const p = companyProgress(key);
+  const left = Math.max(0, BALANCE.delivery.TRADE_INTERVAL_SEC - p.tradeTimer);
+  if(left > 0) return Math.ceil(left) + '초 뒤 거래';
+  return tradeProduct(key) ? '곧 거래' : '선호 제품을 기다리는 중';
+}
+
+function orderText(def){
+  const order = currentOrder(def.key);
+  if(!order) return '모든 수주를 완수했어요. 자유 납품은 계속 할 수 있어요.';
+  const recipe = recipeByKey(order.product);
+  return '수주: ' + recipe.name + ' ' + order.qty + '개 (보유 ' + fmt(state.products[order.product] || 0) + '개) · 배송비 ' + fmt(shippingCost(def.key, order.product, order.qty)) + 'G · 완수 시 명성 +' + orderReputation(order);
+}
+
+function deliverySelection(key){
+  const select = document.querySelector('[data-deliver-product="' + key + '"]');
+  const input = document.querySelector('[data-deliver-qty="' + key + '"]');
+  const productKey = select ? select.value : '';
+  const qty = input ? Math.floor(Number(input.value)) : 0;
+  return { productKey, qty: Number.isFinite(qty) ? qty : 0 };
+}
+
+function deliveryPreviewText(key){
+  const { productKey, qty } = deliverySelection(key);
+  if(!recipeByKey(productKey) || qty <= 0) return '보낼 수량을 정하세요.';
+  return '보유 ' + fmt(state.products[productKey] || 0) + '개 · 배송비 ' + fmt(shippingCost(key, productKey, qty)) + 'G · 점수 +' + fmt(deliveryScore(key, productKey, qty));
+}
+
+function renderDelivery(){
+  const wrap = document.getElementById('deliveryList');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  COMPANIES.forEach(def => {
+    const open = isCompanyOpen(def.key);
+    const card = document.createElement('div');
+    card.className = 'line company-card' + (open ? '' : ' is-closed');
+    card.setAttribute('data-company-card', def.key);
+    card.setAttribute('data-company-open', open ? 'true' : 'false');
+    let html = '<div class="res-name">' + def.name + '</div><div class="rate">' + def.desc + '</div>';
+    if(!open){
+      html += '<div class="rate" data-company-closed="' + def.key + '">' + companyClosedReason(def) + '</div>';
+      card.innerHTML = html;
+      wrap.appendChild(card);
+      return;
+    }
+    const options = RECIPES.filter(r => !recipeNeedsLockedResource(r)).map(r =>
+      '<option value="' + r.key + '">' + r.name + (def.favorites.includes(r.key) ? ' ★' : '') + '</option>'
+    ).join('');
+    html +=
+      '<div class="rate" data-company-score="' + def.key + '">' + companyScoreText(def) + '</div>' +
+      '<div class="rate">좋아하는 것: ' + def.favorites.map(k => (recipeByKey(k) || { name: k }).name).join(', ') + ' (★ 점수 ×' + BALANCE.delivery.FAVORITE_MULT + ')</div>' +
+      '<div class="rate" data-company-order="' + def.key + '">' + orderText(def) + '</div>' +
+      (currentOrder(def.key) ? '<button data-complete-order="' + def.key + '" ' + dis(!canCompleteOrder(def.key)) + '>수주 완수</button>' : '') +
+      '<div class="row">' +
+        '<select data-deliver-product="' + def.key + '">' + options + '</select>' +
+        '<input type="number" min="1" step="1" value="1" data-deliver-qty="' + def.key + '">' +
+      '</div>' +
+      '<div class="rate" data-deliver-preview="' + def.key + '"></div>' +
+      '<button class="ghost" data-deliver="' + def.key + '">자유 납품</button>';
+    card.innerHTML = html;
+    wrap.appendChild(card);
+  });
+  wrap.querySelectorAll('[data-complete-order]').forEach(btn => {
+    btn.onclick = () => {
+      if(!completeOrder(btn.dataset.completeOrder)) return;
+      renderAll();
+    };
+  });
+  wrap.querySelectorAll('[data-deliver]').forEach(btn => {
+    btn.onclick = () => {
+      const key = btn.dataset.deliver;
+      const { productKey, qty } = deliverySelection(key);
+      if(!deliverProducts(key, productKey, qty)) return;
+      updateNumbers();
+    };
+  });
+  wrap.querySelectorAll('[data-deliver-product], [data-deliver-qty]').forEach(el => {
+    el.oninput = el.onchange = () => { updateDeliveryNumbers(); };
+  });
+}
+
+// Per-tick refresh of the delivery tab; never rebuilds anything.
+function updateDeliveryNumbers(){
+  COMPANIES.forEach(def => {
+    if(!isCompanyOpen(def.key)) return;
+    const key = def.key;
+    const score = document.querySelector('[data-company-score="' + key + '"]');
+    if(score) score.textContent = companyScoreText(def);
+    const order = document.querySelector('[data-company-order="' + key + '"]');
+    if(order) order.textContent = orderText(def);
+    const orderBtn = document.querySelector('[data-complete-order="' + key + '"]');
+    if(orderBtn) orderBtn.disabled = !canCompleteOrder(key);
+    const preview = document.querySelector('[data-deliver-preview="' + key + '"]');
+    if(preview) preview.textContent = deliveryPreviewText(key);
+    const btn = document.querySelector('[data-deliver="' + key + '"]');
+    if(btn){
+      const { productKey, qty } = deliverySelection(key);
+      btn.disabled = !canDeliver(key, productKey, qty);
+    }
+  });
+}
+
 // Full rebuild: only called after structural changes (auto-craft unlock
 // toggling, site unlock, prestige reset). Buttons keep their identity between ticks.
 function buildRecipes(){
@@ -564,6 +687,7 @@ function updateNumbers(){
     const progressEl = document.querySelector('[data-workshop-progress="' + workshop.id + '"]');
     if(progressEl) progressEl.textContent = workshopProgressLabel(workshop, recipe);
   });
+  updateDeliveryNumbers();
   const buildBtn = document.querySelector('[data-build-workshop]');
   if(buildBtn){ buildBtn.disabled = !canBuildWorkshop(); buildBtn.textContent = workshopBuildLabel(); }
   RESEARCH.forEach(def=>{
@@ -608,6 +732,7 @@ function renderAll(){
   buildWorkers();
   renderResearch();
   renderWorkshopBuild();
+  renderDelivery();
   renderLastPull();
   updateNumbers();
   renderWorldGround();

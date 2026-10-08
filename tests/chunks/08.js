@@ -2881,6 +2881,126 @@ function t72Open(win) {
 })();
 
 
+// ---------------------------------------------------------------------------
+// Task 73: regular trade tick and the delivery tab
+// ---------------------------------------------------------------------------
+function t73Trade(win, n) { for (let i = 0; i < n; i++) win.tickTrades(); }
+
+(function test_T73_tradeTick() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  win.permanent.companies.forge.score = 300;
+  win.state.products.steel = 12;
+  const g0 = win.state.gold;
+  t73Trade(win, 599);
+  check('Task73: nothing is bought before 60 seconds', win.state.products.steel === 12 && win.state.gold === g0);
+  t73Trade(win, 2);
+  const paid = 5 * 5 * 1.3 * win.mult();
+  check('Task73: after 60 s the company buys 5 favorites at 1.3x', win.state.products.steel === 7 && Math.abs(win.state.gold - g0 - paid) < 1e-6);
+  check('Task73: the timer restarts', win.permanent.companies.forge.tradeTimer < 1);
+  t73Trade(win, 1200);
+  check('Task73: it keeps trading every interval until the stock is short', win.state.products.steel === 0);
+  win.state.products.steel = 0;
+  t73Trade(win, 700);
+  const g1 = win.state.gold;
+  check('Task73: with no stock it waits without penalty', win.state.gold === g1 && win.permanent.companies.forge.tradeTimer === 60);
+  win.state.products.steel = 3;
+  t73Trade(win, 2);
+  check('Task73: it buys what exists as soon as stock appears', win.state.products.steel === 0 && win.state.gold > g1);
+})();
+
+(function test_T73_tradeRules() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  win.state.products.steel = 10;
+  t73Trade(win, 1300);
+  check('Task73: a company without a regular trade buys nothing', win.state.products.steel === 10);
+  win.permanent.companies.forge.score = 300;
+  win.state.products.steel = 0; win.state.products.coalBrick = 4;
+  t73Trade(win, 620);
+  check('Task73: it buys the first favorite that is in stock (coal brick)', win.state.products.coalBrick === 0);
+  win.state.products.alloy = 9;
+  check('Task73: it never buys a non-favorite', win.tradeProduct('forge') === null && win.state.products.alloy === 9);
+})();
+
+(function test_T73_tradeSave() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  t72Open(win);
+  win.permanent.companies.forge.score = 300;
+  t73Trade(win, 250);
+  win.saveGame();
+  const loaded = newDom(storage).window;
+  check('Task73: the trade timer is saved and loaded', Math.abs(loaded.permanent.companies.forge.tradeTimer - win.permanent.companies.forge.tradeTimer) < 1e-9 && loaded.permanent.companies.forge.tradeTimer > 24);
+  const p = JSON.parse(storage.getItem('gachaFactorySave'));
+  p.permanent.companies.forge.tradeTimer = 9999;
+  storage.setItem('gachaFactorySave', JSON.stringify(p));
+  check('Task73: a huge saved timer is capped to the interval', newDom(storage).window.permanent.companies.forge.tradeTimer === 60);
+  p.permanent.companies.forge.tradeTimer = -5;
+  storage.setItem('gachaFactorySave', JSON.stringify(p));
+  check('Task73: a negative saved timer becomes 0', newDom(storage).window.permanent.companies.forge.tradeTimer === 0);
+})();
+
+(function test_T73_deliveryTab() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  check('Task73: a 납품 tab and panel exist', !!doc.querySelector('[data-tab="delivery"]') && !!doc.getElementById('tab-delivery'));
+  check('Task73: before the research every company is closed and points to it', doc.querySelectorAll('[data-company-card]').length === 3 && Array.from(doc.querySelectorAll('[data-company-open]')).every(e => e.getAttribute('data-company-open') === 'false') && /납품 계약/.test(doc.querySelector('[data-company-closed="forge"]').textContent));
+  doc.querySelector('[data-tab="delivery"]').click();
+  check('Task73: clicking the tab shows the panel', doc.getElementById('tab-delivery').classList.contains('active'));
+  t72Open(win);
+  win.renderAll();
+  check('Task73: after the research the forge is open and the others say why not', doc.querySelector('[data-company-card="forge"]').getAttribute('data-company-open') === 'true' && /명성 5점/.test(doc.querySelector('[data-company-closed="harbor"]').textContent) && /명성 15점/.test(doc.querySelector('[data-company-closed="lab"]').textContent));
+  check('Task73: the card shows score, order and a disabled order button without stock', /점수 0 \/ 300/.test(doc.querySelector('[data-company-score="forge"]').textContent) && /강철 20개/.test(doc.querySelector('[data-company-order="forge"]').textContent));
+})();
+
+(function test_T73_deliveryActions() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  t72Open(win);
+  win.state.products.steel = 5;
+  win.renderAll();
+  const orderBtn = doc.querySelector('[data-complete-order="forge"]');
+  check('Task73: the order button is disabled while stock is short', orderBtn.disabled === true);
+  win.state.products.steel = 30;
+  win.updateNumbers();
+  check('Task73: the per-tick refresh enables it without rebuilding', doc.querySelector('[data-complete-order="forge"]') === orderBtn && orderBtn.disabled === false);
+  const select = doc.querySelector('[data-deliver-product="forge"]');
+  const input = doc.querySelector('[data-deliver-qty="forge"]');
+  select.value = 'steel'; input.value = '7';
+  select.dispatchEvent(new win.Event('change'));
+  check('Task73: the preview shows shipping and score for the typed amount', /배송비 4G/.test(doc.querySelector('[data-deliver-preview="forge"]').textContent) && /점수 \+52/.test(doc.querySelector('[data-deliver-preview="forge"]').textContent));
+  doc.querySelector('[data-deliver="forge"]').click();
+  check('Task73: free delivery spends stock, keeps the typed values and updates the score text', win.state.products.steel === 23 && doc.querySelector('[data-deliver-qty="forge"]') === input && input.value === '7' && /점수 52 /.test(doc.querySelector('[data-company-score="forge"]').textContent));
+  input.value = '0';
+  input.dispatchEvent(new win.Event('input'));
+  check('Task73: an empty amount disables the delivery button', doc.querySelector('[data-deliver="forge"]').disabled === true);
+  input.value = '1.9'; input.dispatchEvent(new win.Event('input'));
+  check('Task73: a fractional amount is floored', /점수 \+7\.2/.test(doc.querySelector('[data-deliver-preview="forge"]').textContent));
+  orderBtn.click();
+  check('Task73: clicking 수주 완수 completes the order and shows the next one', win.permanent.totalPrestige === 1 && /석탄 벽돌 25개/.test(doc.querySelector('[data-company-order="forge"]').textContent));
+  win.renderAll(); win.renderAll();
+  check('Task73: re-rendering never duplicates cards', doc.querySelectorAll('[data-company-card]').length === 3);
+})();
+
+(function test_T73_slotsInTab() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  t72Open(win);
+  win.permanent.totalPrestige = 5;
+  win.renderAll();
+  check('Task73: reputation 5 opens the harbor card', doc.querySelector('[data-company-card="harbor"]').getAttribute('data-company-open') === 'true');
+  win.permanent.totalPrestige = 15;
+  win.renderAll();
+  check('Task73: the lab still asks for the tunnel research', /터널 굴착/.test(doc.querySelector('[data-company-closed="lab"]').textContent));
+  win.state.research.tunnelWork = true;
+  win.renderAll();
+  check('Task73: and opens after it', doc.querySelector('[data-company-card="lab"]').getAttribute('data-company-open') === 'true');
+  const css = require('fs').readFileSync('css/style.css', 'utf8');
+  check('Task73: company cards are styled', /\.company-card/.test(css));
+})();
+
+
 // SUMMARY
 // =============================================================================
 
