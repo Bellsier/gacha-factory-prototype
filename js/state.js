@@ -74,7 +74,7 @@ let state = freshRunState();
 // meaning, same save/load JSON shape as before (Task 1/6); sanitizePermanent()
 // already returns exactly this shape, so loading a save assigns into this
 // variable directly.
-let permanent = { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: false };
+let permanent = { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: false, reputationPoints: 0, companies: freshCompaniesState() };
 
 function freshRunState(){
   const resources = {}, facility = {}, workforce = {};
@@ -425,11 +425,41 @@ function sanitizeRunState(raw){
     world, // Task 27: additive field; missing (legacy save) -> fresh world state
   };
 }
+// Task 72: per-company delivery progress. Lives in `permanent` because
+// deliveries no longer reset with a run (Blueprint 15.1).
+//   score       delivery score (regular trade starts at company.regularScore)
+//   orderIndex  how many of the company's orders were completed
+//   sent        units delivered per product (scoring decay for repeats)
+function freshCompaniesState(){
+  const out = {};
+  COMPANIES.forEach(c => {
+    const sent = {};
+    RECIPES.forEach(r => { sent[r.key] = 0; });
+    out[c.key] = { score: 0, orderIndex: 0, sent };
+  });
+  return out;
+}
+function sanitizeCompaniesState(raw){
+  const out = freshCompaniesState();
+  if(!isPlainObject(raw)) return out;
+  COMPANIES.forEach(c => {
+    const r = raw[c.key];
+    if(!isPlainObject(r)) return;
+    out[c.key].score = isNonNegativeFinite(r.score) ? r.score : 0;
+    out[c.key].orderIndex = (Number.isInteger(r.orderIndex) && r.orderIndex >= 0) ? Math.min(r.orderIndex, c.orders.length) : 0;
+    out[c.key].sent = sanitizeNumberMap(r.sent, RECIPES.map(x => x.key), 0, isNonNegativeFinite);
+  });
+  return out;
+}
 function sanitizePermanent(raw){
-  const fresh = { totalPrestige:0, runCount:1, tickets:0, firstGachaGranted:false };
+  const fresh = { totalPrestige:0, runCount:1, tickets:0, firstGachaGranted:false, reputationPoints:0, companies: freshCompaniesState() };
   if(!isPlainObject(raw)) return fresh;
+  const totalPrestige = isNonNegativeFinite(raw.totalPrestige) ? raw.totalPrestige : 0;
   return {
-    totalPrestige: isNonNegativeFinite(raw.totalPrestige) ? raw.totalPrestige : 0,
+    totalPrestige,
+    // Task 72: spendable reputation. An older save has none: it starts equal to what was earned.
+    reputationPoints: isNonNegativeFinite(raw.reputationPoints) ? Math.min(raw.reputationPoints, totalPrestige) : totalPrestige,
+    companies: sanitizeCompaniesState(raw.companies),
     runCount: (Number.isInteger(raw.runCount) && raw.runCount >= 1) ? raw.runCount : 1, // runCount starts at 1 and only ever increments
     tickets: isNonNegativeFinite(raw.tickets) ? raw.tickets : 0,
     firstGachaGranted: typeof raw.firstGachaGranted === 'boolean' ? raw.firstGachaGranted : false,
@@ -468,7 +498,7 @@ function saveGame(){
     const payload = {
       saveVersion: CURRENT_SAVE_VERSION,
       savedAt: Date.now(),
-      permanent: { totalPrestige: permanent.totalPrestige, runCount: permanent.runCount, tickets: permanent.tickets, firstGachaGranted: permanent.firstGachaGranted },
+      permanent: { totalPrestige: permanent.totalPrestige, runCount: permanent.runCount, tickets: permanent.tickets, firstGachaGranted: permanent.firstGachaGranted, reputationPoints: permanent.reputationPoints, companies: permanent.companies },
       run: state,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));

@@ -17,10 +17,12 @@ const RESEARCH_EFFECTS = {
   unlockTunnel: () => unlockTunnel(),
   unlockWorkshopBuild: () => { log('제작소를 지을 수 있게 되었습니다.'); },
   unlockAutoCraft: () => { log('자동 제작 장치가 완성되었습니다.'); },
+  unlockDelivery: () => { log('회사와 납품 계약을 맺었습니다.'); },
 };
 
 function isAutoCraftUnlocked(){ return isResearchDone('autoCraftDevice'); }
 function isWorkshopBuildUnlocked(){ return isResearchDone('workshopBuild'); }
+function isDeliveryUnlocked(){ return isResearchDone('deliveryContract'); }
 
 function researchDef(key){
   if(typeof key !== 'string') return null;

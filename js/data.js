@@ -52,14 +52,37 @@ const RESEARCH_BRANCHES = [
   {key:'craft',      name:'제작'},
   {key:'automation', name:'자동화'},
   {key:'explore',    name:'탐험'},
+  {key:'delivery',   name:'납품'},
 ];
 const RESEARCH = [
   {key:'workshopBuild', branch:'craft', name:'제작소 건설', desc:'기지 주변에 제작소를 지을 수 있게 됩니다. 제작소는 레시피를 정해 두고 따로 물건을 만들어요.',
    effect:'unlockWorkshopBuild', cost:{gold:100, products:{steel:5}}, requires:[]},
   {key:'autoCraftDevice', branch:'automation', name:'자동 제작 장치', desc:'제작을 스스로 반복하는 기계 장치입니다. 레시피 카드와 제작소에서 "자동 제작"을 켤 수 있게 돼요.',
    effect:'unlockAutoCraft', cost:{gold:150, products:{steel:10}}, requires:[]},
+  {key:'deliveryContract', branch:'delivery', name:'납품 계약', desc:'회사에 제품을 보내고 수주를 받을 수 있게 됩니다. 수주를 완수하면 명성을 얻어요.',
+   effect:'unlockDelivery', cost:{gold:200, products:{steel:10}}, requires:[]},
   {key:'tunnelWork', branch:'explore', name:'터널 굴착', desc:'산을 가로지르는 터널을 뚫어 산 너머로 가는 길을 엽니다. 산 너머에는 더 희귀한 광맥이 있어요.',
    effect:'unlockTunnel', cost:{gold:1500, products:{alloy:5}}, requires:[]},
+];
+// Task 72: partner companies (Blueprint 15.1). Content data like SITES.
+//   distance      shipping-cost factor (farther = costlier)
+//   favorites     product keys the company likes: their delivery score is multiplied
+//   regularScore  score at which a regular trade begins (Task 73)
+//   requires      research keys that must be done before the company can be reached
+//   orders        the company's orders in sequence: { product, qty }. Completing one
+//                 pays reputation (see orderReputation in delivery.js).
+// The number of companies that can be reached grows with reputation
+// (BALANCE.delivery.SLOT_THRESHOLDS); free deliveries to them are always possible.
+const COMPANIES = [
+  {key:'forge', name:'마을 대장간', desc:'가까운 마을의 대장간. 강철과 석탄 벽돌을 좋아해요.',
+   distance:1, favorites:['steel','coalBrick'], regularScore:300, requires:[],
+   orders:[{product:'steel', qty:20}, {product:'coalBrick', qty:25}, {product:'steel', qty:60}, {product:'alloy', qty:10}, {product:'alloy', qty:20}]},
+  {key:'harbor', name:'항구 상회', desc:'바다 건너로 물건을 파는 상회. 합금류를 높이 쳐줘요.',
+   distance:1.5, favorites:['alloy','crystalAlloy','specialAlloy'], regularScore:1200, requires:[],
+   orders:[{product:'alloy', qty:30}, {product:'crystalAlloy', qty:25}, {product:'specialAlloy', qty:20}, {product:'precisionPart', qty:10}, {product:'specialAlloy', qty:35}]},
+  {key:'lab', name:'산 너머 연구소', desc:'산 너머의 연구소. 정밀한 부품과 코어를 찾아요. 터널이 열려야 닿을 수 있어요.',
+   distance:2.5, favorites:['precisionPart','relicPart','quantumCore','plasmaCore'], regularScore:6000, requires:['tunnelWork'],
+   orders:[{product:'precisionPart', qty:20}, {product:'relicPart', qty:20}, {product:'quantumCore', qty:5}, {product:'plasmaCore', qty:8}]},
 ];
 const RARITY = [
   {key:'common', label:'일반', chance:60, mining:1, carry:2, move:1, cls:'common'},

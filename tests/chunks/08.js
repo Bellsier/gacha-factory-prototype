@@ -2675,11 +2675,11 @@ function t70Afford(win) {
   const win = newDom(makeMemoryStorage()).window;
   const doc = win.document;
   check('Task71: every research belongs to a known branch', win.RESEARCH.every(r => win.RESEARCH_BRANCHES.some(b => b.key === r.branch)));
-  check('Task71: the tab shows one title per branch with its cards', doc.querySelectorAll('.research-branch-title').length === 3 && doc.querySelectorAll('[data-research-card]').length === 3);
+  check('Task71: the tab shows one title per branch with its cards', doc.querySelectorAll('.research-branch-title').length === 4 && doc.querySelectorAll('[data-research-card]').length === 4);
   const titles = Array.from(doc.querySelectorAll('.research-branch-title')).map(e => e.textContent).join();
-  check('Task71: branches are 제작/자동화/탐험', titles === '제작,자동화,탐험');
+  check('Task71: branches are 제작/자동화/탐험/납품', titles === '제작,자동화,탐험,납품');
   win.renderAll(); win.renderAll();
-  check('Task71: re-rendering never duplicates titles', doc.querySelectorAll('.research-branch-title').length === 3);
+  check('Task71: re-rendering never duplicates titles', doc.querySelectorAll('.research-branch-title').length === 4);
   const css = require('fs').readFileSync('css/style.css', 'utf8');
   check('Task71: branch titles are styled', /\.research-branch-title/.test(css));
 })();
@@ -2705,6 +2705,179 @@ function t70Afford(win) {
     const w = edit((p) => { p.run.research = bad; p.run.autoCraft = {}; p.run.world.workshops = []; });
     check('Task71: invalid research value #' + i + ' loads as not done', w.isWorkshopBuildUnlocked() === false && w.isAutoCraftUnlocked() === false);
   });
+})();
+
+
+// ---------------------------------------------------------------------------
+// Task 72: delivery, companies, orders, reputation
+// ---------------------------------------------------------------------------
+function t72Open(win) {
+  win.state.gold = 1e6;
+  win.state.products.steel = 200;
+  win.doResearch('deliveryContract');
+  win.state.gold = 1e6;
+  win.state.products.steel = 200;
+}
+
+(function test_T72_data() {
+  const win = newDom(makeMemoryStorage()).window;
+  const cs = win.COMPANIES;
+  check('Task72: three companies with unique keys', cs.length === 3 && new Set(cs.map(c => c.key)).size === 3);
+  check('Task72: every favorite and order product is a real recipe', cs.every(c => c.favorites.every(k => win.RECIPES.some(r => r.key === k)) && c.orders.every(o => win.RECIPES.some(r => r.key === o.product) && Number.isInteger(o.qty) && o.qty > 0)));
+  check('Task72: farther companies cost more to ship to', cs[0].distance < cs[1].distance && cs[1].distance < cs[2].distance);
+  check('Task72: the mountain company needs the tunnel research', cs[2].requires.join() === 'tunnelWork' && cs[0].requires.length === 0);
+  check('Task72: the order list is known as reference rewards', [20, 10, 20, 25].every((q, i) => win.orderReputation({ product: ['steel', 'alloy', 'alloy', 'coalBrick'][i], qty: q }) === [1, 1, 2, 1][i]));
+})();
+
+(function test_T72_reputationFormula() {
+  const win = newDom(makeMemoryStorage()).window;
+  const rep = (product, qty) => win.orderReputation({ product, qty });
+  check('Task72: steel x20 (value 100) pays 1', rep('steel', 20) === 1);
+  check('Task72: alloy x20 (400) pays 2', rep('alloy', 20) === 2);
+  check('Task72: special alloy x35 (1575) pays 3', rep('specialAlloy', 35) === 3);
+  check('Task72: precision part x20 (1600) pays 4', rep('precisionPart', 20) === 4);
+  check('Task72: a very large order is capped at 4', rep('quantumCore', 16) === 4);
+  check('Task72: too small an order pays nothing', rep('steel', 5) === 0);
+  check('Task72: an unknown product pays nothing', win.orderReputation({ product: 'nope', qty: 10 }) === 0 && win.orderReputation(null) === 0);
+})();
+
+(function test_T72_slots() {
+  const win = newDom(makeMemoryStorage()).window;
+  const at = (n) => { win.permanent.totalPrestige = n; return win.companySlots(); };
+  check('Task72: no reputation still gives one company', at(0) === 1);
+  check('Task72: 4 reputation is still one', at(4) === 1);
+  check('Task72: 5 gives two', at(5) === 2);
+  check('Task72: 14 is still two', at(14) === 2);
+  check('Task72: 15 gives three', at(15) === 3);
+  check('Task72: more reputation never adds more', at(1000) === 3);
+})();
+
+(function test_T72_openAndGate() {
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task72: nothing can be delivered before the research', win.isCompanyOpen('forge') === false && win.deliverProducts('forge', 'steel', 1) === 0);
+  t72Open(win);
+  check('Task72: the research opens the first company only', win.isCompanyOpen('forge') === true && win.isCompanyOpen('harbor') === false && win.isCompanyOpen('lab') === false);
+  win.permanent.totalPrestige = 5;
+  check('Task72: reputation 5 opens the second', win.isCompanyOpen('harbor') === true && win.isCompanyOpen('lab') === false);
+  win.permanent.totalPrestige = 15;
+  check('Task72: the third still needs the tunnel research', win.isCompanyOpen('lab') === false);
+  win.state.research.tunnelWork = true;
+  check('Task72: ...and opens once it is done', win.isCompanyOpen('lab') === true);
+  check('Task72: an unknown company is never open', win.isCompanyOpen('nope') === false && win.isCompanyOpen(null) === false);
+})();
+
+(function test_T72_freeDelivery() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  const g0 = win.state.gold;
+  check('Task72: shipping for 10 steel to the forge is ceil(10*5*0.1*1)=5', win.shippingCost('forge', 'steel', 10) === 5);
+  check('Task72: shipping for 20 alloy to the harbor is ceil(20*20*0.1*1.5)=60', win.shippingCost('harbor', 'alloy', 20) === 60);
+  const gain = win.deliverProducts('forge', 'steel', 10);
+  check('Task72: a favorite delivery scores qty*sell*1.5 = 75', gain === 75 && win.permanent.companies.forge.score === 75);
+  check('Task72: the products and shipping are used up', win.state.products.steel === 190 && win.state.gold === g0 - 5);
+  check('Task72: a free delivery gives no reputation', win.permanent.totalPrestige === 0 && win.permanent.reputationPoints === 0);
+  check('Task72: the delivered amount is recorded', win.permanent.companies.forge.sent.steel === 10);
+  const before = JSON.stringify([win.state.products, win.state.gold, win.permanent.companies]);
+  check('Task72: more than owned is refused and changes nothing', win.deliverProducts('forge', 'steel', 1000) === 0 && JSON.stringify([win.state.products, win.state.gold, win.permanent.companies]) === before);
+  win.state.gold = 2;
+  check('Task72: not enough gold for shipping is refused', win.canDeliver('forge', 'steel', 10) === false && win.deliverProducts('forge', 'steel', 10) === 0 && win.state.products.steel === 190);
+  win.state.gold = 1e6;
+  check('Task72: invalid quantities are refused', [0, -1, 1.5, NaN, '3', null].every(q => win.deliverProducts('forge', 'steel', q) === 0));
+  check('Task72: an unknown product is refused', win.deliverProducts('forge', 'nope', 1) === 0);
+  check('Task72: a closed company is refused', win.deliverProducts('harbor', 'steel', 1) === 0);
+})();
+
+(function test_T72_scoreRules() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  win.state.products.alloy = 100;
+  win.permanent.totalPrestige = 5;
+  check('Task72: a non-favorite is not boosted (harbor, steel x10 = 50)', win.deliveryScore('harbor', 'steel', 10) === 50);
+  check('Task72: a favorite is boosted (harbor, alloy x10 = 300)', win.deliveryScore('harbor', 'alloy', 10) === 300);
+  win.permanent.companies.forge.sent.steel = 100;
+  check('Task72: repeating the same product weighs less (half at 100 sent)', win.deliveryScore('forge', 'steel', 10) === 10 * 5 * 1.5 * 0.5);
+  win.permanent.companies.forge.sent.steel = 10000;
+  check('Task72: the weight never goes below 0.25', win.deliveryScore('forge', 'steel', 10) === 10 * 5 * 1.5 * 0.25);
+  check('Task72: another company is not affected by that repeat', win.deliveryScore('harbor', 'steel', 10) === 50);
+})();
+
+(function test_T72_regularTrade() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  check('Task72: no regular trade at first', win.isRegularTrade('forge') === false);
+  win.permanent.companies.forge.score = 299;
+  check('Task72: 299 is not enough', win.isRegularTrade('forge') === false);
+  win.state.products.steel = 10;
+  win.deliverProducts('forge', 'steel', 1);
+  check('Task72: crossing 300 starts a regular trade', win.isRegularTrade('forge') === true);
+  check('Task72: the log says so once', win.document.getElementById('log').textContent.split('정기 거래를 시작').length === 2);
+})();
+
+(function test_T72_orders() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  const o = win.currentOrder('forge');
+  check('Task72: the first forge order is steel x20', o.product === 'steel' && o.qty === 20);
+  win.state.products.steel = 19;
+  check('Task72: a short stock cannot complete it', win.canCompleteOrder('forge') === false && win.completeOrder('forge') === 0 && win.state.products.steel === 19 && win.permanent.companies.forge.orderIndex === 0);
+  win.state.products.steel = 25;
+  const g0 = win.state.gold;
+  const rep = win.completeOrder('forge');
+  check('Task72: completing pays 1 reputation to both values', rep === 1 && win.permanent.totalPrestige === 1 && win.permanent.reputationPoints === 1);
+  check('Task72: it spends exactly the order and its shipping', win.state.products.steel === 5 && win.state.gold === g0 - win.shippingCost('forge', 'steel', 20));
+  check('Task72: the order also counts as a delivery', win.permanent.companies.forge.score === 20 * 5 * 1.5 && win.permanent.companies.forge.sent.steel === 20);
+  check('Task72: the next order comes up', win.permanent.companies.forge.orderIndex === 1 && win.currentOrder('forge').product === 'coalBrick');
+  check('Task72: the multiplier follows the reputation', Math.abs(win.mult() - 1.15) < 1e-12);
+  win.permanent.companies.forge.orderIndex = win.COMPANIES[0].orders.length;
+  check('Task72: when every order is done there is no current order', win.currentOrder('forge') === null && win.completeOrder('forge') === 0);
+  check('Task72: orders of a closed company cannot be completed', win.canCompleteOrder('harbor') === false && win.completeOrder('harbor') === 0);
+})();
+
+(function test_T72_slotRise() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  win.permanent.totalPrestige = 4; win.permanent.reputationPoints = 4;
+  win.permanent.companies.forge.orderIndex = 3;  // alloy x10 -> 200 value -> 1
+  win.state.products.alloy = 10;
+  win.completeOrder('forge');
+  check('Task72: reaching 5 reputation opens the second company', win.permanent.totalPrestige === 5 && win.isCompanyOpen('harbor') === true);
+  check('Task72: and says so in the log', win.document.getElementById('log').textContent.includes('새 회사와 거래할 수 있게'));
+})();
+
+(function test_T72_saveLoad() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  t72Open(win);
+  win.completeOrder('forge');
+  win.deliverProducts('forge', 'steel', 10);
+  win.permanent.reputationPoints = 0; // as if spent
+  win.saveGame();
+  const saved = JSON.parse(storage.getItem('gachaFactorySave'));
+  check('Task72: reputation and companies are saved in permanent; saveVersion stays 1', saved.permanent.totalPrestige === 1 && saved.permanent.reputationPoints === 0 && saved.permanent.companies.forge.orderIndex === 1 && saved.saveVersion === 1);
+  const loaded = newDom(storage).window;
+  check('Task72: they load back', loaded.permanent.totalPrestige === 1 && loaded.permanent.reputationPoints === 0 && loaded.permanent.companies.forge.orderIndex === 1 && loaded.permanent.companies.forge.sent.steel === 30 && loaded.permanent.companies.forge.score === win.permanent.companies.forge.score);
+  const edit = (fn) => { const p = JSON.parse(storage.getItem('gachaFactorySave')); fn(p); storage.setItem('gachaFactorySave', JSON.stringify(p)); return newDom(storage).window; };
+  const old = edit((p) => { delete p.permanent.reputationPoints; delete p.permanent.companies; p.permanent.totalPrestige = 7; });
+  check('Task72: an older save starts spendable reputation equal to what it earned', old.permanent.reputationPoints === 7 && old.permanent.companies.forge.score === 0 && old.permanent.companies.lab.orderIndex === 0);
+  const over = edit((p) => { p.permanent.totalPrestige = 3; p.permanent.reputationPoints = 99; });
+  check('Task72: spendable reputation never exceeds what was earned', over.permanent.reputationPoints === 3);
+  [1, 'x', null, [], { forge: 5 }, { forge: { score: -1, orderIndex: 99, sent: { steel: -4, nope: 3 } }, ghost: { score: 9 } }].forEach((bad, i) => {
+    const w = edit((p) => { p.permanent.companies = bad; });
+    const f = w.permanent.companies.forge;
+    check('Task72: invalid companies value #' + i + ' loads safely', Object.keys(w.permanent.companies).sort().join() === 'forge,harbor,lab' && f.score >= 0 && Number.isInteger(f.orderIndex) && f.orderIndex >= 0 && f.orderIndex <= 5 && !('nope' in f.sent) && f.sent.steel >= 0);
+  });
+  const bad2 = edit((p) => { p.permanent.reputationPoints = 'many'; p.permanent.totalPrestige = 6; });
+  check('Task72: a bad spendable value falls back to what was earned', bad2.permanent.reputationPoints === 6);
+})();
+
+(function test_T72_wiring() {
+  const fs = require('fs');
+  const html = fs.readFileSync('index.html', 'utf8');
+  check('Task72: index.html loads delivery.js after research.js and before ui.js', html.indexOf('js/research.js') < html.indexOf('js/delivery.js') && html.indexOf('js/delivery.js') < html.indexOf('js/ui.js'));
+  const win = newDom(makeMemoryStorage()).window;
+  check('Task72: the delivery research is in the 납품 branch and costs 200G + 10 steel', win.RESEARCH.some(r => r.key === 'deliveryContract' && r.branch === 'delivery' && r.cost.gold === 200 && r.cost.products.steel === 10));
+  win.state.gold = 200; win.state.products.steel = 10;
+  check('Task72: researching it opens delivery', win.isDeliveryUnlocked() === false && win.doResearch('deliveryContract') === true && win.isDeliveryUnlocked() === true);
 })();
 
 
