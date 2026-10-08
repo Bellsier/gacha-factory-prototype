@@ -10,8 +10,7 @@ function craftFacilityCost(){
 }
 
 function isUnlocked(resKey){
-  const r = RESOURCES.find(x=>x.key===resKey);
-  return state.unlockedSites[r.site];
+  return state.unlockedSites[resourceByKey(resKey).site];
 }
 
 function workerEffective(worker){
@@ -28,7 +27,7 @@ function autoRate(resKey){
 }
 
 function manualAmount(resKey){
-  const base = RESOURCES.find(r=>r.key===resKey).base;
+  const base = resourceByKey(resKey).base;
   return (base + state.facility[resKey]) * mult();
 }
 
@@ -55,7 +54,12 @@ function fmt(n){
 }
 
 // Shared helpers to avoid repeating the same formula/lookup everywhere.
-function resName(key){ return RESOURCES.find(r=>r.key===key).name; }
+function mineById(id){ return state.world.mines.find(m => m && m.id === id) || null; }
+function workshopById(id){ return state.world.workshops.find(w => w && w.id === id) || null; }
+function workerById(id){ return state.characters.find(w => w && w.id === id) || null; }
+function resourceByKey(key){ return RESOURCES.find(r => r.key === key) || null; }
+function recipeByKey(key){ return RECIPES.find(r => r.key === key) || null; }
+function resName(key){ return resourceByKey(key).name; }
 function expCost(base, growth, level){ return Math.round(base * Math.pow(growth, level)); }
 function dis(condition){ return condition ? 'disabled' : ''; }
 // Task 6: which existing recipes become reachable because of a site's
@@ -69,12 +73,17 @@ function siteRelatedRecipeNames(site){
 // local file, where secure-context APIs aren't guaranteed). `existingIds`
 // (a Set) is checked and regenerated on collision, so callers are always
 // guaranteed a fresh, unique id.
-function makeWorkerId(existingIds){
+// One collision-safe id generator for everything (prefix = id namespace:
+// 'w_' workers, 'node_'/'link_' factory, 'workshop_', ...).
+function makeEntityId(prefix, existingIds){
   let id;
   do{
-    id = 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    id = prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   } while(existingIds instanceof Set && existingIds.has(id));
   return id;
+}
+function makeWorkerId(existingIds){
+  return makeEntityId('w_', existingIds);
 }
 
 // Task 6: the very first moment both iron AND coal have at least one worker
@@ -200,17 +209,16 @@ function consumeRecipeInputs(recipe, getStock, setStock){
   Object.entries(recipe.need).forEach(([k,v]) => setStock(k, getStock(k) - v));
 }
 
+// Recipe inputs are raw resources or products; these read/write whichever it is.
+function stockOf(k){ return state.resources[k] !== undefined ? state.resources[k] : state.products[k]; }
+function setStock(k, val){ if(state.resources[k] !== undefined) state.resources[k] = val; else state.products[k] = val; }
 function canCraft(recipe){
   return recipeInputsAvailable(recipe, k => state.resources[k] ?? state.products[k] ?? 0);
 }
 function startCraft(recipe){
   if(state.craftQueue[recipe.key] !== null) return false; // already crafting
   if(!canCraft(recipe)) return false;
-  consumeRecipeInputs(
-    recipe,
-    k => state.resources[k] !== undefined ? state.resources[k] : state.products[k],
-    (k, val) => { if(state.resources[k] !== undefined) state.resources[k] = val; else state.products[k] = val; }
-  );
+  consumeRecipeInputs(recipe, stockOf, setStock);
   if(recipe.craftTime > 0){
     state.craftQueue[recipe.key] = recipe.craftTime;
   } else {
@@ -248,7 +256,7 @@ function sellAll(recipe, silent){
 // actions above — its state change (purchase + flags) can be read apart
 // from the DOM-building/rebuild code in buildRecipes(). Unchanged behavior.
 function buyAutoSell(key){
-  const recipe = RECIPES.find(r=>r.key===key);
+  const recipe = recipeByKey(key);
   const cost = autoSellCost(recipe);
   if(state.gold < cost) return false;
   state.gold -= cost;
@@ -262,7 +270,7 @@ function buyAutoSell(key){
 // recipe actions above. Unchanged behavior — same lookups, same log text,
 // same checkDualAutomation() call at the same point.
 function reassignWorker(workerId, newResource){
-  const worker = state.characters.find(w=>w.id===workerId);
+  const worker = workerById(workerId);
   if(!worker) return false;
   const idx = state.characters.indexOf(worker);
   const oldRes = worker.resource;
@@ -273,7 +281,7 @@ function reassignWorker(workerId, newResource){
 }
 
 function upgradeWorkerStat(workerId, stat){
-  const worker = state.characters.find(w=>w.id===workerId);
+  const worker = workerById(workerId);
   if(!worker) return false;
   const idx = state.characters.indexOf(worker);
   const cost = workerUpgradeCost(worker, stat);
@@ -370,10 +378,10 @@ function isMineDiscovered(mine){
 function discoverMine(mineId){
   const hidden = state.world.hiddenMineIds;
   if(!Array.isArray(hidden) || !hidden.includes(mineId)) return false;
-  const mine = state.world.mines.find(m => m && m.id === mineId);
+  const mine = mineById(mineId);
   state.world.hiddenMineIds = hidden.filter(id => id !== mineId);
   if(mine){
-    const res = RESOURCES.find(r => r.key === mine.resource);
+    const res = resourceByKey(mine.resource);
     log('새 광맥 발견: ' + (res ? res.name : mine.resource) + ' (' + mine.x + ', ' + mine.y + ')');
   }
   return true;

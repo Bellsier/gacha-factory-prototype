@@ -1,14 +1,3 @@
-// Task 21: same collision-safe id pattern as makeWorkerId() above, generalized
-// with a prefix so Factory nodes/links get their own id namespace (node_.../
-// link_...) without duplicating the generation logic. makeWorkerId() itself
-// is left as-is so no existing id format/behavior changes.
-function makeEntityId(prefix, existingIds){
-  let id;
-  do{
-    id = prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  } while(existingIds instanceof Set && existingIds.has(id));
-  return id;
-}
 // ---------------------------------------------------------------------------
 // Task 22: Factory Node placement validation — pure functions that answer
 // "can this exact Node go here, right now, against this grid and these
@@ -281,9 +270,9 @@ function buildWorkshop(){
 
 function workshopRecipe(workshopId){
   if(typeof workshopId !== 'string' || workshopId.length === 0) return null;
-  const workshop = state.world.workshops.find(item => item && item.id === workshopId);
+  const workshop = workshopById(workshopId);
   if(!workshop || typeof workshop.recipeKey !== 'string') return null;
-  return RECIPES.find(recipe => recipe.key === workshop.recipeKey) || null;
+  return recipeByKey(workshop.recipeKey);
 }
 
 function workshopCraftTime(workshop, recipe){
@@ -294,16 +283,12 @@ function workshopCraftTime(workshop, recipe){
 }
 
 function craftWorkshop(workshopId){
-  const workshop = state.world.workshops.find(item => item && item.id === workshopId);
+  const workshop = workshopById(workshopId);
   if(!workshop) return false;
   if(workshop.progress !== null) return false;
   const recipe = workshopRecipe(workshopId);
   if(!recipe || !canCraft(recipe)) return false;
-  consumeRecipeInputs(
-    recipe,
-    k => state.resources[k] !== undefined ? state.resources[k] : state.products[k],
-    (k, val) => { if(state.resources[k] !== undefined) state.resources[k] = val; else state.products[k] = val; }
-  );
+  consumeRecipeInputs(recipe, stockOf, setStock);
   const time = workshopCraftTime(workshop, recipe);
   if(time > 0){
     workshop.progress = time;
@@ -337,7 +322,7 @@ function tickWorkshops(){
 function setWorkshopRecipe(workshopId, recipeKey){
   if(typeof workshopId !== 'string' || workshopId.length === 0) return false;
   if(!isWorkshopRecipeValid(recipeKey)) return false;
-  const workshop = state.world.workshops.find(item => item && item.id === workshopId);
+  const workshop = workshopById(workshopId);
   if(!workshop) return false;
   if(workshop.progress !== null) return false;
   if(workshop.recipeKey === recipeKey) return false;
@@ -355,13 +340,13 @@ function setWorkshopRecipe(workshopId, recipeKey){
 // rings from the start; without this they could be secured before their site
 // is reached, skipping the site-unlock progression.
 function isMineSiteUnlocked(mine){
-  const res = mine ? RESOURCES.find(r => r.key === mine.resource) : null;
+  const res = mine ? resourceByKey(mine.resource) : null;
   return !!res && !!state.unlockedSites[res.site];
 }
 
 function secureMine(mineId){
   if(typeof mineId !== 'string' || mineId.length === 0) return false;
-  const mine = state.world.mines.find(m => m && m.id === mineId);
+  const mine = mineById(mineId);
   if(!mine || mine.developmentState !== 'unsecured') return false;
   if(!isMineDiscovered(mine)) return false; // Task 65: find it before securing it
   if(!isMineSiteUnlocked(mine)) return false;
@@ -376,7 +361,7 @@ function secureMine(mineId){
 // later balance Task defines how it modifies output.
 function mineMine(mineId){
   if(typeof mineId !== 'string' || mineId.length === 0) return false;
-  const mine = state.world.mines.find(m => m && m.id === mineId);
+  const mine = mineById(mineId);
   if(!mine || mine.developmentState !== 'secured') return false;
   if(!isMineResourceValid(mine.resource) || !isNonNegativeFinite(mine.miningPower) || mine.miningPower <= 0) return false;
   state.resources[mine.resource] += mine.miningPower;

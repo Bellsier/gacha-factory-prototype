@@ -41,12 +41,17 @@ function renderSharedStorage(){
   ).join('');
 }
 
+// The next site the base can expand to (null when all are unlocked).
+function nextExpansionSite(){
+  const nextKey = BALANCE.world.EXPANSION_SITE_ORDER.find(key => !state.unlockedSites[key]);
+  return nextKey ? SITES.find(site => site.key === nextKey) : null;
+}
+
 // Task 33: Minimal base information UI.
 function renderBaseInfo(){
   const wrap = document.getElementById('baseInfo');
   if(!wrap) return;
-  const nextKey = BALANCE.world.EXPANSION_SITE_ORDER.find(key => !state.unlockedSites[key]);
-  const nextSite = nextKey ? SITES.find(site => site.key === nextKey) : null;
+  const nextSite = nextExpansionSite();
   wrap.innerHTML =
     '<div class="line base-info">' +
       '<div class="res-name">거점 Lv.' + state.world.base.level + '</div>' +
@@ -74,7 +79,7 @@ function buildMines(){
   const hiddenCount = state.world.mines.length - discovered.length;
   if(discovered.length === 0 && hiddenCount === 0){ wrap.innerHTML = '<div class="rate">아직 발견된 광맥이 없습니다.</div>'; return; }
   discovered.forEach(mine=>{
-    const resource = RESOURCES.find(r=>r.key===mine.resource);
+    const resource = resourceByKey(mine.resource);
     const secured = mine.developmentState === 'secured';
     // Task 64: a mine whose site is still locked can't be secured yet.
     const siteLocked = !secured && !isMineSiteUnlocked(mine);
@@ -185,7 +190,7 @@ function buildLines(){
 // craft, and auto-craft controls call factory.js actions then re-render.
 function recipeNeedsLockedResource(recipe){
   return Object.keys(recipe.need).some(k=>{
-    const res = RESOURCES.find(x=>x.key===k);
+    const res = resourceByKey(k);
     return res && !isUnlocked(k);
   });
 }
@@ -264,7 +269,7 @@ function renderWorkshops(){
   });
   wrap.querySelectorAll('[data-workshop-auto]').forEach(chk=>{
     chk.onchange = ()=>{
-      const workshop = state.world.workshops.find(item => item.id === chk.dataset.workshopAuto);
+      const workshop = workshopById(chk.dataset.workshopAuto);
       if(!workshop) return;
       workshop.auto = chk.checked;
       if(workshop.auto) craftWorkshop(workshop.id);
@@ -281,7 +286,7 @@ function researchCostText(def){
   const parts = [];
   if(cost.gold) parts.push(fmt(cost.gold) + 'G (보유 ' + fmt(state.gold) + 'G)');
   Object.keys(cost.products || {}).forEach(k => {
-    const recipe = RECIPES.find(r => r.key === k);
+    const recipe = recipeByKey(k);
     parts.push((recipe ? recipe.name : k) + ' ' + cost.products[k] + '개 (보유 ' + fmt(state.products[k] || 0) + '개)');
   });
   return '비용: ' + (parts.length ? parts.join(' + ') : '없음');
@@ -496,7 +501,7 @@ function buildRecipes(){
     const needsLockedResource = recipeNeedsLockedResource(r);
     if(needsLockedResource) return;
     const needText = Object.entries(r.need).map(([k,v])=>{
-      const name = RESOURCES.find(x=>x.key===k)?.name || RECIPES.find(x=>x.key===k)?.name || k;
+      const name = resourceByKey(k)?.name || recipeByKey(k)?.name || k;
       return `${name} ${v}`;
     }).join(' + ');
     const div = document.createElement('div');
@@ -528,10 +533,10 @@ function buildRecipes(){
     wrap.appendChild(div);
   });
   wrap.querySelectorAll('[data-craft]').forEach(btn=>{
-    btn.onclick=()=>{ startCraft(RECIPES.find(r=>r.key===btn.dataset.craft)); updateNumbers(); };
+    btn.onclick=()=>{ startCraft(recipeByKey(btn.dataset.craft)); updateNumbers(); };
   });
   wrap.querySelectorAll('[data-sell]').forEach(btn=>{
-    btn.onclick=()=>{ sellAll(RECIPES.find(r=>r.key===btn.dataset.sell)); updateNumbers(); renderCurrencies(); };
+    btn.onclick=()=>{ sellAll(recipeByKey(btn.dataset.sell)); updateNumbers(); renderCurrencies(); };
   });
   wrap.querySelectorAll('[data-autocraft]').forEach(chk=>{
     chk.onchange=()=>{ state.autoCraft[chk.dataset.autocraft] = chk.checked; };
@@ -554,7 +559,7 @@ function renderLastPull(){
   if(!state.lastPull) return;
   const c = state.lastPull;
   const rarity = RARITY.find(r=>r.key===c.rarity);
-  const resName = RESOURCES.find(r=>r.key===c.resource).name;
+  const resName = resourceByKey(c.resource).name;
   const chip = document.createElement('span');
   chip.className = 'chip ' + rarity.cls;
   chip.textContent = `방금 뽑음: [${rarity.label}] ${resName} 담당 (종합 +${workerEffective(c).toFixed(2)}/초)`;
@@ -614,7 +619,6 @@ function buildWorkers(){
 document.getElementById('gachaTicketBtn').onclick = ()=>{
   if(permanent.tickets < BALANCE.gacha.PULL_COST_TICKET) return;
   permanent.tickets -= BALANCE.gacha.PULL_COST_TICKET;
-  document.getElementById('gachaTicketBtn').disabled = permanent.tickets < BALANCE.gacha.PULL_COST_TICKET;
   pullGacha();
 };
 document.getElementById('gachaGoldBtn').onclick = ()=>{
@@ -709,14 +713,13 @@ function updateNumbers(){
   });
   const expandBtn = document.querySelector('[data-expand-base]');
   if(expandBtn){
-    const nextKey = BALANCE.world.EXPANSION_SITE_ORDER.find(key => !state.unlockedSites[key]);
-    const nextSite = nextKey ? SITES.find(site => site.key === nextKey) : null;
+    const nextSite = nextExpansionSite();
     expandBtn.disabled = !nextSite || state.gold < nextSite.unlockCost;
   }
   document.querySelectorAll('[data-upstat]').forEach(btn=>{
     const workerId = btn.dataset.workerId;
     const stat = btn.dataset.upstat;
-    const worker = state.characters.find(w=>w.id===workerId);
+    const worker = workerById(workerId);
     if(worker) btn.disabled = state.gold < workerUpgradeCost(worker, stat);
   });
   const hqBtn = document.getElementById('hqBtn');
@@ -964,7 +967,7 @@ function renderWorldObjects(){
   layer.innerHTML = '';
   state.world.mines.forEach(mine=>{
     if(!mine) return;
-    const resource = RESOURCES.find(r=>r.key===mine.resource);
+    const resource = resourceByKey(mine.resource);
     const name = resource ? resource.name : mine.resource;
     const secured = mine.developmentState === 'secured';
     const node = document.createElement('div');
@@ -1136,7 +1139,7 @@ function worldInfoLines(sel){
     ];
   }
   if(sel.type === 'mine'){
-    const mine = state.world.mines.find(m => m && m.id === sel.id);
+    const mine = mineById(sel.id);
     if(!mine) return null;
     if(!isMineDiscovered(mine)){
       // Task 65: identity stays hidden until the player walks up to it.
@@ -1147,7 +1150,7 @@ function worldInfoLines(sel){
         { key: 'state', text: '가까이 가면 발견' },
       ];
     }
-    const resource = RESOURCES.find(r => r.key === mine.resource);
+    const resource = resourceByKey(mine.resource);
     const name = resource ? resource.name : mine.resource;
     return [
       { key: 'title', text: name + ' 광맥' },

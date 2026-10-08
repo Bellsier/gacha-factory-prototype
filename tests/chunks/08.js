@@ -1887,7 +1887,7 @@ function t67Sweep(win, fn) {
   check('Task67: the passage runs from the gate to the exit through the range', win.terrainRegionAt(t.gateX - 0.1, 1) === 'tunnel' && win.terrainRegionAt(exit.x + 0.05, 1) === 'tunnel');
   check('Task67: just past the exit is beyond, in the deep forest', win.terrainRegionAt(exit.x - 0.1, 1) === 'beyond' && win.terrainBeyondZoneAt(exit.x - 0.1, 1) === 'deepForest');
   check('Task67: the passage behind the gate is not walkable while locked', !win.isWorldPointWalkable(t.gateX - 0.1, 1) && !win.isWorldPointWalkable(exit.x + 0.05, 1));
-  check('Task67: tunnel and beyond are both still locked', t.locked === true && win.isBeyondAccessible() === false);
+  check('Task67: tunnel and beyond are both still locked', t.locked === true && win.terrainTunnelOpen() === false);
   // Beyond is only reachable through the tunnel: every beyond point touches
   // open ground only via the range (no beyond point is next to open ground).
   let sealed = true;
@@ -1987,7 +1987,7 @@ function t68Hold(win, keys, ticks) {
 (function test_T68_closedByDefault() {
   const win = newDom(makeMemoryStorage()).window;
   check('Task68: a new game starts with the tunnel closed', win.state.world.tunnelUnlocked === false);
-  check('Task68: closed tunnel reports locked and beyond inaccessible', win.terrainTunnel().locked === true && win.isBeyondAccessible() === false);
+  check('Task68: closed tunnel reports locked and beyond inaccessible', win.terrainTunnel().locked === true && win.terrainTunnelOpen() === false);
   check('Task68: closed — the passage and beyond are not walkable', !win.isWorldPointWalkable(-5, 1) && !win.isWorldPointWalkable(-8, 1) && !win.isWorldPointWalkable(-8, 5));
   check('Task68: walkability can be asked about a given tunnel state', win.isWorldPointWalkable(-8, 1, true) === true && win.isWorldPointWalkable(-8, 1, false) === false);
   check('Task68: no "LOCKED" constant is left in the terrain data', win.WORLD_TERRAIN === undefined || win.WORLD_TERRAIN.TUNNEL.LOCKED === undefined);
@@ -1998,7 +1998,7 @@ function t68Hold(win, keys, ticks) {
   const logBefore = win.document.getElementById('log').children.length;
   check('Task68: unlockTunnel opens a closed tunnel', win.unlockTunnel() === true && win.state.world.tunnelUnlocked === true);
   check('Task68: unlockTunnel writes one log line', win.document.getElementById('log').children.length === logBefore + 1 && win.document.getElementById('log').firstChild.textContent.includes('터널'));
-  check('Task68: unlocked tunnel reports open and beyond accessible', win.terrainTunnel().locked === false && win.isBeyondAccessible() === true);
+  check('Task68: unlocked tunnel reports open and beyond accessible', win.terrainTunnel().locked === false && win.terrainTunnelOpen() === true);
   const logAfter = win.document.getElementById('log').children.length;
   check('Task68: opening twice is rejected and changes nothing', win.unlockTunnel() === false && win.state.world.tunnelUnlocked === true && win.document.getElementById('log').children.length === logAfter);
   check('Task68: opening costs nothing (gold and resources untouched)', win.state.gold === 0 && Object.values(win.state.resources).every(v => v === 0));
@@ -2479,7 +2479,7 @@ function t70Afford(win) {
   check('Task70: it costs exactly 1500 gold and 5 alloy', win.state.gold === 500 && win.state.products.alloy === 2);
   check('Task70: nothing else is spent', win.state.products.steel === 3 && win.state.resources.mana === 2);
   check('Task70: it is marked done and stays done', win.isResearchDone('tunnelWork') === true && win.researchStatus('tunnelWork') === 'done' && win.state.research.tunnelWork === true);
-  check('Task70: the tunnel is open and its mines were generated (14 + 8)', win.state.world.tunnelUnlocked === true && win.state.world.mines.length === 22 && win.isBeyondAccessible() === true);
+  check('Task70: the tunnel is open and its mines were generated (14 + 8)', win.state.world.tunnelUnlocked === true && win.state.world.mines.length === 22 && win.terrainTunnelOpen() === true);
   check('Task70: two log lines, the research first and the tunnel on top', logEl.children.length === logs + 2 && logEl.children[1].textContent === '연구 완료: 터널 굴착' && logEl.children[0].textContent.includes('터널이 열렸습니다'));
   const afterGold = win.state.gold;
   win.state.products.alloy = 10; win.state.gold = 5000;

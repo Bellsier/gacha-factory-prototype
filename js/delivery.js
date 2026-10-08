@@ -74,10 +74,6 @@ function companyProgress(key){
   return permanent.companies && permanent.companies[key] ? permanent.companies[key] : null;
 }
 
-function recipeByKey(key){
-  return RECIPES.find(r => r.key === key) || null;
-}
-
 function shippingCost(key, productKey, qty){
   const def = companyDef(key), recipe = recipeByKey(productKey);
   if(!def || !recipe || !Number.isInteger(qty) || qty <= 0) return 0;
@@ -126,8 +122,13 @@ function deliverProducts(key, productKey, qty){
   const wasRegular = isRegularTrade(key);
   const gain = applyDelivery(key, productKey, qty);
   log(def.name + '에 ' + recipe.name + ' ' + qty + '개를 납품했습니다. (점수 +' + fmt(gain) + ')');
-  if(!wasRegular && isRegularTrade(key)) log(def.name + '과(와) 정기 거래를 시작합니다!');
+  logRegularTradeStart(def, wasRegular);
   return gain;
+}
+
+// Says so once, on the delivery that makes the score cross the company's line.
+function logRegularTradeStart(def, wasRegular){
+  if(!wasRegular && isRegularTrade(def.key)) log(def.name + '과(와) 정기 거래를 시작합니다!');
 }
 
 function isRegularTrade(key){
@@ -169,7 +170,7 @@ function completeOrder(key){
   p.orderIndex += 1;
   permanent.totalPrestige += rep;
   log(def.name + '의 수주를 완수했습니다. 명성 +' + rep);
-  if(!wasRegular && isRegularTrade(key)) log(def.name + '과(와) 정기 거래를 시작합니다!');
+  logRegularTradeStart(def, wasRegular);
   if(companySlots() > slotsBefore) log('명성이 올라 새 회사와 거래할 수 있게 되었습니다.');
   REPUTATION_EFFECTS.filter(e => isReputationEffectOpen(e.key) && !effectsBefore.includes(e)).forEach(e => log('명성 효과가 열렸습니다: ' + e.name));
   return rep;

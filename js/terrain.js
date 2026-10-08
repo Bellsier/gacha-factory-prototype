@@ -139,11 +139,6 @@ function terrainTunnelOpen(){
   }
 }
 
-// Task 67/68: "beyond" is reachable only once the tunnel is open.
-function isBeyondAccessible(){
-  return terrainTunnelOpen();
-}
-
 function terrainInBounds(x, y){
   const b = BALANCE.world;
   return x >= b.BOUNDS_MIN_X && x <= b.BOUNDS_MAX_X && y >= b.BOUNDS_MIN_Y && y <= b.BOUNDS_MAX_Y;

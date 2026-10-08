@@ -16,7 +16,6 @@ const FACTORY_NODE_TYPES = ['production', 'storage']; // splitter/merger are NOT
 const MINE_DEVELOPMENT_STATES = ['unsecured', 'secured'];
 
 const PLAYER_FACINGS = ['up', 'down', 'left', 'right'];
-const PLAYER_POSES = ['idle', 'walk'];
 
 // Task 62: the player starts on the base (not at world 0,0).
 function freshPlayerState(base){
@@ -485,13 +484,18 @@ function setSaveStatus(text){
   if(el) el.textContent = text;
 }
 
+// Tells the player once that saving does not work; saveGame() returns its result.
+function reportSaveFailed(){
+  if(!saveFailLogged){ log('저장할 수 없음'); saveFailLogged = true; }
+  setSaveStatus('저장 안 됨');
+  return false;
+}
+
 function saveGame(){
   if(saveBlocked) return false; // a future-version save exists on disk — never overwrite it
   try{
     if(!storageAvailable()){
-      if(!saveFailLogged){ log('저장할 수 없음'); saveFailLogged = true; }
-      setSaveStatus('저장 안 됨');
-      return false;
+      return reportSaveFailed();
     }
     const payload = {
       saveVersion: CURRENT_SAVE_VERSION,
@@ -504,9 +508,7 @@ function saveGame(){
     setSaveStatus('저장됨');
     return true;
   }catch(e){
-    if(!saveFailLogged){ log('저장할 수 없음'); saveFailLogged = true; }
-    setSaveStatus('저장 안 됨');
-    return false;
+    return reportSaveFailed();
   }
 }
 

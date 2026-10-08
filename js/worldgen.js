@@ -84,7 +84,7 @@ function worldGenStartResources(){
 // Task 64: a mine's grade follows its resource's site tier (abandonedMine 1,
 // manaVein 2, ruins 3, spaceStation 4) — the same grades WORLD_MINE_SEEDS use.
 function worldGenResourceGrade(resource){
-  const res = RESOURCES.find(r => r.key === resource);
+  const res = resourceByKey(resource);
   const tier = res ? SITES.findIndex(s => s.key === res.site) : -1;
   return tier >= 0 ? tier + 1 : 1;
 }
