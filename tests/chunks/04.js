@@ -72,16 +72,15 @@
   check('Task21: legacy save gets a fresh default factory state', win.state.factory.grid.width === 25 && win.state.factory.grid.height === 25 && win.state.factory.nodes.length === 0 && win.state.factory.links.length === 0);
 })();
 
-(function test_T21_prestigeResetsFactory() {
+(function test_T21_ordersKeepFactory() {
   const win = newDom(makeMemoryStorage()).window;
-  win.permanent.tickets = 1;
-  win.pullGacha();
-  win.state.factory.nodes.push({ id: 'node_beforeReset', type: 'production', x: 1, y: 1, width: 1, height: 1 });
-  check('Task21: factory node present before prestige', win.state.factory.nodes.length === 1);
-  win.state.runGold = 5000;
-  win.document.getElementById('prestigeBtn').onclick();
-  check('Task21: factory nodes cleared after prestige', win.state.factory.nodes.length === 0);
-  check('Task21: factory grid still defaults to 25x25 after prestige', win.state.factory.grid.width === 25 && win.state.factory.grid.height === 25);
+  win.state.factory.nodes.push({ id: 'node_keep', type: 'production', x: 1, y: 1, width: 1, height: 1 });
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.doResearch('deliveryContract');
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.completeOrder('forge');
+  check('Task21: factory nodes are kept after an order (no reset)', win.state.factory.nodes.length === 1 && win.state.factory.nodes[0].id === 'node_keep');
+  check('Task21: factory grid still defaults to 25x25', win.state.factory.grid.width === 25 && win.state.factory.grid.height === 25);
 })();
 
 (function test_T21_linksRepresentFromTo() {

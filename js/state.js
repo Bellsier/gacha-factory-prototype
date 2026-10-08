@@ -58,17 +58,16 @@ function freshFactoryState(){
 }
 
 // ---------------------------------------------------------------------------
-// Task 20/21: `state` vs `permanent` is the run-scoped vs cross-prestige
-// boundary — everything freshRunState() returns is wiped on prestige,
-// everything in `permanent` survives it. Factory data is run-scoped (resets
-// with mining/crafting progress on prestige, exactly like craftFacility),
-// so it lives as an ADDITIVE key (`factory`) on the object freshRunState()
-// returns, using the same additive-field pattern sanitizeRunState() already
-// applies to craftFacility (missing/invalid -> safe default), so old saves
-// without a `factory` field keep loading normally.
+// Task 20/21/74: `state` is the run (what a new game starts with);
+// `permanent` holds what is kept across games: reputation, company progress,
+// tickets. There is no prestige reset any more (Task 74): a new run state is
+// built only for a new game or a save that has none. Factory data is an
+// ADDITIVE key (`factory`) on the object freshRunState() returns, using the
+// same additive-field pattern sanitizeRunState() applies to craftFacility
+// (missing/invalid -> safe default), so old saves without it keep loading.
 // ---------------------------------------------------------------------------
 let state = freshRunState();
-// Permanent (cross-prestige) state — totalPrestige/runCount/tickets/
+// Permanent state — totalPrestige (reputation)/runCount/tickets/
 // firstGachaGranted all live here in one container instead of being split
 // across module-scope lets and window.* globals. Same four values, same
 // meaning, same save/load JSON shape as before (Task 1/6); sanitizePermanent()
@@ -86,7 +85,7 @@ function freshRunState(){
   const products = {}, autoCraft = {}, autoSell = {}, autoSellOn = {}, craftQueue = {};
   RECIPES.forEach(r=>{ products[r.key]=0; autoCraft[r.key]=false; autoSell[r.key]=false; autoSellOn[r.key]=true; craftQueue[r.key]=null; });
   return {
-    resources, products, gold:0, runGold:0,
+    resources, products, gold:0,
     characters:[], // {id, rarity, resource, mining, carry, move, miningLvl, carryLvl, moveLvl}
     lastPull:null,
     facility,   // resource-funded manual-yield upgrade levels (per line)
@@ -407,7 +406,6 @@ function sanitizeRunState(raw){
     resources: sanitizeNumberMap(raw.resources, resKeys, 0, isNonNegativeFinite),
     products: sanitizeNumberMap(raw.products, recipeKeys, 0, isNonNegativeFinite),
     gold: isNonNegativeFinite(raw.gold) ? raw.gold : 0,
-    runGold: isNonNegativeFinite(raw.runGold) ? raw.runGold : 0,
     characters: sanitizeCharacters(raw.characters),
     lastPull: sanitizeCharacter(raw.lastPull), // cosmetic only; null is a safe fallback
     facility: sanitizeNumberMap(raw.facility, resKeys, 0, isNonNegativeFinite),

@@ -2,8 +2,8 @@
 // Task 70: research (Blueprint 11). "연구 = 무엇을 할 수 있는가" — a one-time,
 // instant purchase that unlocks a new possibility (RESEARCH in data.js).
 //
-// state.research maps research key -> true once done (run-scoped, like the
-// world: it resets with a new run until the prestige overhaul, Blueprint 15.1).
+// state.research maps research key -> true once done. Nothing resets it any
+// more: the old prestige reset is gone (Task 74, Blueprint 15.1).
 // A research's effect is one entry of RESEARCH_EFFECTS; the effect itself is
 // the single place that changes the game (e.g. unlockTunnel in factory.js).
 //

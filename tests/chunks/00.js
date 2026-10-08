@@ -197,24 +197,20 @@ function advanceTicks(win, n) {
   check('craftQueue: resumes via the normal tick loop after reload', after !== null && Math.abs((before - after) - 0.5) < 1e-9, `${before} -> ${after}`);
 })();
 
-(function test_prestigeThenReload() {
+(function test_reputationThenReload() {
   const storage = makeMemoryStorage();
   let win = newDom(storage).window;
-
   win.permanent.tickets = 1;
   win.pullGacha();
-  win.state.runGold = 5000;
-  const expectedGain = win.prestigeGain();
-  win.document.getElementById('prestigeBtn').onclick();
-  check('prestige: totalPrestige increased by the expected amount', win.permanent.totalPrestige === expectedGain, `${win.permanent.totalPrestige} vs ${expectedGain}`);
-  check('prestige: autosaves immediately on confirm', storage._raw()['gachaFactorySave'] !== undefined);
-
-  const prestigeAfter = win.permanent.totalPrestige;
-  const runCountAfter = win.permanent.runCount;
+  win.permanent.totalPrestige = 3;
+  win.permanent.reputationPoints = 2;
+  win.saveGame();
+  check('reputation: autosave stores the save', storage._raw()['gachaFactorySave'] !== undefined);
   win = newDom(storage).window;
-  check('prestige: totalPrestige persists across reload', win.permanent.totalPrestige === prestigeAfter);
-  check('prestige: runCount persists across reload', win.permanent.runCount === runCountAfter);
-  check('prestige: characters reset to empty on the new run', win.state.characters.length === 0);
+  check('reputation: totalPrestige persists across reload', win.permanent.totalPrestige === 3);
+  check('reputation: spendable points persist across reload', win.permanent.reputationPoints === 2);
+  check('reputation: the run is not reset (the worker is still there)', win.state.characters.length === 1);
+  check('reputation: the header shows both values', win.document.getElementById('prestigeVal').textContent === '3' && /사용 2/.test(win.document.getElementById('prestigeLabel').textContent));
 })();
 
 (function test_corruptedJson() {
@@ -284,7 +280,6 @@ function advanceTicks(win, n) {
   check('negative values: craftQueue.steel=-4.2 rejected, falls back to null', win.state.craftQueue.steel === null);
   check('negative values: craftQueue.alloy=3.1 (valid) preserved', win.state.craftQueue.alloy === 3.1);
   check('negative values: worker with negative mining is dropped entirely', win.state.characters.length === 0);
-  check('negative values: valid sibling runGold=50 preserved', win.state.runGold === 50);
 })();
 
 (function test_nanInfinityRejected() {

@@ -63,13 +63,8 @@
     check(`BALANCE: autoSellCost() matches reference (sell=${sell})`, win.autoSellCost({ sell }) === sell * REF.autoSellMult);
   });
 
-  // prestigeGain(): reference floor(sqrt(runGold/200)), gated on >=1 worker
-  win.permanent.tickets = 1;
-  win.pullGacha();
-  [[0, 0], [199, 0], [200, 1], [800, 2], [1800, 3], [3200, 4], [5000, 5]].forEach(([gold, expectedPts]) => {
-    win.state.runGold = gold;
-    check(`BALANCE: prestigeGain() matches reference at runGold=${gold}`, win.prestigeGain() === expectedPts);
-  });
+  // (Task 74: prestigeGain() is gone; reputation comes from orders, see Task72 tests.)
+  check('BALANCE: prestigeGain no longer exists', typeof win.prestigeGain === 'undefined');
 })();
 
 // =============================================================================
@@ -293,18 +288,18 @@
   const workerRes = win.state.characters[0].resource;
   check('flow: auto rate is now > 0 for the worker\'s resource', win.autoRate(workerRes) > 0);
 
-  // 7. Build up enough runGold for a prestige point, then prestige.
-  win.state.runGold = 5000;
-  const expectedGain = win.prestigeGain();
-  check('flow: prestige gain is available with a worker present', expectedGain > 0);
-  win.document.getElementById('prestigeBtn').onclick();
-  check('flow: prestige increased totalPrestige', win.permanent.totalPrestige === expectedGain);
-  check('flow: prestige reset the run (0 workers, 0 gold)', win.state.characters.length === 0 && win.state.gold === 0);
+  // 7. Task 74: there is no reset button any more; a completed order pays reputation.
+  check('flow: there is no prestige button', win.document.getElementById('prestigeBtn') === null);
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.doResearch('deliveryContract');
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  check('flow: completing an order gives reputation', win.completeOrder('forge') === 1 && win.permanent.totalPrestige === 1);
+  check('flow: the run keeps going (worker and gold stay)', win.state.characters.length === 1 && win.state.gold > 0);
 
-  // 8. Permanent prestige value persists across a reload.
-  const prestigeAfter = win.permanent.totalPrestige;
-  win = newDom(storage).window; // no explicit save call — relies on the autosave-on-prestige from step 7
-  check('flow: permanent prestige persists after prestige + reload', win.permanent.totalPrestige === prestigeAfter);
+  // 8. Reputation persists across a reload.
+  win.saveGame();
+  win = newDom(storage).window;
+  check('flow: reputation persists after a reload', win.permanent.totalPrestige === 1 && win.state.characters.length === 1);
 })();
 
 // =============================================================================

@@ -76,10 +76,6 @@ function makeWorkerId(existingIds){
   } while(existingIds instanceof Set && existingIds.has(id));
   return id;
 }
-function prestigeGain(){
-  if(state.characters.length < BALANCE.worker.MIN_REQUIRED) return 0;
-  return Math.floor(Math.sqrt(state.runGold/BALANCE.prestige.GOLD_DIVISOR));
-}
 
 // Task 6: the very first moment both iron AND coal have at least one worker
 // assigned (the point at which steel can be produced with zero manual
@@ -243,7 +239,6 @@ function sellAll(recipe, silent){
   if(qty<=0) return;
   const earned = qty * recipe.sell * mult();
   state.gold += earned;
-  state.runGold += earned;
   state.products[recipe.key] = 0;
   if(!silent) log(`${recipe.name} ${fmt(qty)}개 판매 → +${fmt(earned)}G`);
   checkFirstGachaMilestone();

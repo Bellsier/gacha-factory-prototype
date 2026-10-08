@@ -2176,13 +2176,14 @@ function t68Hold(win, keys, ticks) {
   check('Task68: walking through the open tunnel discovers it by the usual rule', !win.state.world.hiddenMineIds.includes('mine_t68_beyond') && win.isMineDiscovered(win.state.world.mines.find(m => m.id === 'mine_t68_beyond')));
   check('Task68: it is drawn on the exploration map once discovered', !!win.document.querySelector('[data-map-mine="mine_t68_beyond"]'));
   check('Task68: it still cannot be secured while its site is locked (existing rule)', win.secureMine('mine_t68_beyond') === false);
-  // Prestige never leaves the player standing somewhere unwalkable.
-  win.state.characters.push({ id: 'w_t68', rarity: 'common', resource: 'iron', mining: 1, carry: 1, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 });
-  win.state.runGold = 5000;
-  let threw = false;
-  try { win.document.getElementById('prestigeBtn').click(); } catch (e) { threw = true; }
+  // Task 74: there is no reset; completing an order leaves the open tunnel and the player alone.
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.doResearch('deliveryContract');
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  const ppBefore = JSON.stringify(win.state.world.player);
+  win.completeOrder('forge');
   const pp = win.state.world.player;
-  check('Task68: prestige after opening the tunnel does not break the world', !threw && win.isWorldPointWalkable(pp.x, pp.y) && win.permanent.runCount === 2);
+  check('Task68: an order after opening the tunnel keeps the tunnel open and the player in place', win.state.world.tunnelUnlocked === true && JSON.stringify(pp) === ppBefore && win.isWorldPointWalkable(pp.x, pp.y));
 })();
 
 // =============================================================================
@@ -2412,13 +2413,15 @@ function t69Problems(win, before, after) {
   check('Task69: no new mine shares a cell with an older one', new Set(after.map(m => m.x + ',' + m.y)).size === after.length);
 })();
 
-(function test_T69_prestigeStartsClosedAgain() {
+(function test_T69_ordersKeepTheTunnelOpen() {
   const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
   win.unlockTunnel({ random: t63Lcg(3) });
-  win.state.characters.push({ id: 'w_t69', rarity: 'common', resource: 'iron', mining: 1, carry: 1, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 });
-  win.state.runGold = 5000;
-  win.document.getElementById('prestigeBtn').click();
-  check('Task69: after prestige the new world is closed again with no beyond mines (until reopened)', win.state.world.tunnelUnlocked === false && t69Beyond(win, win.state.world.mines).length === 0 && win.state.world.mines.length === 14);
+  const count = win.state.world.mines.length;
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.doResearch('deliveryContract');
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.completeOrder('forge');
+  check('Task69: an order keeps the tunnel open and the beyond mines (nothing is reset or generated again)', win.state.world.tunnelUnlocked === true && t69Beyond(win, win.state.world.mines).length > 0 && win.state.world.mines.length === count);
 })();
 
 // =============================================================================
@@ -2571,14 +2574,16 @@ function t70Afford(win) {
   check('Task70: unknown research keys in a save are dropped', unknown.state.research.mystery === undefined && Object.keys(unknown.state.research).sort().join() === unknown.RESEARCH.map(r => r.key).sort().join());
 })();
 
-(function test_T70_prestigeResetsResearch() {
+(function test_T70_ordersKeepResearch() {
   const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
   t70Afford(win);
   win.doResearch('tunnelWork');
-  win.state.characters.push({ id: 'w_t70', rarity: 'common', resource: 'iron', mining: 1, carry: 1, move: 1, miningLvl: 0, carryLvl: 0, moveLvl: 0 });
-  win.state.runGold = 5000;
-  win.document.getElementById('prestigeBtn').click();
-  check('Task70: a new run starts with research not done, tunnel closed and 14 mines (until prestige is overhauled)', win.state.research.tunnelWork === false && win.state.world.tunnelUnlocked === false && win.state.world.mines.length === 14 && win.document.querySelector('[data-research-card="tunnelWork"]').getAttribute('data-research-status') === 'available');
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.doResearch('deliveryContract');
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.completeOrder('forge');
+  win.renderAll();
+  check('Task70: research, the open tunnel and the beyond mines all stay after an order (Task 74: no reset)', win.state.research.tunnelWork === true && win.state.world.tunnelUnlocked === true && win.state.world.mines.length === 22 && win.document.querySelector('[data-research-card="tunnelWork"]').getAttribute('data-research-status') === 'done');
 })();
 
 (function test_T70_researchFilesAndStyles() {
@@ -2998,6 +3003,51 @@ function t73Trade(win, n) { for (let i = 0; i < n; i++) win.tickTrades(); }
   check('Task73: and opens after it', doc.querySelector('[data-company-card="lab"]').getAttribute('data-company-open') === 'true');
   const css = require('fs').readFileSync('css/style.css', 'utf8');
   check('Task73: company cards are styled', /\.company-card/.test(css));
+})();
+
+
+// ---------------------------------------------------------------------------
+// Task 74: the prestige reset is gone; orders (big deliveries) are the way to reputation
+// ---------------------------------------------------------------------------
+(function test_T74_noPrestige() {
+  const fs = require('fs');
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  check('Task74: no prestige button, info box or preview in the page', !doc.getElementById('prestigeBtn') && !doc.getElementById('prestigeInfoBtn') && !doc.getElementById('prestigeGainPreview') && !doc.getElementById('runGoldVal') && !doc.getElementById('runNum'));
+  check('Task74: prestigeGain is gone and the run no longer counts gold', typeof win.prestigeGain === 'undefined' && !('runGold' in win.state));
+  const src = ['index.html', 'js/ui.js', 'js/systems.js', 'js/state.js'].map(f => fs.readFileSync(f, 'utf8')).join('\n');
+  check('Task74: nothing still offers an initialize-and-restart', !/초기화하고 명성/.test(src) && !/^\s*state = freshRunState\(\)/m.test(src));
+  check('Task74: the multiplier moved to the 납품 tab', !!doc.querySelector('#tab-delivery #multVal'));
+  check('Task74: the HQ text no longer says it resets', !/프레스티지/.test(doc.getElementById('tab-dev').textContent));
+  win.state.gold = 100;
+  win.sellAll(win.RECIPES.find(r => r.key === 'steel'), true);
+  check('Task74: selling still works without runGold', win.state.gold === 100 && !('runGold' in win.state));
+})();
+
+(function test_T74_hints() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.permanent.firstGachaGranted = true;
+  win.state.characters.push(makeTestWorker('h1', 'iron'), makeTestWorker('h2', 'coal'));
+  win.state.autoCraft.steel = true;
+  win.updateNextHint();
+  check('Task74: before the contract the hint points to the research', /납품 계약/.test(win.document.getElementById('nextHint').textContent));
+  win.state.research.deliveryContract = true;
+  win.updateNextHint();
+  check('Task74: after it the hint points to the orders', /수주/.test(win.document.getElementById('nextHint').textContent));
+})();
+
+(function test_T74_headerAndOldSave() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  win.saveGame();
+  const p = JSON.parse(storage.getItem('gachaFactorySave'));
+  p.run.runGold = 1234; p.permanent.runCount = 4; p.permanent.totalPrestige = 6; delete p.permanent.reputationPoints;
+  storage.setItem('gachaFactorySave', JSON.stringify(p));
+  const old = newDom(storage).window;
+  check('Task74: an old save with runGold and a run count still loads', old.permanent.totalPrestige === 6 && old.permanent.reputationPoints === 6 && old.permanent.runCount === 4 && !('runGold' in old.state));
+  check('Task74: the header shows reputation with the spendable amount', old.document.getElementById('prestigeVal').textContent === '6' && /사용 6/.test(old.document.getElementById('prestigeLabel').textContent));
+  old.saveGame();
+  check('Task74: saving drops runGold', !('runGold' in JSON.parse(storage.getItem('gachaFactorySave')).run));
 })();
 
 

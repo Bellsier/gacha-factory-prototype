@@ -244,20 +244,20 @@ function stockCrystalAlloyInputs(win) {
   win.state.gold = 10000;
   win.upgradeCraftFacility();
   win.upgradeCraftFacility();
-  check('Task16: craftFacility is upgraded before prestige', win.state.craftFacility === 3);
+  check('Task16: craftFacility is upgraded before the order', win.state.craftFacility === 3);
 
   win.permanent.tickets = 3;
   win.permanent.firstGachaGranted = true;
   win.pullGacha();
-  win.state.runGold = 5000;
-  const expectedGain = win.prestigeGain();
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.doResearch('deliveryContract');
+  win.state.gold = 1e6; win.state.products.steel = 200;
   const ticketsBefore = win.permanent.tickets;
-  win.document.getElementById('prestigeBtn').onclick();
-
-  check('Task16: prestige resets craftFacility to 1', win.state.craftFacility === 1);
-  check('Task16: prestige still awards totalPrestige', win.permanent.totalPrestige === expectedGain);
-  check('Task16: prestige leaves tickets / firstGachaGranted intact', win.permanent.tickets === ticketsBefore && win.permanent.firstGachaGranted === true);
-  check('Task16: prestige still resets run gold/workers', win.state.gold === 0 && win.state.characters.length === 0);
+  const rep = win.completeOrder('forge');
+  check('Task16: an order keeps craftFacility (no reset)', win.state.craftFacility === 3);
+  check('Task16: an order awards totalPrestige', win.permanent.totalPrestige === rep && rep === 1);
+  check('Task16: an order leaves tickets / firstGachaGranted intact', win.permanent.tickets === ticketsBefore && win.permanent.firstGachaGranted === true);
+  check('Task16: an order keeps the workers', win.state.characters.length === 1);
 })();
 
 (function test_T16_uiInDevTab() {

@@ -78,17 +78,18 @@
   check('Task6-G: no duplicate milestone log after reload', logHits === 0, `count=${logHits}`); // the reload itself logs "이전 진행 상황을 불러왔습니다", not this milestone
 })();
 
-(function test_G2_flagResetsOnPrestige() {
+(function test_G2_flagSurvivesOrders() {
   const win = newDom(makeMemoryStorage()).window;
   win.permanent.tickets = 1;
   win.pullGacha();
   win.state.characters.push(makeTestWorker('t2', win.state.characters[0].resource === 'iron' ? 'coal' : 'iron'));
   win.checkDualAutomation();
-  check('Task6-G2: flag set before prestige', win.state.autoLineLogged === true);
-
-  win.state.runGold = 5000;
-  win.document.getElementById('prestigeBtn').onclick();
-  check('Task6-G2: flag resets to false on the new run after prestige', win.state.autoLineLogged === false);
+  check('Task6-G2: flag set before completing an order', win.state.autoLineLogged === true);
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.doResearch('deliveryContract');
+  win.state.gold = 1e6; win.state.products.steel = 200;
+  win.completeOrder('forge');
+  check('Task6-G2: the flag is not reset by an order (there is no run reset any more)', win.state.autoLineLogged === true);
 })();
 
 (function test_H_lockedSiteShowsExistingRecipesOnly() {

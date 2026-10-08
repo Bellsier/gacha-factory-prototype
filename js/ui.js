@@ -7,17 +7,17 @@ function updateNextHint(){
     el.textContent = `채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다. (현재 ${fmt(state.gold)}/${BALANCE.gacha.FIRST_TICKET_GOLD_THRESHOLD}G)`;
   } else if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
     el.textContent = permanent.tickets >= 1
-      ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 일꾼이 있어야 프레스티지가 열립니다. 자동 제작은 연구 탭의 장치로 열어요.'
-      : '인부 탭에서 일꾼을 뽑으세요. 일꾼 1명 이상이어야 초기화(명성)를 할 수 있습니다.';
+      ? '인부 탭에서 가챠권으로 일꾼을 뽑으세요. 자동 제작은 연구 탭의 장치로 열어요.'
+      : '인부 탭에서 일꾼을 뽑으세요. 일꾼이 있으면 광석을 자동으로 캐 줘요.';
   } else if(ironHas !== coalHas){
     const missing = ironHas ? 'coal' : 'iron';
     el.textContent = `${resName(missing)}은 아직 수동입니다. 일꾼을 한 명 더 뽑으면 강철도 완전 자동화할 수 있어요.`;
   } else if(ironHas && coalHas && !state.autoCraft.steel){
     el.textContent = (isAutoCraftUnlocked() ? '철광석/석탄 자동화 완료! 자동 제작을 켜면 강철도 자동으로 만들어져요.' : '철광석/석탄 자동화 완료! 연구 탭에서 자동 제작 장치를 연구하면 강철도 자동으로 만들 수 있어요.');
-  } else if(prestigeGain() <= 0){
-    el.textContent = '일꾼을 채굴장에 배치하고 공방을 굴리세요. 이번 회차 200G부터 명성 1점을 얻습니다.';
+  } else if(!isDeliveryUnlocked()){
+    el.textContent = '연구 탭에서 "납품 계약"을 연구하면 회사에 제품을 보내고 명성을 얻을 수 있어요.';
   } else {
-    el.textContent = `이번 회차를 초기화하면 명성 +${prestigeGain()}점을 얻습니다. 일꾼·자원은 사라지고 영구 배율이 남습니다.`;
+    el.textContent = '납품 탭의 수주를 완수하면 명성을 얻어요. 명성이 오르면 더 많은 회사와 거래할 수 있습니다.';
   }
 }
 
@@ -25,9 +25,8 @@ function renderCurrencies(){
   document.getElementById('goldVal').textContent = fmt(state.gold);
   document.getElementById('ticketVal').textContent = fmt(permanent.tickets);
   document.getElementById('prestigeVal').textContent = fmt(permanent.totalPrestige);
+  document.getElementById('prestigeLabel').textContent = '명성 (사용 ' + fmt(permanent.reputationPoints) + ')';
   document.getElementById('multVal').textContent = '×' + mult().toFixed(2);
-  document.getElementById('runGoldVal').textContent = fmt(state.runGold);
-  document.getElementById('runNum').textContent = permanent.runCount;
 }
 
 // Task 35: Shared storage UI. The game's existing state.resources object is
@@ -111,7 +110,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 });
 
 // Full rebuild: only called after structural changes (new character, facility
-// level up, site unlock, prestige). Never called from the fast tick loop, so
+// level up, site unlock). Never called from the fast tick loop, so
 // buttons keep their identity and don't flicker.
 function buildLines(){
   const wrap = document.getElementById('lines');
@@ -452,7 +451,7 @@ function updateDeliveryNumbers(){
 }
 
 // Full rebuild: only called after structural changes (auto-craft unlock
-// toggling, site unlock, prestige reset). Buttons keep their identity between ticks.
+// toggling, site unlock). Buttons keep their identity between ticks.
 function buildRecipes(){
   const wrap = document.getElementById('recipes');
   wrap.innerHTML = '';
@@ -528,7 +527,7 @@ function renderLastPull(){
 }
 
 // Full rebuild: only called after structural changes (gacha pull, reassignment,
-// stat upgrade purchase, site unlock, prestige).
+// stat upgrade purchase, site unlock).
 function buildWorkers(){
   const wrap = document.getElementById('workers');
   wrap.innerHTML = '';
@@ -602,30 +601,6 @@ document.getElementById('hqBtn').onclick = ()=>{
 document.getElementById('craftFacilityBtn').onclick = ()=>{
   if(!upgradeCraftFacility()) return;
   updateNumbers();
-};
-
-document.getElementById('prestigeInfoBtn').onclick = ()=>{
-  const box = document.getElementById('prestigeInfoBox');
-  box.style.display = box.style.display === 'none' ? 'block' : 'none';
-};
-
-document.getElementById('prestigeBtn').onclick = ()=>{
-  if(state.characters.length < BALANCE.worker.MIN_REQUIRED){
-    log('일꾼을 한 명 이상 뽑은 뒤에 초기화할 수 있습니다.');
-    return;
-  }
-  const gain = prestigeGain();
-  if(gain <= 0){
-    log('명성 포인트를 얻으려면 이번 회차에서 더 골드를 벌어야 합니다.');
-    return;
-  }
-  if(!confirm(`초기화하면 모든 자원/제품/일꾼이 사라집니다. 명성 포인트 +${gain}을 얻고 다음 회차를 시작할까요?`)) return;
-  permanent.totalPrestige += gain;
-  state = freshRunState();
-  log(`── 회차 ${permanent.runCount} 종료. 명성 포인트 +${gain} (누적 ${permanent.totalPrestige}, 배율 ×${mult().toFixed(2)}) ──`);
-  permanent.runCount++;
-  renderAll();
-  saveGame();
 };
 
 // Runs 10x/second: only touches numbers and disabled flags on EXISTING
@@ -716,7 +691,6 @@ function updateNumbers(){
   const craftFacilityBtn = document.getElementById('craftFacilityBtn');
   craftFacilityBtn.textContent = `제작 시설 강화 — ${craftFacilityCost()}G`;
   craftFacilityBtn.disabled = state.gold < craftFacilityCost();
-  document.getElementById('prestigeGainPreview').textContent = '+' + prestigeGain();
   renderCurrencies();
 }
 
@@ -1092,7 +1066,7 @@ function clearWorldSelection(){
 }
 
 // Reflects worldSelection onto the stage DOM (one .is-selected at most).
-// Drops a selection whose mine no longer exists (e.g. after prestige).
+// Drops a selection whose mine no longer exists.
 function applyWorldSelection(){
   if(!isWorldSelectionValid(worldSelection)) worldSelection = null;
   const stage = document.getElementById('worldStage');

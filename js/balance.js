@@ -11,8 +11,7 @@ const TICK_MS = 100;
 const TICKS_PER_SECOND = 1000/TICK_MS; // exactly 10 — used to derive per-tick fractions bit-identically to the prior /10 and -0.1 literals
 const BALANCE = {
   prestige: {
-    MULTIPLIER_PER_POINT: 0.15, // mult(): permanent multiplier gained per prestige point
-    GOLD_DIVISOR: 200,          // prestigeGain(): floor(sqrt(runGold / GOLD_DIVISOR))
+    MULTIPLIER_PER_POINT: 0.15, // mult(): permanent multiplier gained per reputation point
   },
   // Task 72: delivery and partner companies (Blueprint 15.1).
   delivery: {
@@ -46,7 +45,7 @@ const BALANCE = {
     STAT_COST_BASE: {mining:40, carry:60, move:50}, // workerUpgradeCost(): base cost per stat
     STAT_COST_GROWTH: 1.35,      // workerUpgradeCost(): cost growth factor per stat level
     STAT_INCREMENT_PER_UPGRADE: 1, // stat gain per upgrade purchase
-    MIN_REQUIRED: 1,             // minimum workers needed for prestige / auto-craft unlock
+    MIN_REQUIRED: 1,             // minimum workers (early-game guidance)
   },
   selling: {
     AUTO_SELL_COST_MULTIPLIER: 20, // autoSellCost(): recipe.sell * AUTO_SELL_COST_MULTIPLIER
