@@ -2780,7 +2780,7 @@ function t72Open(win) {
   const gain = win.deliverProducts('forge', 'steel', 10);
   check('Task72: a favorite delivery scores qty*sell*1.5 = 75', gain === 75 && win.permanent.companies.forge.score === 75);
   check('Task72: the products and shipping are used up', win.state.products.steel === 190 && win.state.gold === g0 - 5);
-  check('Task72: a free delivery gives no reputation', win.permanent.totalPrestige === 0 && win.permanent.reputationPoints === 0);
+  check('Task72: a free delivery gives no reputation', win.permanent.totalPrestige === 0);
   check('Task72: the delivered amount is recorded', win.permanent.companies.forge.sent.steel === 10);
   const before = JSON.stringify([win.state.products, win.state.gold, win.permanent.companies]);
   check('Task72: more than owned is refused and changes nothing', win.deliverProducts('forge', 'steel', 1000) === 0 && JSON.stringify([win.state.products, win.state.gold, win.permanent.companies]) === before);
@@ -2828,7 +2828,7 @@ function t72Open(win) {
   win.state.products.steel = 25;
   const g0 = win.state.gold;
   const rep = win.completeOrder('forge');
-  check('Task72: completing pays 1 reputation to both values', rep === 1 && win.permanent.totalPrestige === 1 && win.permanent.reputationPoints === 1);
+  check('Task72: completing pays 1 reputation', rep === 1 && win.permanent.totalPrestige === 1);
   check('Task72: it spends exactly the order and its shipping', win.state.products.steel === 5 && win.state.gold === g0 - win.shippingCost('forge', 'steel', 20));
   check('Task72: the order also counts as a delivery', win.permanent.companies.forge.score === 20 * 5 * 1.5 && win.permanent.companies.forge.sent.steel === 20);
   check('Task72: the next order comes up', win.permanent.companies.forge.orderIndex === 1 && win.currentOrder('forge').product === 'coalBrick');
@@ -2841,7 +2841,7 @@ function t72Open(win) {
 (function test_T72_slotRise() {
   const win = newDom(makeMemoryStorage()).window;
   t72Open(win);
-  win.permanent.totalPrestige = 4; win.permanent.reputationPoints = 4;
+  win.permanent.totalPrestige = 4;
   win.permanent.companies.forge.orderIndex = 3;  // alloy x10 -> 200 value -> 1
   win.state.products.alloy = 10;
   win.completeOrder('forge');
@@ -2855,24 +2855,19 @@ function t72Open(win) {
   t72Open(win);
   win.completeOrder('forge');
   win.deliverProducts('forge', 'steel', 10);
-  win.permanent.reputationPoints = 0; // as if spent
   win.saveGame();
   const saved = JSON.parse(storage.getItem('gachaFactorySave'));
-  check('Task72: reputation and companies are saved in permanent; saveVersion stays 1', saved.permanent.totalPrestige === 1 && saved.permanent.reputationPoints === 0 && saved.permanent.companies.forge.orderIndex === 1 && saved.saveVersion === 1);
+  check('Task72: reputation and companies are saved in permanent; saveVersion stays 1', saved.permanent.totalPrestige === 1 && !('reputationPoints' in saved.permanent) && saved.permanent.companies.forge.orderIndex === 1 && saved.saveVersion === 1);
   const loaded = newDom(storage).window;
-  check('Task72: they load back', loaded.permanent.totalPrestige === 1 && loaded.permanent.reputationPoints === 0 && loaded.permanent.companies.forge.orderIndex === 1 && loaded.permanent.companies.forge.sent.steel === 30 && loaded.permanent.companies.forge.score === win.permanent.companies.forge.score);
+  check('Task72: they load back', loaded.permanent.totalPrestige === 1 && loaded.permanent.companies.forge.orderIndex === 1 && loaded.permanent.companies.forge.sent.steel === 30 && loaded.permanent.companies.forge.score === win.permanent.companies.forge.score);
   const edit = (fn) => { const p = JSON.parse(storage.getItem('gachaFactorySave')); fn(p); storage.setItem('gachaFactorySave', JSON.stringify(p)); return newDom(storage).window; };
-  const old = edit((p) => { delete p.permanent.reputationPoints; delete p.permanent.companies; p.permanent.totalPrestige = 7; });
-  check('Task72: an older save starts spendable reputation equal to what it earned', old.permanent.reputationPoints === 7 && old.permanent.companies.forge.score === 0 && old.permanent.companies.lab.orderIndex === 0);
-  const over = edit((p) => { p.permanent.totalPrestige = 3; p.permanent.reputationPoints = 99; });
-  check('Task72: spendable reputation never exceeds what was earned', over.permanent.reputationPoints === 3);
+  const old = edit((p) => { delete p.permanent.companies; p.permanent.totalPrestige = 7; p.permanent.reputationPoints = 5; });
+  check('Task72: an older save keeps its reputation and ignores the old spendable field', old.permanent.totalPrestige === 7 && !('reputationPoints' in old.permanent) && old.permanent.companies.forge.score === 0 && old.permanent.companies.lab.orderIndex === 0);
   [1, 'x', null, [], { forge: 5 }, { forge: { score: -1, orderIndex: 99, sent: { steel: -4, nope: 3 } }, ghost: { score: 9 } }].forEach((bad, i) => {
     const w = edit((p) => { p.permanent.companies = bad; });
     const f = w.permanent.companies.forge;
     check('Task72: invalid companies value #' + i + ' loads safely', Object.keys(w.permanent.companies).sort().join() === 'forge,harbor,lab' && f.score >= 0 && Number.isInteger(f.orderIndex) && f.orderIndex >= 0 && f.orderIndex <= 5 && !('nope' in f.sent) && f.sent.steel >= 0);
   });
-  const bad2 = edit((p) => { p.permanent.reputationPoints = 'many'; p.permanent.totalPrestige = 6; });
-  check('Task72: a bad spendable value falls back to what was earned', bad2.permanent.reputationPoints === 6);
 })();
 
 (function test_T72_wiring() {
@@ -3041,13 +3036,124 @@ function t73Trade(win, n) { for (let i = 0; i < n; i++) win.tickTrades(); }
   const win = newDom(storage).window;
   win.saveGame();
   const p = JSON.parse(storage.getItem('gachaFactorySave'));
-  p.run.runGold = 1234; p.permanent.runCount = 4; p.permanent.totalPrestige = 6; delete p.permanent.reputationPoints;
+  p.run.runGold = 1234; p.permanent.runCount = 4; p.permanent.totalPrestige = 6; p.permanent.reputationPoints = 4;
   storage.setItem('gachaFactorySave', JSON.stringify(p));
   const old = newDom(storage).window;
-  check('Task74: an old save with runGold and a run count still loads', old.permanent.totalPrestige === 6 && old.permanent.reputationPoints === 6 && old.permanent.runCount === 4 && !('runGold' in old.state));
-  check('Task74: the header shows reputation with the spendable amount', old.document.getElementById('prestigeVal').textContent === '6' && /사용 6/.test(old.document.getElementById('prestigeLabel').textContent));
+  check('Task74: an old save with runGold and a run count still loads', old.permanent.totalPrestige === 6 && !('reputationPoints' in old.permanent) && old.permanent.runCount === 4 && !('runGold' in old.state));
+  check('Task74: the header shows the reputation', old.document.getElementById('prestigeVal').textContent === '6');
   old.saveGame();
   check('Task74: saving drops runGold', !('runGold' in JSON.parse(storage.getItem('gachaFactorySave')).run));
+})();
+
+
+// ---------------------------------------------------------------------------
+// Task 75/76: reputation effects (they open, grow and stay) and the gentler multiplier
+// ---------------------------------------------------------------------------
+function t75Rep(win, n) { win.permanent.totalPrestige = n; return win; }
+const t75Close = (a, b) => Math.abs(a - b) < 1e-9;
+
+(function test_T75_effectData() {
+  const win = newDom(makeMemoryStorage()).window;
+  const defs = win.REPUTATION_EFFECTS;
+  check('Task75: four effects open at 0 / 3 / 6 / 9', defs.map(e => e.key + e.unlock).join() === 'multiplier0,shippingDiscount3,craftSpeed6,tradePrice9');
+  check('Task75: every effect has a name and description', defs.every(e => e.name && e.desc));
+  check('Task75: effects never open in reverse order of difficulty', defs.every((e, i) => i === 0 || e.unlock >= defs[i - 1].unlock));
+})();
+
+(function test_T75_effectSizes() {
+  const win = newDom(makeMemoryStorage()).window;
+  const eff = (n, k) => { t75Rep(win, n); return win.reputationEffect(k); };
+  check('Task75: closed effects are 0', eff(2, 'shippingDiscount') === 0 && eff(5, 'craftSpeed') === 0 && eff(8, 'tradePrice') === 0);
+  check('Task75: an effect opens exactly at its reputation (3 -> -6%)', t75Close(eff(3, 'shippingDiscount'), 0.06));
+  check('Task75: it grows with reputation (10 -> 20%)', t75Close(eff(10, 'shippingDiscount'), 0.20));
+  check('Task75: the discount stops at 30%', t75Close(eff(15, 'shippingDiscount'), 0.30) && t75Close(eff(30, 'shippingDiscount'), 0.30));
+  check('Task75: craft speed 6 -> 12%, 20 -> 40%', t75Close(eff(6, 'craftSpeed'), 0.12) && t75Close(eff(20, 'craftSpeed'), 0.40));
+  check('Task75: trade price 9 -> 18%', t75Close(eff(9, 'tradePrice'), 0.18));
+  check('Task75: nothing counts above reputation 30', t75Close(eff(30, 'craftSpeed'), 0.60) && t75Close(eff(500, 'craftSpeed'), 0.60) && t75Close(eff(500, 'tradePrice'), 0.60));
+  check('Task75: an effect never shrinks when reputation rises', [0, 3, 6, 9, 12, 20, 30, 40].map(n => eff(n, 'craftSpeed')).every((v, i, a) => i === 0 || v >= a[i - 1]));
+  check('Task75: unknown keys and the multiplier give 0 here', win.reputationEffect('nope') === 0 && win.reputationEffect('multiplier') === 0 && win.reputationEffect(null) === 0);
+})();
+
+(function test_T76_multiplier() {
+  const win = newDom(makeMemoryStorage()).window;
+  const m = (n) => { t75Rep(win, n); return win.mult(); };
+  check('Task76: no reputation is x1', t75Close(m(0), 1));
+  check('Task76: up to 15 it is +15% per point as before (5 -> 1.75, 15 -> 3.25)', t75Close(m(5), 1.75) && t75Close(m(15), 3.25));
+  check('Task76: above 15 it grows by 5% per point (20 -> 3.5, 30 -> 4.0)', t75Close(m(20), 3.5) && t75Close(m(30), 4.0));
+  check('Task76: it stops at reputation 30', t75Close(m(31), 4.0) && t75Close(m(10000), 4.0));
+  check('Task76: it never decreases', [0, 1, 5, 14, 15, 16, 29, 30, 31].map(m).every((v, i, a) => i === 0 || v >= a[i - 1]));
+  t75Rep(win, 30); win.state.hqLevel = 2;
+  check('Task76: HQ investment still multiplies on top', t75Close(win.mult(), 4.0 * (1 + 2 * 0.08)));
+})();
+
+(function test_T75_effectsApplied() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  const ship = (n) => { t75Rep(win, n); return win.shippingCost('forge', 'steel', 100); };
+  check('Task75: shipping without reputation is ceil(100*5*0.1) = 50', ship(0) === 50);
+  check('Task75: reputation 3 cuts it by 6% -> 47', ship(3) === 47);
+  check('Task75: reputation 15 cuts it by 30% -> 35', ship(15) === 35);
+  t75Rep(win, 0);
+  win.state.craftFacility = 1;
+  check('Task75: craft speed is 1 without reputation', t75Close(win.craftSpeed(), 1));
+  t75Rep(win, 6);
+  check('Task75: craft speed 1.12 at reputation 6', t75Close(win.craftSpeed(), 1.12));
+  win.state.craftFacility = 3;
+  check('Task75: it multiplies with the facility level (1.2 * 1.12)', t75Close(win.craftSpeed(), 1.2 * 1.12));
+  const ws = win.addWorkshop({ id: 'ws75', x: 4, y: 2, level: 1, recipeKey: 'crystalAlloy' });
+  const rec = win.RECIPES.find(r => r.key === 'crystalAlloy');
+  t75Rep(win, 0);
+  check('Task75: workshop craft time is the recipe time without reputation', t75Close(win.workshopCraftTime(ws, rec), 3));
+  t75Rep(win, 6);
+  check('Task75: reputation 6 shortens it by the same speed (3 / 1.12)', t75Close(win.workshopCraftTime(ws, rec), 3 / 1.12));
+})();
+
+(function test_T75_tradePriceApplied() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  win.permanent.companies.forge.score = 300;
+  const run = (rep) => {
+    t75Rep(win, rep);
+    win.permanent.companies.forge.tradeTimer = 60;
+    win.state.products.steel = 5;
+    const g0 = win.state.gold;
+    win.tickTrades();
+    return win.state.gold - g0;
+  };
+  const base = run(0);
+  check('Task75: without reputation the trade pays 5*5*1.3', t75Close(base, 5 * 5 * 1.3));
+  const r9 = run(9);
+  check('Task75: reputation 9 adds 18% to the trade price (on top of the multiplier)', t75Close(r9, 5 * 5 * 1.3 * 1.18 * win.mult()));
+})();
+
+(function test_T75_openingIsLogged() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  win.permanent.totalPrestige = 2;
+  win.permanent.companies.forge.orderIndex = 3;
+  win.state.products.alloy = 10;
+  win.completeOrder('forge');
+  const log = win.document.getElementById('log').textContent;
+  check('Task75: reaching reputation 3 logs the new effect once', win.permanent.totalPrestige === 3 && log.split('명성 효과가 열렸습니다: 배송비 할인').length === 2);
+  check('Task75: effects that stay closed are not logged', !/명성 효과가 열렸습니다: 제작 속도/.test(log));
+})();
+
+(function test_T75_panel() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  check('Task75: the 납품 tab lists all four effects', doc.querySelectorAll('[data-reputation-effect]').length === 4);
+  check('Task75: closed effects say at which reputation they open', /명성 3점에서 열려요/.test(doc.querySelector('[data-reputation-text="shippingDiscount"]').textContent) && doc.querySelector('[data-reputation-effect="shippingDiscount"]').classList.contains('is-closed'));
+  check('Task75: the multiplier row is open from the start', /×1\.00/.test(doc.querySelector('[data-reputation-text="multiplier"]').textContent));
+  check('Task75: the reputation line shows progress to the maximum', /0 \/ 30/.test(doc.getElementById('reputationVal').textContent));
+  win.permanent.totalPrestige = 10;
+  win.updateNumbers();
+  check('Task75: the per-tick refresh updates sizes and opens rows without rebuilding', /-20%/.test(doc.querySelector('[data-reputation-text="shippingDiscount"]').textContent) && /\+20%/.test(doc.querySelector('[data-reputation-text="craftSpeed"]').textContent) && !doc.querySelector('[data-reputation-effect="tradePrice"]').classList.contains('is-closed') && /\+20%/.test(doc.querySelector('[data-reputation-text="tradePrice"]').textContent));
+  check('Task75: the multiplier row follows reputation (x2.50 at 10)', /×2\.50/.test(doc.querySelector('[data-reputation-text="multiplier"]').textContent));
+  win.permanent.totalPrestige = 40;
+  win.updateNumbers();
+  check('Task75: at the top it says 최대', /최대/.test(doc.getElementById('reputationVal').textContent));
+  win.renderAll(); win.renderAll();
+  check('Task75: re-rendering never duplicates rows', doc.querySelectorAll('[data-reputation-effect]').length === 4);
 })();
 
 

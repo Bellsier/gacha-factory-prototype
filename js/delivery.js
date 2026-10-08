@@ -4,13 +4,50 @@
 // Free delivery: send any product to a reachable company. The products and the
 // shipping cost (gold) are used up; the company's score grows.
 // Order: a company's next order asks for a fixed product and quantity. Sending
-// exactly that completes it and pays reputation (permanent.totalPrestige, which
-// mult() already reads, and permanent.reputationPoints, which is spendable —
-// the spending is a later Task). Nothing here touches the DOM except log().
+// exactly that completes it and pays reputation (permanent.totalPrestige: it
+// only grows and is never spent; the reputation effects read it, see below).
+// Nothing here touches the DOM except log().
 //
 // Progress per company lives in permanent.companies (see state.js).
 // Regular trade (score >= company.regularScore): tickTrades() buys the
 // company's favorite products at a better price on a fixed interval (Task 73).
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Task 75: reputation effects (REPUTATION_EFFECTS in data.js).
+// ---------------------------------------------------------------------------
+function reputationDef(key){
+  return REPUTATION_EFFECTS.find(e => e.key === key) || null;
+}
+
+// Reputation that counts: never above BALANCE.reputation.MAX.
+function reputationPointsCounted(){
+  return Math.min(permanent.totalPrestige, BALANCE.reputation.MAX);
+}
+
+function isReputationEffectOpen(key){
+  const def = reputationDef(key);
+  return !!def && permanent.totalPrestige >= def.unlock;
+}
+
+// Extra multiplier from reputation: +MULT_PER_POINT per point up to MULT_SOFT_AT,
+// then the smaller MULT_PER_POINT_SOFT (Task 76).
+function reputationMultiplierBonus(){
+  const b = BALANCE.reputation, p = reputationPointsCounted();
+  const firstPart = Math.min(p, b.MULT_SOFT_AT);
+  return firstPart * b.MULT_PER_POINT + Math.max(0, p - b.MULT_SOFT_AT) * b.MULT_PER_POINT_SOFT;
+}
+
+// Size of an effect right now (0 while it is closed). 'multiplier' is read
+// through mult(); the others are fractions (0.06 = 6%).
+function reputationEffect(key){
+  const def = reputationDef(key);
+  if(!def || def.unit === 'multiplier' || !isReputationEffectOpen(key)) return 0;
+  const size = def.perPoint * reputationPointsCounted();
+  return def.max === undefined ? size : Math.min(def.max, size);
+}
+
+// ---------------------------------------------------------------------------
+// Task 72: delivery and companies.
 // ---------------------------------------------------------------------------
 function companyDef(key){
   if(typeof key !== 'string') return null;
@@ -44,7 +81,7 @@ function recipeByKey(key){
 function shippingCost(key, productKey, qty){
   const def = companyDef(key), recipe = recipeByKey(productKey);
   if(!def || !recipe || !Number.isInteger(qty) || qty <= 0) return 0;
-  return Math.ceil(qty * recipe.sell * BALANCE.delivery.SHIPPING_RATE * def.distance);
+  return Math.ceil(qty * recipe.sell * BALANCE.delivery.SHIPPING_RATE * def.distance * (1 - reputationEffect('shippingDiscount')));
 }
 
 // Score a delivery of `qty` units would add right now (fractional is fine).
@@ -120,13 +157,14 @@ function completeOrder(key){
   const rep = orderReputation(order);
   const wasRegular = isRegularTrade(key);
   const slotsBefore = companySlots();
+  const effectsBefore = REPUTATION_EFFECTS.filter(e => isReputationEffectOpen(e.key));
   applyDelivery(key, order.product, order.qty);
   p.orderIndex += 1;
   permanent.totalPrestige += rep;
-  permanent.reputationPoints += rep;
   log(def.name + '의 수주를 완수했습니다. 명성 +' + rep);
   if(!wasRegular && isRegularTrade(key)) log(def.name + '과(와) 정기 거래를 시작합니다!');
   if(companySlots() > slotsBefore) log('명성이 올라 새 회사와 거래할 수 있게 되었습니다.');
+  REPUTATION_EFFECTS.filter(e => isReputationEffectOpen(e.key) && !effectsBefore.includes(e)).forEach(e => log('명성 효과가 열렸습니다: ' + e.name));
   return rep;
 }
 
@@ -151,7 +189,7 @@ function tickTrades(){
     if(!productKey) return;
     const qty = Math.min(b.TRADE_QTY, Math.floor(state.products[productKey]));
     const recipe = recipeByKey(productKey);
-    const earned = qty * recipe.sell * b.TRADE_PRICE_MULT * mult();
+    const earned = qty * recipe.sell * b.TRADE_PRICE_MULT * (1 + reputationEffect('tradePrice')) * mult();
     state.products[productKey] -= qty;
     state.gold += earned;
     p.tradeTimer = 0;

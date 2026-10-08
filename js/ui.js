@@ -25,7 +25,6 @@ function renderCurrencies(){
   document.getElementById('goldVal').textContent = fmt(state.gold);
   document.getElementById('ticketVal').textContent = fmt(permanent.tickets);
   document.getElementById('prestigeVal').textContent = fmt(permanent.totalPrestige);
-  document.getElementById('prestigeLabel').textContent = '명성 (사용 ' + fmt(permanent.reputationPoints) + ')';
   document.getElementById('multVal').textContent = '×' + mult().toFixed(2);
 }
 
@@ -376,6 +375,42 @@ function deliveryPreviewText(key){
   return '보유 ' + fmt(state.products[productKey] || 0) + '개 · 배송비 ' + fmt(shippingCost(key, productKey, qty)) + 'G · 점수 +' + fmt(deliveryScore(key, productKey, qty));
 }
 
+// Reputation effects list (납품 tab). Rebuilt with renderAll(); the per-tick
+// refresh only rewrites the text.
+function reputationEffectText(def){
+  if(!isReputationEffectOpen(def.key)){
+    return '명성 ' + def.unlock + '점에서 열려요';
+  }
+  if(def.unit === 'multiplier') return '×' + (1 + reputationMultiplierBonus()).toFixed(2);
+  const size = reputationEffect(def.key);
+  return (def.key === 'shippingDiscount' ? '-' : '+') + Math.round(size * 100) + '%';
+}
+
+function renderReputation(){
+  const wrap = document.getElementById('reputationEffects');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  REPUTATION_EFFECTS.forEach(def => {
+    const row = document.createElement('div');
+    row.className = 'rate reputation-effect' + (isReputationEffectOpen(def.key) ? '' : ' is-closed');
+    row.setAttribute('data-reputation-effect', def.key);
+    row.innerHTML = '<b>' + def.name + '</b> <span data-reputation-text="' + def.key + '">' + reputationEffectText(def) + '</span> — ' + def.desc;
+    wrap.appendChild(row);
+  });
+}
+
+function updateReputationNumbers(){
+  const val = document.getElementById('reputationVal');
+  if(val) val.textContent = fmt(permanent.totalPrestige) + (permanent.totalPrestige >= BALANCE.reputation.MAX ? ' (최대)' : ' / ' + BALANCE.reputation.MAX);
+  REPUTATION_EFFECTS.forEach(def => {
+    const open = isReputationEffectOpen(def.key);
+    const row = document.querySelector('[data-reputation-effect="' + def.key + '"]');
+    if(row) row.classList.toggle('is-closed', !open);
+    const text = document.querySelector('[data-reputation-text="' + def.key + '"]');
+    if(text) text.textContent = reputationEffectText(def);
+  });
+}
+
 function renderDelivery(){
   const wrap = document.getElementById('deliveryList');
   if(!wrap) return;
@@ -663,6 +698,7 @@ function updateNumbers(){
     if(progressEl) progressEl.textContent = workshopProgressLabel(workshop, recipe);
   });
   updateDeliveryNumbers();
+  updateReputationNumbers();
   const buildBtn = document.querySelector('[data-build-workshop]');
   if(buildBtn){ buildBtn.disabled = !canBuildWorkshop(); buildBtn.textContent = workshopBuildLabel(); }
   RESEARCH.forEach(def=>{
@@ -707,6 +743,7 @@ function renderAll(){
   renderResearch();
   renderWorkshopBuild();
   renderDelivery();
+  renderReputation();
   renderLastPull();
   updateNumbers();
   renderWorldGround();

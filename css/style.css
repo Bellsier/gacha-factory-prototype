@@ -141,6 +141,7 @@
 
   .world-mine{display:flex; flex-direction:column; gap:4px; margin-bottom:10px;}
   /* Task 70: research cards. */
+  .reputation-effect.is-closed{opacity:.55;}
   .company-card{display:flex; flex-direction:column; gap:6px; margin-bottom:10px;}
   .company-card.is-closed{opacity:.6;}
   .company-card input[type=number]{width:80px;}

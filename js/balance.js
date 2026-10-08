@@ -10,8 +10,14 @@
 const TICK_MS = 100;
 const TICKS_PER_SECOND = 1000/TICK_MS; // exactly 10 — used to derive per-tick fractions bit-identically to the prior /10 and -0.1 literals
 const BALANCE = {
-  prestige: {
-    MULTIPLIER_PER_POINT: 0.15, // mult(): permanent multiplier gained per reputation point
+  // Task 75/76: reputation (permanent, only ever grows). Each reputation
+  // effect in REPUTATION_EFFECTS (data.js) opens at its own reputation and
+  // grows with it; nothing counts reputation beyond MAX.
+  reputation: {
+    MAX: 30,                    // reputation beyond this adds nothing
+    MULT_PER_POINT: 0.15,       // mult(): +15% per point up to MULT_SOFT_AT ...
+    MULT_SOFT_AT: 15,
+    MULT_PER_POINT_SOFT: 0.05,  // ... and +5% per point above it (Task 76: gentler growth)
   },
   // Task 72: delivery and partner companies (Blueprint 15.1).
   delivery: {

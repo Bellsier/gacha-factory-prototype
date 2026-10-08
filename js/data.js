@@ -84,6 +84,17 @@ const COMPANIES = [
    distance:2.5, favorites:['precisionPart','relicPart','quantumCore','plasmaCore'], regularScore:6000, requires:['tunnelWork'],
    orders:[{product:'precisionPart', qty:20}, {product:'relicPart', qty:20}, {product:'quantumCore', qty:5}, {product:'plasmaCore', qty:8}]},
 ];
+// Task 75: reputation effects. Each opens once reputation (permanent.totalPrestige)
+// reaches `unlock` and stays; its size grows with reputation (capped by
+// BALANCE.reputation.MAX). The size is read through reputationEffect(key).
+//   perPoint  size gained per reputation point (the multiplier is special: BALANCE.reputation)
+//   max       largest size (optional)
+const REPUTATION_EFFECTS = [
+  {key:'multiplier',       name:'채굴·판매 배율',  unlock:0, unit:'multiplier', desc:'모든 채굴과 판매 수익이 늘어요.'},
+  {key:'shippingDiscount', name:'배송비 할인',     unlock:3, perPoint:0.02, max:0.30, unit:'percent', desc:'납품 배송비가 줄어요.'},
+  {key:'craftSpeed',       name:'제작 속도',       unlock:6, perPoint:0.02, unit:'percent', desc:'제작이 빨라져요. (레시피와 제작소)'},
+  {key:'tradePrice',       name:'정기 거래 가격',  unlock:9, perPoint:0.02, unit:'percent', desc:'정기 거래에서 더 높은 값을 받아요.'},
+];
 const RARITY = [
   {key:'common', label:'일반', chance:60, mining:1, carry:2, move:1, cls:'common'},
   {key:'rare',   label:'희귀', chance:25, mining:2, carry:3, move:2, cls:'rare'},

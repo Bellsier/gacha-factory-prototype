@@ -1,9 +1,9 @@
-function mult(){ return (1 + permanent.totalPrestige * BALANCE.prestige.MULTIPLIER_PER_POINT) * hqMult(); }
+function mult(){ return (1 + reputationMultiplierBonus()) * hqMult(); }
 function hqMult(){ return 1 + state.hqLevel * BALANCE.hq.MULTIPLIER_PER_LEVEL; }
 function hqCost(){ return expCost(BALANCE.hq.COST_BASE, BALANCE.hq.COST_GROWTH, state.hqLevel); }
 
 function craftSpeed(){
-  return 1 + Math.max(0, state.craftFacility - 1) * BALANCE.crafting.FACILITY_SPEED_PER_LEVEL;
+  return (1 + Math.max(0, state.craftFacility - 1) * BALANCE.crafting.FACILITY_SPEED_PER_LEVEL) * (1 + reputationEffect('craftSpeed'));
 }
 function craftFacilityCost(){
   return expCost(BALANCE.crafting.FACILITY_COST_BASE, BALANCE.crafting.FACILITY_COST_GROWTH, Math.max(0, state.craftFacility - 1));

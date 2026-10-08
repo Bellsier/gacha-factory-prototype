@@ -73,7 +73,7 @@ let state = freshRunState();
 // meaning, same save/load JSON shape as before (Task 1/6); sanitizePermanent()
 // already returns exactly this shape, so loading a save assigns into this
 // variable directly.
-let permanent = { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: false, reputationPoints: 0, companies: freshCompaniesState() };
+let permanent = { totalPrestige: 0, runCount: 1, tickets: 0, firstGachaGranted: false, companies: freshCompaniesState() };
 
 function freshRunState(){
   const resources = {}, facility = {}, workforce = {};
@@ -452,13 +452,11 @@ function sanitizeCompaniesState(raw){
   return out;
 }
 function sanitizePermanent(raw){
-  const fresh = { totalPrestige:0, runCount:1, tickets:0, firstGachaGranted:false, reputationPoints:0, companies: freshCompaniesState() };
+  const fresh = { totalPrestige:0, runCount:1, tickets:0, firstGachaGranted:false, companies: freshCompaniesState() };
   if(!isPlainObject(raw)) return fresh;
   const totalPrestige = isNonNegativeFinite(raw.totalPrestige) ? raw.totalPrestige : 0;
   return {
     totalPrestige,
-    // Task 72: spendable reputation. An older save has none: it starts equal to what was earned.
-    reputationPoints: isNonNegativeFinite(raw.reputationPoints) ? Math.min(raw.reputationPoints, totalPrestige) : totalPrestige,
     companies: sanitizeCompaniesState(raw.companies),
     runCount: (Number.isInteger(raw.runCount) && raw.runCount >= 1) ? raw.runCount : 1, // runCount starts at 1 and only ever increments
     tickets: isNonNegativeFinite(raw.tickets) ? raw.tickets : 0,
@@ -498,7 +496,7 @@ function saveGame(){
     const payload = {
       saveVersion: CURRENT_SAVE_VERSION,
       savedAt: Date.now(),
-      permanent: { totalPrestige: permanent.totalPrestige, runCount: permanent.runCount, tickets: permanent.tickets, firstGachaGranted: permanent.firstGachaGranted, reputationPoints: permanent.reputationPoints, companies: permanent.companies },
+      permanent: { totalPrestige: permanent.totalPrestige, runCount: permanent.runCount, tickets: permanent.tickets, firstGachaGranted: permanent.firstGachaGranted, companies: permanent.companies },
       run: state,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));

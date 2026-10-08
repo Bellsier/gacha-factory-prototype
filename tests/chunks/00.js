@@ -98,6 +98,7 @@ function newDom(storage, opts) {
   RESEARCH: () => RESEARCH,
   RESEARCH_BRANCHES: () => RESEARCH_BRANCHES,
   COMPANIES: () => COMPANIES,
+  REPUTATION_EFFECTS: () => REPUTATION_EFFECTS,
   TICK_MS: () => TICK_MS,
   TICKS_PER_SECOND: () => TICKS_PER_SECOND,
 };
@@ -118,6 +119,7 @@ function newDom(storage, opts) {
     RESEARCH: { get: () => win.__expose.RESEARCH(), configurable: true },
     RESEARCH_BRANCHES: { get: () => win.__expose.RESEARCH_BRANCHES(), configurable: true },
     COMPANIES: { get: () => win.__expose.COMPANIES(), configurable: true },
+    REPUTATION_EFFECTS: { get: () => win.__expose.REPUTATION_EFFECTS(), configurable: true },
     TICK_MS: { get: () => win.__expose.TICK_MS(), configurable: true },
     TICKS_PER_SECOND: { get: () => win.__expose.TICKS_PER_SECOND(), configurable: true },
   });
@@ -203,14 +205,12 @@ function advanceTicks(win, n) {
   win.permanent.tickets = 1;
   win.pullGacha();
   win.permanent.totalPrestige = 3;
-  win.permanent.reputationPoints = 2;
   win.saveGame();
   check('reputation: autosave stores the save', storage._raw()['gachaFactorySave'] !== undefined);
   win = newDom(storage).window;
   check('reputation: totalPrestige persists across reload', win.permanent.totalPrestige === 3);
-  check('reputation: spendable points persist across reload', win.permanent.reputationPoints === 2);
   check('reputation: the run is not reset (the worker is still there)', win.state.characters.length === 1);
-  check('reputation: the header shows both values', win.document.getElementById('prestigeVal').textContent === '3' && /사용 2/.test(win.document.getElementById('prestigeLabel').textContent));
+  check('reputation: the header shows the value', win.document.getElementById('prestigeVal').textContent === '3');
 })();
 
 (function test_corruptedJson() {

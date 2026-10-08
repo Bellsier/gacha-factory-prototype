@@ -22,7 +22,7 @@
   <div class="currencies">
     <div class="cur"><div class="label">골드</div><div class="value" id="goldVal">0</div></div>
     <div class="cur ticket"><div class="label">가챠권</div><div class="value" id="ticketVal">0</div></div>
-    <div class="cur prestige"><div class="label" id="prestigeLabel">명성</div><div class="value" id="prestigeVal">0</div></div>
+    <div class="cur prestige"><div class="label">명성</div><div class="value" id="prestigeVal">0</div></div>
   </div>
 
   <div class="next-hint" id="nextHint">채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다.</div>
@@ -125,8 +125,9 @@
     <section>
       <h2>납품</h2>
       <div class="prestige-box" style="margin-bottom:10px;">
-        <div>현재 명성 배율 <span class="mult" id="multVal">×1.00</span></div>
-        <p>명성은 수주를 완수하면 오릅니다. 명성이 높을수록 채굴과 판매가 영구히 빨라지고, 더 많은 회사와 거래할 수 있어요.</p>
+        <div>명성 <span class="mult" id="reputationVal">0</span> · 현재 배율 <span class="mult" id="multVal">×1.00</span></div>
+        <p>명성은 수주를 완수하면 오르고, 줄어들지 않아요. 명성이 오를수록 아래 효과가 열리고 더 강해집니다.</p>
+        <div id="reputationEffects"></div>
       </div>
       <p class="rate" style="margin:0 0 10px;">회사에 제품을 보내면 점수가 쌓이고, 점수가 기준을 넘으면 정기 거래가 시작됩니다. 수주를 완수하면 명성을 얻어요. 보낸 제품과 배송비는 사라집니다.</p>
       <div id="deliveryList"></div>
