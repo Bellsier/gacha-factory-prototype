@@ -85,13 +85,20 @@ function shippingCost(key, productKey, qty){
 }
 
 // Score a delivery of `qty` units would add right now (fractional is fine).
+// Each unit counts for max(REPEAT_MIN_WEIGHT, 1 - unitsAlreadySent / REPEAT_DECAY_UNITS),
+// where unitsAlreadySent includes the earlier units of the same delivery: one huge
+// delivery is worth no more than the same units sent in small pieces (Task 76).
 function deliveryScore(key, productKey, qty){
   const def = companyDef(key), recipe = recipeByKey(productKey), p = companyProgress(key);
   if(!def || !recipe || !p || !Number.isInteger(qty) || qty <= 0) return 0;
   const b = BALANCE.delivery;
-  const weight = Math.max(b.REPEAT_MIN_WEIGHT, 1 - (p.sent[productKey] || 0) / b.REPEAT_DECAY_UNITS);
+  const sent = p.sent[productKey] || 0;
+  const linearUnits = b.REPEAT_DECAY_UNITS * (1 - b.REPEAT_MIN_WEIGHT); // units before the weight reaches its floor
+  const a = Math.min(qty, Math.max(0, linearUnits - sent));              // units still on the slope
+  const slope = a * (1 - sent / b.REPEAT_DECAY_UNITS) - a * (a - 1) / (2 * b.REPEAT_DECAY_UNITS);
+  const weighted = slope + (qty - a) * b.REPEAT_MIN_WEIGHT;
   const fav = def.favorites.includes(productKey) ? b.FAVORITE_MULT : 1;
-  return qty * recipe.sell * fav * weight;
+  return weighted * recipe.sell * fav;
 }
 
 function canDeliver(key, productKey, qty){

@@ -24,7 +24,7 @@ const BALANCE = {
     SLOT_THRESHOLDS: [0, 5, 15],   // reputation needed for the 1st, 2nd, 3rd company (companySlots)
     SHIPPING_RATE: 0.1,            // shipping gold = ceil(base value * SHIPPING_RATE * company.distance)
     FAVORITE_MULT: 1.5,            // score multiplier for a company's favorite products
-    REPEAT_DECAY_UNITS: 200,       // score weight = max(REPEAT_MIN_WEIGHT, 1 - unitsAlreadySent / this), per product and company
+    REPEAT_DECAY_UNITS: 200,       // each unit's score weight = max(REPEAT_MIN_WEIGHT, 1 - unitsAlreadySent / this), per product and company
     REPEAT_MIN_WEIGHT: 0.25,
     ORDER_VALUE_DIVISOR: 100,      // order reputation = floor(sqrt(order value / this))
     ORDER_REPUTATION_CAP: 4,       // most reputation one order can give

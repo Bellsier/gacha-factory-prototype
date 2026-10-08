@@ -2716,6 +2716,13 @@ function t70Afford(win) {
 // ---------------------------------------------------------------------------
 // Task 72: delivery, companies, orders, reputation
 // ---------------------------------------------------------------------------
+// Reference for the delivery score: the plain per-unit loop (independent of the closed form in delivery.js).
+function t72RefScore(sell, fav, sentBefore, qty) {
+  let total = 0;
+  for (let i = 0; i < qty; i++) total += Math.max(0.25, 1 - (sentBefore + i) / 200);
+  return total * sell * fav;
+}
+
 function t72Open(win) {
   win.state.gold = 1e6;
   win.state.products.steel = 200;
@@ -2778,7 +2785,7 @@ function t72Open(win) {
   check('Task72: shipping for 10 steel to the forge is ceil(10*5*0.1*1)=5', win.shippingCost('forge', 'steel', 10) === 5);
   check('Task72: shipping for 20 alloy to the harbor is ceil(20*20*0.1*1.5)=60', win.shippingCost('harbor', 'alloy', 20) === 60);
   const gain = win.deliverProducts('forge', 'steel', 10);
-  check('Task72: a favorite delivery scores qty*sell*1.5 = 75', gain === 75 && win.permanent.companies.forge.score === 75);
+  check('Task72: a favorite delivery scores by the per-unit weights (10 steel = 73.3)', Math.abs(gain - t72RefScore(5, 1.5, 0, 10)) < 1e-9 && Math.abs(gain - 73.3125) < 1e-9 && win.permanent.companies.forge.score === gain);
   check('Task72: the products and shipping are used up', win.state.products.steel === 190 && win.state.gold === g0 - 5);
   check('Task72: a free delivery gives no reputation', win.permanent.totalPrestige === 0);
   check('Task72: the delivered amount is recorded', win.permanent.companies.forge.sent.steel === 10);
@@ -2797,13 +2804,21 @@ function t72Open(win) {
   t72Open(win);
   win.state.products.alloy = 100;
   win.permanent.totalPrestige = 5;
-  check('Task72: a non-favorite is not boosted (harbor, steel x10 = 50)', win.deliveryScore('harbor', 'steel', 10) === 50);
-  check('Task72: a favorite is boosted (harbor, alloy x10 = 300)', win.deliveryScore('harbor', 'alloy', 10) === 300);
+  check('Task72: a non-favorite is not boosted (harbor, steel x10)', Math.abs(win.deliveryScore('harbor', 'steel', 10) - t72RefScore(5, 1, 0, 10)) < 1e-9);
+  check('Task72: a favorite is boosted (harbor, alloy x10)', Math.abs(win.deliveryScore('harbor', 'alloy', 10) - t72RefScore(20, 1.5, 0, 10)) < 1e-9);
   win.permanent.companies.forge.sent.steel = 100;
-  check('Task72: repeating the same product weighs less (half at 100 sent)', win.deliveryScore('forge', 'steel', 10) === 10 * 5 * 1.5 * 0.5);
+  check('Task72: repeating the same product weighs less (100 sent: weights 0.5 down to 0.455)', Math.abs(win.deliveryScore('forge', 'steel', 10) - t72RefScore(5, 1.5, 100, 10)) < 1e-9 && win.deliveryScore('forge', 'steel', 10) < 10 * 5 * 1.5 * 0.5);
   win.permanent.companies.forge.sent.steel = 10000;
   check('Task72: the weight never goes below 0.25', win.deliveryScore('forge', 'steel', 10) === 10 * 5 * 1.5 * 0.25);
-  check('Task72: another company is not affected by that repeat', win.deliveryScore('harbor', 'steel', 10) === 50);
+  win.permanent.companies.forge.sent.steel = 0;
+  [[1, 0], [10, 0], [150, 0], [151, 0], [400, 0], [10, 140], [50, 130], [10, 149]].forEach(([q, sb]) => {
+    win.permanent.companies.forge.sent.steel = sb;
+    check('Task76: score of ' + q + ' units after ' + sb + ' sent matches the per-unit reference', Math.abs(win.deliveryScore('forge', 'steel', q) - t72RefScore(5, 1.5, sb, q)) < 1e-6);
+  });
+  win.permanent.companies.forge.sent.steel = 0;
+  check('Task76: one huge delivery is not worth more than the same units in pieces', win.deliveryScore('forge', 'steel', 400) < 400 * 5 * 1.5 * 0.5 && Math.abs(win.deliveryScore('forge', 'steel', 400) - (win.deliveryScore('forge', 'steel', 200) + (win.permanent.companies.forge.sent.steel = 200, win.deliveryScore('forge', 'steel', 200)))) < 1e-6);
+  win.permanent.companies.forge.sent.steel = 10000;
+  check('Task72: another company is not affected by that repeat', Math.abs(win.deliveryScore('harbor', 'steel', 10) - t72RefScore(5, 1, 0, 10)) < 1e-9);
 })();
 
 (function test_T72_regularTrade() {
@@ -2830,7 +2845,7 @@ function t72Open(win) {
   const rep = win.completeOrder('forge');
   check('Task72: completing pays 1 reputation', rep === 1 && win.permanent.totalPrestige === 1);
   check('Task72: it spends exactly the order and its shipping', win.state.products.steel === 5 && win.state.gold === g0 - win.shippingCost('forge', 'steel', 20));
-  check('Task72: the order also counts as a delivery', win.permanent.companies.forge.score === 20 * 5 * 1.5 && win.permanent.companies.forge.sent.steel === 20);
+  check('Task72: the order also counts as a delivery', Math.abs(win.permanent.companies.forge.score - t72RefScore(5, 1.5, 0, 20)) < 1e-9 && win.permanent.companies.forge.sent.steel === 20);
   check('Task72: the next order comes up', win.permanent.companies.forge.orderIndex === 1 && win.currentOrder('forge').product === 'coalBrick');
   check('Task72: the multiplier follows the reputation', Math.abs(win.mult() - 1.15) < 1e-12);
   win.permanent.companies.forge.orderIndex = win.COMPANIES[0].orders.length;
@@ -2969,9 +2984,9 @@ function t73Trade(win, n) { for (let i = 0; i < n; i++) win.tickTrades(); }
   const input = doc.querySelector('[data-deliver-qty="forge"]');
   select.value = 'steel'; input.value = '7';
   select.dispatchEvent(new win.Event('change'));
-  check('Task73: the preview shows shipping and score for the typed amount', /배송비 4G/.test(doc.querySelector('[data-deliver-preview="forge"]').textContent) && /점수 \+52/.test(doc.querySelector('[data-deliver-preview="forge"]').textContent));
+  check('Task73: the preview shows shipping and score for the typed amount', /배송비 4G/.test(doc.querySelector('[data-deliver-preview="forge"]').textContent) && /점수 \+51/.test(doc.querySelector('[data-deliver-preview="forge"]').textContent));
   doc.querySelector('[data-deliver="forge"]').click();
-  check('Task73: free delivery spends stock, keeps the typed values and updates the score text', win.state.products.steel === 23 && doc.querySelector('[data-deliver-qty="forge"]') === input && input.value === '7' && /점수 52 /.test(doc.querySelector('[data-company-score="forge"]').textContent));
+  check('Task73: free delivery spends stock, keeps the typed values and updates the score text', win.state.products.steel === 23 && doc.querySelector('[data-deliver-qty="forge"]') === input && input.value === '7' && /점수 51 /.test(doc.querySelector('[data-company-score="forge"]').textContent));
   input.value = '0';
   input.dispatchEvent(new win.Event('input'));
   check('Task73: an empty amount disables the delivery button', doc.querySelector('[data-deliver="forge"]').disabled === true);
