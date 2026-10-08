@@ -188,11 +188,19 @@ function buildLines(){
 
 // Task 38/44: Workshop cards live in the 개발 tab. Recipe select, manual
 // craft, and auto-craft controls call factory.js actions then re-render.
-function recipeNeedsLockedResource(recipe){
-  return Object.keys(recipe.need).some(k=>{
-    const res = resourceByKey(k);
-    return res && !isUnlocked(k);
+// Task 78: a recipe is shown only when every raw resource in its whole chain
+// is unlocked (its direct inputs and those of the products it needs).
+function recipeRawResources(recipe, seen){
+  const raws = new Set();
+  Object.keys(recipe.need).forEach(k => {
+    if(resourceByKey(k)){ raws.add(k); return; }
+    const sub = recipeByKey(k);
+    if(sub && !(seen && seen.has(k))) recipeRawResources(sub, new Set([...(seen || []), k])).forEach(r => raws.add(r));
   });
+  return raws;
+}
+function recipeNeedsLockedResource(recipe){
+  return Array.from(recipeRawResources(recipe)).some(k => !isUnlocked(k));
 }
 function workshopProgressLabel(workshop, recipe){
   if(workshop.progress !== null && recipe) return '제작 중... ' + workshop.progress.toFixed(1) + '초';

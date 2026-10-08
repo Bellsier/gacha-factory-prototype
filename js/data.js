@@ -19,11 +19,23 @@ const RECIPES = [
   {key:'coalBrick', name:'석탄 벽돌', need:{coal:3}, out:1, sell:4, craftTime:0},
   {key:'alloy', name:'마법 합금', need:{steel:2, mana:1}, out:1, sell:20, craftTime:0},
   {key:'crystalAlloy', name:'결정 합금', need:{steel:2, crystal:1}, out:1, sell:22, craftTime:3},
-  {key:'specialAlloy', name:'특수 합금', need:{alloy:3, coal:3}, out:1, sell:45, craftTime:4},
+  {key:'specialAlloy', name:'특수 합금', need:{alloy:3, coal:3}, out:1, sell:90, craftTime:4}, // Task 78: was 45, below its own inputs (3 alloy = 60G)
   {key:'precisionPart', name:'정밀 부품', need:{alloy:2, rareMetal:1}, out:1, sell:80, craftTime:6},
   {key:'relicPart', name:'유물 부품', need:{alloy:2, relic:1}, out:1, sell:85, craftTime:6},
   {key:'quantumCore', name:'퀀텀 코어', need:{precisionPart:2, cosmicShard:1}, out:1, sell:400, craftTime:15},
   {key:'plasmaCore', name:'플라즈마 코어', need:{precisionPart:2, plasma:1}, out:1, sell:420, craftTime:15},
+  // Task 78: more recipes. Rules: every raw resource feeds at least two recipes,
+  // intermediates are shared (steelGear, crystalLens), and a recipe sells for
+  // about 1.4-2x the value of its inputs. A recipe only needs inputs defined above it.
+  {key:'ironTool', name:'철제 공구', need:{iron:4, coalBrick:1}, out:1, sell:14, craftTime:2},
+  {key:'manaLamp', name:'마정 램프', need:{coalBrick:2, mana:2}, out:1, sell:30, craftTime:3},
+  {key:'crystalLens', name:'결정 렌즈', need:{crystal:3, steel:1}, out:1, sell:35, craftTime:3},
+  {key:'steelGear', name:'강철 기어', need:{steel:3, rareMetal:1}, out:1, sell:60, craftTime:4},
+  {key:'relicOrnament', name:'고대 장식', need:{crystalAlloy:1, relic:1}, out:1, sell:70, craftTime:5},
+  {key:'manaEngine', name:'마정 엔진', need:{steelGear:2, alloy:2}, out:1, sell:220, craftTime:8},
+  {key:'starLens', name:'별빛 렌즈', need:{crystalLens:2, cosmicShard:1}, out:1, sell:260, craftTime:10},
+  {key:'plasmaCell', name:'플라즈마 전지', need:{specialAlloy:2, plasma:1}, out:1, sell:250, craftTime:10},
+  {key:'precisionMachine', name:'정밀 기계', need:{steelGear:2, precisionPart:1}, out:1, sell:330, craftTime:12},
 ];
 // Task 62: x/y are offsets from state.world.base (see seedWorldMinesForSite).
 const WORLD_MINE_SEEDS = {
@@ -75,13 +87,13 @@ const RESEARCH = [
 // (BALANCE.delivery.SLOT_THRESHOLDS); free deliveries to them are always possible.
 const COMPANIES = [
   {key:'forge', name:'마을 대장간', desc:'가까운 마을의 대장간. 강철과 석탄 벽돌을 좋아해요.',
-   distance:1, favorites:['steel','coalBrick'], regularScore:300, requires:[],
+   distance:1, favorites:['steel','coalBrick','ironTool','steelGear'], regularScore:300, requires:[],
    orders:[{product:'steel', qty:20}, {product:'coalBrick', qty:25}, {product:'steel', qty:60}, {product:'alloy', qty:10}, {product:'alloy', qty:20}]},
   {key:'harbor', name:'항구 상회', desc:'바다 건너로 물건을 파는 상회. 합금류를 높이 쳐줘요.',
-   distance:1.5, favorites:['alloy','crystalAlloy','specialAlloy'], regularScore:1200, requires:[],
+   distance:1.5, favorites:['alloy','crystalAlloy','specialAlloy','manaLamp','crystalLens'], regularScore:1200, requires:[],
    orders:[{product:'alloy', qty:30}, {product:'crystalAlloy', qty:25}, {product:'specialAlloy', qty:20}, {product:'precisionPart', qty:10}, {product:'specialAlloy', qty:35}]},
   {key:'lab', name:'산 너머 연구소', desc:'산 너머의 연구소. 정밀한 부품과 코어를 찾아요. 터널이 열려야 닿을 수 있어요.',
-   distance:2.5, favorites:['precisionPart','relicPart','quantumCore','plasmaCore'], regularScore:6000, requires:['tunnelWork'],
+   distance:2.5, favorites:['precisionPart','relicPart','quantumCore','plasmaCore','relicOrnament','manaEngine','starLens','plasmaCell','precisionMachine'], regularScore:6000, requires:['tunnelWork'],
    orders:[{product:'precisionPart', qty:20}, {product:'relicPart', qty:20}, {product:'quantumCore', qty:5}, {product:'plasmaCore', qty:8}]},
 ];
 // Task 75: reputation effects. Each opens once reputation (permanent.totalPrestige)

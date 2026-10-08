@@ -34,7 +34,7 @@ function stockCrystalAlloyInputs(win) {
     'Task16: craftQueue still keyed by recipe with null idle values',
     win.RECIPES.every((r) => Object.prototype.hasOwnProperty.call(win.state.craftQueue, r.key) && win.state.craftQueue[r.key] === null)
   );
-  check('Task16: RECIPES length unchanged (no new recipes)', win.RECIPES.length === 9);
+  check('Task16: the original nine recipes keep their keys and order (Task 78 appends more)', win.RECIPES.slice(0, 9).map((r) => r.key).join() === 'steel,coalBrick,alloy,crystalAlloy,specialAlloy,precisionPart,relicPart,quantumCore,plasmaCore');
 })();
 
 (function test_T16_legacySaveMissingFieldDefaults() {

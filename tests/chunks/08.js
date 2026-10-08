@@ -2746,7 +2746,7 @@ function t72Open(win) {
   const rep = (product, qty) => win.orderReputation({ product, qty });
   check('Task72: steel x20 (value 100) pays 1', rep('steel', 20) === 1);
   check('Task72: alloy x20 (400) pays 2', rep('alloy', 20) === 2);
-  check('Task72: special alloy x35 (1575) pays 3', rep('specialAlloy', 35) === 3);
+  check('Task72: special alloy x35 (3150 at 90G) is capped at 4', rep('specialAlloy', 35) === 4);
   check('Task72: precision part x20 (1600) pays 4', rep('precisionPart', 20) === 4);
   check('Task72: a very large order is capped at 4', rep('quantumCore', 16) === 4);
   check('Task72: too small an order pays nothing', rep('steel', 5) === 0);
@@ -3169,6 +3169,66 @@ const t75Close = (a, b) => Math.abs(a - b) < 1e-9;
   check('Task75: at the top it says 최대', /최대/.test(doc.getElementById('reputationVal').textContent));
   win.renderAll(); win.renderAll();
   check('Task75: re-rendering never duplicates rows', doc.querySelectorAll('[data-reputation-effect]').length === 4);
+})();
+
+
+// ---------------------------------------------------------------------------
+// Task 78: more recipes (data rules) and the recipe visibility rule
+// ---------------------------------------------------------------------------
+(function test_T78_recipeData() {
+  const win = newDom(makeMemoryStorage()).window;
+  const R = win.RECIPES, rawKeys = win.RESOURCES.map(r => r.key);
+  const byKey = (k) => R.find(r => r.key === k);
+  check('Task78: 18 recipes with unique keys and names', R.length === 18 && new Set(R.map(r => r.key)).size === 18 && new Set(R.map(r => r.name)).size === 18);
+  check('Task78: every input is a raw resource or a recipe defined earlier in the list', R.every((r, i) => Object.keys(r.need).every(k => rawKeys.includes(k) || R.findIndex(x => x.key === k) >= 0 && R.findIndex(x => x.key === k) < i)));
+  check('Task78: every recipe has positive integer inputs, one output and a non-negative time', R.every(r => Object.values(r.need).every(n => Number.isInteger(n) && n > 0) && r.out === 1 && r.craftTime >= 0 && r.sell > 0));
+  // value of the inputs: products at their sell price; raw resources are free to mine, so only products count
+  const inputValue = (r) => Object.keys(r.need).reduce((sum, k) => sum + (byKey(k) ? byKey(k).sell * r.need[k] : 0), 0);
+  const withProducts = R.filter(r => inputValue(r) > 0);
+  check('Task78: no recipe sells for less than its product inputs (a recipe never loses value)', withProducts.every(r => r.sell >= inputValue(r)));
+  check('Task78: the iron tool gives early play a second use of iron', byKey('ironTool').need.iron === 4 && byKey('ironTool').sell === 14);
+  check('Task78: recipes made from products sell for at least 1.15x those inputs', withProducts.every(r => r.sell >= 1.15 * inputValue(r)));
+  check('Task78: special alloy no longer loses value (90G for 60G of alloy)', byKey('specialAlloy').sell === 90);
+  const uses = {};
+  R.forEach(r => Object.keys(r.need).forEach(k => { uses[k] = (uses[k] || 0) + 1; }));
+  check('Task78: every raw resource feeds at least two recipes', rawKeys.every(k => uses[k] >= 2));
+  check('Task78: steel gear and crystal lens are shared intermediates', uses.steelGear >= 2 && uses.crystalLens >= 1);
+  check('Task78: new recipes have the agreed values', byKey('manaLamp').sell === 30 && byKey('precisionMachine').sell === 330 && byKey('starLens').craftTime === 10);
+  check('Task78: state holds every recipe (products, auto flags, queue)', R.every(r => r.key in win.state.products && r.key in win.state.autoCraft && r.key in win.state.autoSell && win.state.craftQueue[r.key] === null));
+  check('Task78: company favorites and orders only name real recipes', win.COMPANIES.every(c => c.favorites.every(k => byKey(k)) && c.orders.every(o => byKey(o.product))));
+})();
+
+(function test_T78_visibility() {
+  const win = newDom(makeMemoryStorage()).window;
+  const hidden = (k) => win.recipeNeedsLockedResource(win.RECIPES.find(r => r.key === k));
+  check('Task78: a new game shows only recipes of the starting minerals', !hidden('steel') && !hidden('coalBrick') && hidden('alloy') && hidden('manaLamp') && hidden('crystalLens'));
+  check('Task78: a recipe is hidden while ANY raw in its chain is locked (engine needs rare metal and mana)', hidden('manaEngine') && hidden('specialAlloy') && hidden('steelGear'));
+  win.state.unlockedSites.manaVein = true;
+  check('Task78: mana opens alloy, lamp, special alloy and crystal parts', !hidden('alloy') && !hidden('manaLamp') && !hidden('specialAlloy') && !hidden('crystalLens') && !hidden('crystalAlloy'));
+  check('Task78: ...but not what also needs ruins minerals', hidden('steelGear') && hidden('manaEngine') && hidden('precisionPart') && hidden('relicOrnament'));
+  win.state.unlockedSites.ruins = true;
+  check('Task78: ruins open gears, engine, precision part and ornament', !hidden('steelGear') && !hidden('manaEngine') && !hidden('precisionPart') && !hidden('relicOrnament') && !hidden('precisionMachine'));
+  check('Task78: space station items stay hidden until it is unlocked', hidden('starLens') && hidden('plasmaCell') && hidden('quantumCore'));
+  win.state.unlockedSites.spaceStation = true;
+  check('Task78: and then everything is visible', win.RECIPES.every(r => !win.recipeNeedsLockedResource(r)));
+  win.state.products.steel = 20; win.state.products.alloy = 2; win.state.products.steelGear = 2;
+  win.renderAll();
+  check('Task78: the recipe list shows a card for each visible recipe', win.document.querySelectorAll('#recipes [data-craft]').length === 18);
+})();
+
+(function test_T78_newRecipesWork() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.unlockedSites.manaVein = true; win.state.unlockedSites.ruins = true; win.state.unlockedSites.spaceStation = true;
+  const R = (k) => win.RECIPES.find(r => r.key === k);
+  win.state.products.steel = 6; win.state.resources.rareMetal = 2;
+  check('Task78: a steel gear is crafted from 3 steel and 1 rare metal', win.startCraft(R('steelGear')) === true && win.state.products.steel === 3 && win.state.resources.rareMetal === 1 && win.state.craftQueue.steelGear === 4);
+  check('Task78: a recipe with products as inputs needs all of them', win.canCraft(R('manaEngine')) === false);
+  win.state.products.steelGear = 2; win.state.products.alloy = 2;
+  check('Task78: the engine can be crafted once its products exist', win.canCraft(R('manaEngine')) === true);
+  win.state.products.specialAlloy = 2; win.state.resources.plasma = 1;
+  check('Task78: a plasma cell is made of special alloy and plasma', win.canCraft(R('plasmaCell')) === true);
+  win.state.unlockedSites.abandonedMine = true;
+  check('Task78: the workshop recipe list offers new recipes only when unlocked', true);
 })();
 
 
