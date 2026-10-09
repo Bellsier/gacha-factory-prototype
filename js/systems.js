@@ -57,8 +57,6 @@ function fmt(n){
 function mineById(id){ return state.world.mines.find(m => m && m.id === id) || null; }
 function workshopById(id){ return state.world.workshops.find(w => w && w.id === id) || null; }
 function workerById(id){ return state.characters.find(w => w && w.id === id) || null; }
-function resourceByKey(key){ return RESOURCES.find(r => r.key === key) || null; }
-function recipeByKey(key){ return RECIPES.find(r => r.key === key) || null; }
 function resName(key){ return resourceByKey(key).name; }
 function expCost(base, growth, level){ return Math.round(base * Math.pow(growth, level)); }
 function dis(condition){ return condition ? 'disabled' : ''; }
@@ -216,6 +214,7 @@ function canCraft(recipe){
   return recipeInputsAvailable(recipe, k => state.resources[k] ?? state.products[k] ?? 0);
 }
 function startCraft(recipe){
+  if(recipe.workshopOnly) return false; // Task 79: made in a workshop only
   if(state.craftQueue[recipe.key] !== null) return false; // already crafting
   if(!canCraft(recipe)) return false;
   consumeRecipeInputs(recipe, stockOf, setStock);
@@ -255,8 +254,12 @@ function sellAll(recipe, silent){
 // Recipe-tab player action, extracted for the same reason as the mining
 // actions above — its state change (purchase + flags) can be read apart
 // from the DOM-building/rebuild code in buildRecipes(). Unchanged behavior.
+// Task 79: workshop-only products are materials, so they are never sold automatically.
+function canAutoSell(recipe){ return !!recipe && !recipe.workshopOnly; }
+
 function buyAutoSell(key){
   const recipe = recipeByKey(key);
+  if(!canAutoSell(recipe)) return false;
   const cost = autoSellCost(recipe);
   if(state.gold < cost) return false;
   state.gold -= cost;
@@ -350,7 +353,7 @@ function tickCrafting(){
         state.craftQueue[r.key] = null;
         state.products[r.key] += r.out;
       }
-    } else if(state.autoCraft[r.key] && isAutoCraftUnlocked()){
+    } else if(state.autoCraft[r.key] && isAutoCraftUnlocked() && !r.workshopOnly){
       startCraft(r);
     }
   });
@@ -358,7 +361,7 @@ function tickCrafting(){
 
 function tickAutoSell(){
   RECIPES.forEach(r=>{
-    if(state.autoSell[r.key] && state.autoSellOn[r.key]) sellAll(r, true);
+    if(canAutoSell(r) && state.autoSell[r.key] && state.autoSellOn[r.key]) sellAll(r, true);
   });
 }
 

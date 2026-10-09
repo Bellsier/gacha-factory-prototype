@@ -207,6 +207,17 @@ function workshopProgressLabel(workshop, recipe){
   if(recipe) return workshop.auto ? '자동 제작 중' : '대기 중';
   return '레시피를 선택하세요';
 }
+// Task 79: workshop upgrade button (cost = gold + any high-tier products).
+function workshopUpgradeCostText(workshop){
+  const cost = workshopUpgradeCost(workshop);
+  if(!cost) return '최대 레벨';
+  const parts = [fmt(cost.gold) + 'G'];
+  Object.keys(cost.products).forEach(k => parts.push(recipeByKey(k).name + ' ' + cost.products[k] + '개'));
+  return '업그레이드 Lv.' + (workshop.level + 1) + ' (' + parts.join(' + ') + ')';
+}
+function workshopUpgradeButton(workshop){
+  return '<button class="ghost" data-workshop-upgrade="' + workshop.id + '" ' + dis(!canUpgradeWorkshop(workshop.id)) + '>' + workshopUpgradeCostText(workshop) + '</button>';
+}
 function workshopBuildLabel(){
   return '제작소 짓기 (' + fmt(workshopBuildCost()) + 'G)';
 }
@@ -257,6 +268,7 @@ function renderWorkshops(){
         '<select data-workshop-recipe="' + workshop.id + '"' + dis(workshop.progress !== null) + '>' + options + '</select>' +
         '<button data-workshop-craft="' + workshop.id + '" ' + dis(!recipe || workshop.progress !== null || !canCraft(recipe)) + '>제작</button>' +
       '</div>' +
+      '<div class="row">' + workshopUpgradeButton(workshop) + '</div>' +
       '<label class="toggle-auto">' +
         '<input type="checkbox" data-workshop-auto="' + workshop.id + '"' + (workshop.auto ? ' checked' : '') + ' ' + dis(!recipe || !isAutoCraftUnlocked()) + '>' + (isAutoCraftUnlocked() ? '자동 제작' : '자동 제작 (연구: 자동 제작 장치)') +
       '</label>';
@@ -273,6 +285,12 @@ function renderWorkshops(){
       if(!craftWorkshop(btn.dataset.workshopCraft)) return;
       updateNumbers();
       renderWorkshops();
+    };
+  });
+  wrap.querySelectorAll('[data-workshop-upgrade]').forEach(btn=>{
+    btn.onclick = ()=>{
+      if(!upgradeWorkshop(btn.dataset.workshopUpgrade)) return;
+      renderAll();
     };
   });
   wrap.querySelectorAll('[data-workshop-auto]').forEach(chk=>{
@@ -514,13 +532,24 @@ function buildRecipes(){
     }).join(' + ');
     const div = document.createElement('div');
     div.className = 'recipe';
-    div.innerHTML = `
+    const sellButton = `<button data-sell="${r.key}" class="ghost" ${dis(state.products[r.key]<=0)}>전량 판매 (${fmt(r.sell * mult())}G/개)</button>`;
+    if(r.workshopOnly){
+      // Task 79: higher recipes are made in a workshop; no hand craft, auto-craft or auto-sell here.
+      div.className = 'recipe is-workshop-only';
+      div.innerHTML = `
+      <div class="name">${r.name}</div>
+      <div class="need">${needText} →</div>
+      <div class="stock" data-stock="${r.key}">${fmt(state.products[r.key])}개 보유</div>
+      <div class="rate" data-workshop-only="${r.key}">제작소에서 만들 수 있어요 (개발 탭의 제작소)</div>
+      <div class="row">${sellButton}</div>
+    `;
+    } else div.innerHTML = `
       <div class="name">${r.name}</div>
       <div class="need">${needText} →</div>
       <div class="stock" data-stock="${r.key}">${fmt(state.products[r.key])}개 보유</div>
       <div class="row">
         <button data-craft="${r.key}" ${dis(!canCraft(r))}>제작</button>
-        <button data-sell="${r.key}" class="ghost" ${dis(state.products[r.key]<=0)}>전량 판매 (${fmt(r.sell * mult())}G/개)</button>
+        ${sellButton}
       </div>
       <label class="toggle-auto">
         <input type="checkbox" data-autocraft="${r.key}" ${state.autoCraft[r.key]?'checked':''} ${dis(!autoUnlocked)}>
@@ -702,6 +731,8 @@ function updateNumbers(){
       btn.disabled = !recipe || workshop.progress !== null || !canCraft(recipe);
       btn.textContent = workshop.progress !== null ? '제작 중...' : '제작';
     }
+    const upBtn = document.querySelector('[data-workshop-upgrade="' + workshop.id + '"]');
+    if(upBtn){ upBtn.disabled = !canUpgradeWorkshop(workshop.id); upBtn.textContent = workshopUpgradeCostText(workshop); }
     const chk = document.querySelector('[data-workshop-auto="' + workshop.id + '"]');
     if(chk) chk.disabled = !workshop.recipeKey || !isAutoCraftUnlocked();
     const select = document.querySelector('[data-workshop-recipe="' + workshop.id + '"]');
@@ -1054,6 +1085,8 @@ function updateExplorationMapPlayer(){
 // (pointer-events:none). Positions use the same worldToStagePercent()
 // conversion as the base, mines, and player. Called from renderWorldObjects(),
 // so renderAll() refreshes the markers with the rest of the stage.
+// Look of a workshop on the map: 1 (Lv.1-2), 2 (Lv.3-5), 3 (Lv.6+).
+function workshopTier(level){ return level >= 6 ? 3 : level >= 3 ? 2 : 1; }
 function renderWorldWorkshopMarkers(){
   const layer = document.getElementById('worldWorkshopLayer');
   if(!layer) return;
@@ -1062,7 +1095,7 @@ function renderWorldWorkshopMarkers(){
   workshops.forEach(workshop=>{
     if(!workshop) return;
     const node = document.createElement('div');
-    node.className = 'world-workshop-node';
+    node.className = 'world-workshop-node tier-' + workshopTier(workshop.level);
     if(typeof workshop.id === 'string' && workshop.id.length > 0){
       node.setAttribute('data-world-workshop', workshop.id);
     }

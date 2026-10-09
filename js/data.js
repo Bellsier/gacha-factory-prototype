@@ -14,28 +14,31 @@ const RESOURCES = [
   {key:'cosmicShard', name:'우주 파편', base:1, site:'spaceStation'},
   {key:'plasma', name:'플라즈마', base:1, site:'spaceStation'},
 ];
+// Task 79: workshopOnly recipes (the timed, higher ones) can only be made in a
+// workshop; the recipe cards craft the simple ones by hand. They are also never
+// sold automatically, since they are materials for upgrades and orders.
 const RECIPES = [
   {key:'steel', name:'강철', need:{iron:2, coal:1}, out:1, sell:5, craftTime:0},
   {key:'coalBrick', name:'석탄 벽돌', need:{coal:3}, out:1, sell:4, craftTime:0},
   {key:'alloy', name:'마법 합금', need:{steel:2, mana:1}, out:1, sell:20, craftTime:0},
   {key:'crystalAlloy', name:'결정 합금', need:{steel:2, crystal:1}, out:1, sell:22, craftTime:3},
-  {key:'specialAlloy', name:'특수 합금', need:{alloy:3, coal:3}, out:1, sell:90, craftTime:4}, // Task 78: was 45, below its own inputs (3 alloy = 60G)
-  {key:'precisionPart', name:'정밀 부품', need:{alloy:2, rareMetal:1}, out:1, sell:80, craftTime:6},
-  {key:'relicPart', name:'유물 부품', need:{alloy:2, relic:1}, out:1, sell:85, craftTime:6},
-  {key:'quantumCore', name:'퀀텀 코어', need:{precisionPart:2, cosmicShard:1}, out:1, sell:400, craftTime:15},
-  {key:'plasmaCore', name:'플라즈마 코어', need:{precisionPart:2, plasma:1}, out:1, sell:420, craftTime:15},
+  {key:'specialAlloy', name:'특수 합금', need:{alloy:3, coal:3}, out:1, sell:90, craftTime:4, workshopOnly:true}, // Task 78: was 45, below its own inputs (3 alloy = 60G)
+  {key:'precisionPart', name:'정밀 부품', need:{alloy:2, rareMetal:1}, out:1, sell:80, craftTime:6, workshopOnly:true},
+  {key:'relicPart', name:'유물 부품', need:{alloy:2, relic:1}, out:1, sell:85, craftTime:6, workshopOnly:true},
+  {key:'quantumCore', name:'퀀텀 코어', need:{precisionPart:2, cosmicShard:1}, out:1, sell:400, craftTime:15, workshopOnly:true},
+  {key:'plasmaCore', name:'플라즈마 코어', need:{precisionPart:2, plasma:1}, out:1, sell:420, craftTime:15, workshopOnly:true},
   // Task 78: more recipes. Rules: every raw resource feeds at least two recipes,
   // intermediates are shared (steelGear, crystalLens), and a recipe sells for
   // about 1.4-2x the value of its inputs. A recipe only needs inputs defined above it.
   {key:'ironTool', name:'철제 공구', need:{iron:4, coalBrick:1}, out:1, sell:14, craftTime:2},
   {key:'manaLamp', name:'마정 램프', need:{coalBrick:2, mana:2}, out:1, sell:30, craftTime:3},
   {key:'crystalLens', name:'결정 렌즈', need:{crystal:3, steel:1}, out:1, sell:35, craftTime:3},
-  {key:'steelGear', name:'강철 기어', need:{steel:3, rareMetal:1}, out:1, sell:60, craftTime:4},
-  {key:'relicOrnament', name:'고대 장식', need:{crystalAlloy:1, relic:1}, out:1, sell:70, craftTime:5},
-  {key:'manaEngine', name:'마정 엔진', need:{steelGear:2, alloy:2}, out:1, sell:220, craftTime:8},
-  {key:'starLens', name:'별빛 렌즈', need:{crystalLens:2, cosmicShard:1}, out:1, sell:260, craftTime:10},
-  {key:'plasmaCell', name:'플라즈마 전지', need:{specialAlloy:2, plasma:1}, out:1, sell:250, craftTime:10},
-  {key:'precisionMachine', name:'정밀 기계', need:{steelGear:2, precisionPart:1}, out:1, sell:330, craftTime:12},
+  {key:'steelGear', name:'강철 기어', need:{steel:3, rareMetal:1}, out:1, sell:60, craftTime:4, workshopOnly:true},
+  {key:'relicOrnament', name:'고대 장식', need:{crystalAlloy:1, relic:1}, out:1, sell:70, craftTime:5, workshopOnly:true},
+  {key:'manaEngine', name:'마정 엔진', need:{steelGear:2, alloy:2}, out:1, sell:220, craftTime:8, workshopOnly:true},
+  {key:'starLens', name:'별빛 렌즈', need:{crystalLens:2, cosmicShard:1}, out:1, sell:260, craftTime:10, workshopOnly:true},
+  {key:'plasmaCell', name:'플라즈마 전지', need:{specialAlloy:2, plasma:1}, out:1, sell:250, craftTime:10, workshopOnly:true},
+  {key:'precisionMachine', name:'정밀 기계', need:{steelGear:2, precisionPart:1}, out:1, sell:330, craftTime:12, workshopOnly:true},
 ];
 // Task 62: x/y are offsets from state.world.base (see seedWorldMinesForSite).
 const WORLD_MINE_SEEDS = {
@@ -115,3 +118,7 @@ const RARITY = [
 ];
 const STAT_LABEL = {mining:'채굴속도', carry:'물자 이동량', move:'이동속도'};
 
+// Lookups by key. They live here (not in systems.js) because worldgen.js and state.js
+// need them while the page is still loading, before systems.js has run.
+function resourceByKey(key){ return RESOURCES.find(r => r.key === key) || null; }
+function recipeByKey(key){ return RECIPES.find(r => r.key === key) || null; }

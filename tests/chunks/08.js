@@ -3213,7 +3213,7 @@ const t75Close = (a, b) => Math.abs(a - b) < 1e-9;
   check('Task78: and then everything is visible', win.RECIPES.every(r => !win.recipeNeedsLockedResource(r)));
   win.state.products.steel = 20; win.state.products.alloy = 2; win.state.products.steelGear = 2;
   win.renderAll();
-  check('Task78: the recipe list shows a card for each visible recipe', win.document.querySelectorAll('#recipes [data-craft]').length === 18);
+  check('Task78: the recipe list shows a card for each visible recipe', win.document.querySelectorAll('#recipes .recipe').length === 18);
 })();
 
 (function test_T78_newRecipesWork() {
@@ -3221,7 +3221,8 @@ const t75Close = (a, b) => Math.abs(a - b) < 1e-9;
   win.state.unlockedSites.manaVein = true; win.state.unlockedSites.ruins = true; win.state.unlockedSites.spaceStation = true;
   const R = (k) => win.RECIPES.find(r => r.key === k);
   win.state.products.steel = 6; win.state.resources.rareMetal = 2;
-  check('Task78: a steel gear is crafted from 3 steel and 1 rare metal', win.startCraft(R('steelGear')) === true && win.state.products.steel === 3 && win.state.resources.rareMetal === 1 && win.state.craftQueue.steelGear === 4);
+  const gearShop = win.addWorkshop({ id: 'ws78', x: 4, y: 2, level: 1, recipeKey: 'steelGear' });
+  check('Task78: a steel gear is crafted in a workshop from 3 steel and 1 rare metal', win.craftWorkshop(gearShop.id) === true && win.state.products.steel === 3 && win.state.resources.rareMetal === 1 && gearShop.progress === 4);
   check('Task78: a recipe with products as inputs needs all of them', win.canCraft(R('manaEngine')) === false);
   win.state.products.steelGear = 2; win.state.products.alloy = 2;
   check('Task78: the engine can be crafted once its products exist', win.canCraft(R('manaEngine')) === true);
@@ -3229,6 +3230,159 @@ const t75Close = (a, b) => Math.abs(a - b) < 1e-9;
   check('Task78: a plasma cell is made of special alloy and plasma', win.canCraft(R('plasmaCell')) === true);
   win.state.unlockedSites.abandonedMine = true;
   check('Task78: the workshop recipe list offers new recipes only when unlocked', true);
+})();
+
+
+// ---------------------------------------------------------------------------
+// Task 79: workshop-only recipes, workshop upgrades, workshop look
+// ---------------------------------------------------------------------------
+const T79_ONLY = ['specialAlloy', 'steelGear', 'relicOrnament', 'precisionPart', 'relicPart', 'manaEngine', 'starLens', 'plasmaCell', 'precisionMachine', 'quantumCore', 'plasmaCore'];
+
+(function test_T79_workshopOnlyData() {
+  const win = newDom(makeMemoryStorage()).window;
+  const only = win.RECIPES.filter(r => r.workshopOnly).map(r => r.key).sort();
+  check('Task79: exactly the eleven higher recipes are workshop-only', only.join() === T79_ONLY.slice().sort().join());
+  check('Task79: they are exactly the ones that take 4 seconds or more', win.RECIPES.every(r => !!r.workshopOnly === (r.craftTime >= 4)));
+  check('Task79: the simple ones stay hand-craftable', ['steel', 'coalBrick', 'ironTool', 'alloy', 'crystalAlloy', 'manaLamp', 'crystalLens'].every(k => !win.RECIPES.find(r => r.key === k).workshopOnly));
+})();
+
+(function test_T79_handAndAuto() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.unlockedSites.manaVein = true;
+  const R = (k) => win.RECIPES.find(r => r.key === k);
+  win.state.products.alloy = 3; win.state.resources.coal = 3;
+  check('Task79: hand crafting a workshop-only recipe is refused and spends nothing', win.canCraft(R('specialAlloy')) === true && win.startCraft(R('specialAlloy')) === false && win.state.products.alloy === 3 && win.state.craftQueue.specialAlloy === null);
+  win.state.research.autoCraftDevice = true;
+  win.state.autoCraft.specialAlloy = true;
+  win.tickLoop();
+  check('Task79: an old auto-craft flag on it does nothing', win.state.products.specialAlloy === 0 && win.state.craftQueue.specialAlloy === null && win.state.products.alloy === 3);
+  win.state.craftQueue.specialAlloy = 0.2;
+  advanceTicks(win, 5);
+  check('Task79: a hand craft already running in an old save still finishes', win.state.craftQueue.specialAlloy === null && win.state.products.specialAlloy === 1);
+  const shop = win.addWorkshop({ id: 'ws79', x: 4, y: 2, level: 1, recipeKey: 'specialAlloy' });
+  win.state.products.specialAlloy = 0;
+  check('Task79: a workshop crafts it', win.craftWorkshop(shop.id) === true && shop.progress === 4);
+})();
+
+(function test_T79_autoSell() {
+  const win = newDom(makeMemoryStorage()).window;
+  const R = (k) => win.RECIPES.find(r => r.key === k);
+  check('Task79: auto-sell cannot be bought for a workshop-only product', win.canAutoSell(R('quantumCore')) === false && (win.state.gold = 1e6, win.buyAutoSell('quantumCore')) === false && win.state.autoSell.quantumCore === false && win.state.gold === 1e6);
+  check('Task79: it still can for simple products', win.canAutoSell(R('steel')) === true && win.buyAutoSell('steel') === true && win.state.autoSell.steel === true);
+  win.state.autoSell.precisionPart = true; win.state.autoSellOn.precisionPart = true; // as an old save could have it
+  win.state.products.precisionPart = 3; win.state.products.steel = 4;
+  const g0 = win.state.gold;
+  win.tickAutoSell();
+  check('Task79: auto-sell never sells a workshop-only product, even from an old save', win.state.products.precisionPart === 3 && win.state.products.steel === 0 && win.state.gold > g0);
+  win.sellAll(R('precisionPart'));
+  check('Task79: selling it by hand still works', win.state.products.precisionPart === 0);
+})();
+
+(function test_T79_recipeCards() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  win.state.unlockedSites.manaVein = true; win.state.unlockedSites.ruins = true; win.state.unlockedSites.spaceStation = true;
+  win.renderAll();
+  check('Task79: workshop-only cards have a note and sell button but no craft, auto-craft or auto-sell', T79_ONLY.every(k => !doc.querySelector('[data-craft="' + k + '"]') && !doc.querySelector('[data-autocraft="' + k + '"]') && !doc.querySelector('[data-buyautosell="' + k + '"]') && !!doc.querySelector('[data-workshop-only="' + k + '"]') && !!doc.querySelector('[data-sell="' + k + '"]')));
+  check('Task79: simple cards keep craft, auto-craft and auto-sell', ['steel', 'alloy', 'manaLamp'].every(k => !!doc.querySelector('[data-craft="' + k + '"]') && !!doc.querySelector('[data-autocraft="' + k + '"]')));
+  win.state.products.quantumCore = 2;
+  win.updateNumbers();
+  check('Task79: the stock of a workshop-only product is still refreshed', /2/.test(doc.querySelector('[data-stock="quantumCore"]').textContent));
+})();
+
+(function test_T79_upgradeCosts() {
+  const win = newDom(makeMemoryStorage()).window;
+  const shop = win.addWorkshop({ id: 'ws79u', x: 4, y: 2, level: 1 });
+  const goldAt = (lvl) => { shop.level = lvl; return win.workshopUpgradeCost(shop); };
+  const expected = [[1, 150], [2, 255], [3, 433], [4, 737], [5, 1253], [6, 2130], [7, 3621]];
+  expected.forEach(([lvl, gold]) => check('Task79: upgrading from Lv.' + lvl + ' costs ' + gold + 'G', goldAt(lvl).gold === gold));
+  check('Task79: levels 2 to 5 need gold only', [1, 2, 3, 4].every(l => Object.keys(goldAt(l).products).length === 0));
+  check('Task79: Lv.6 needs 2 precision parts, Lv.7 3 relic parts, Lv.8 a quantum core', JSON.stringify(goldAt(5).products) === '{"precisionPart":2}' && JSON.stringify(goldAt(6).products) === '{"relicPart":3}' && JSON.stringify(goldAt(7).products) === '{"quantumCore":1}');
+  check('Task79: the maximum level has no upgrade', goldAt(8) === null);
+  check('Task79: each step costs more than the last', expected.every(([lvl], i) => i === 0 || goldAt(lvl).gold > goldAt(expected[i - 1][0]).gold));
+  check('Task79: the cost object is a copy (changing it does not change the balance)', (() => { const c = goldAt(5); c.products.precisionPart = 99; return goldAt(5).products.precisionPart === 2; })());
+  check('Task79: an unknown workshop has no upgrade', win.workshopUpgradeCost(null) === null && win.canUpgradeWorkshop('nope') === false && win.upgradeWorkshop('nope') === false);
+})();
+
+(function test_T79_upgradeAction() {
+  const win = newDom(makeMemoryStorage()).window;
+  const shop = win.addWorkshop({ id: 'ws79a', x: 4, y: 2, level: 1, recipeKey: 'steel' });
+  win.state.gold = 149;
+  check('Task79: not enough gold refuses and changes nothing', win.upgradeWorkshop(shop.id) === false && shop.level === 1 && win.state.gold === 149);
+  win.state.gold = 1000;
+  check('Task79: upgrading spends the gold and adds a level', win.upgradeWorkshop(shop.id) === true && shop.level === 2 && win.state.gold === 850);
+  win.state.gold = 1e6;
+  win.upgradeWorkshop(shop.id); win.upgradeWorkshop(shop.id); win.upgradeWorkshop(shop.id);
+  check('Task79: it is Lv.5 after four upgrades', shop.level === 5);
+  check('Task79: Lv.6 also needs the products', win.canUpgradeWorkshop(shop.id) === false && win.upgradeWorkshop(shop.id) === false && shop.level === 5);
+  win.state.products.precisionPart = 2;
+  check('Task79: with them it works and they are used up', win.upgradeWorkshop(shop.id) === true && shop.level === 6 && win.state.products.precisionPart === 0);
+  win.state.products.relicPart = 3; win.state.products.quantumCore = 1;
+  win.upgradeWorkshop(shop.id); win.upgradeWorkshop(shop.id);
+  check('Task79: it reaches Lv.8 and stops there', shop.level === 8 && win.state.products.relicPart === 0 && win.state.products.quantumCore === 0 && win.upgradeWorkshop(shop.id) === false && shop.level === 8);
+  check('Task79: the log says each new level', win.document.getElementById('log').textContent.includes('제작소가 Lv.8이 되었습니다.'));
+})();
+
+(function test_T79_upgradeSpeed() {
+  const win = newDom(makeMemoryStorage()).window;
+  const shop = win.addWorkshop({ id: 'ws79s', x: 4, y: 2, level: 1 });
+  const rec = win.RECIPES.find(r => r.key === 'precisionPart');
+  const time = (lvl) => { shop.level = lvl; return win.workshopCraftTime(shop, rec); };
+  check('Task79: speed rises 25% per level (Lv.1 6 s, Lv.5 3 s, Lv.8 about 2.18 s)', Math.abs(time(1) - 6) < 1e-9 && Math.abs(time(5) - 3) < 1e-9 && Math.abs(time(8) - 6 / 2.75) < 1e-9);
+  const instant = win.RECIPES.find(r => r.key === 'steel');
+  check('Task79: instant recipes stay instant at any level', time(8) > 0 && win.workshopCraftTime(shop, instant) === 0);
+})();
+
+(function test_T79_workshopCardAndLook() {
+  const win = newDom(makeMemoryStorage()).window;
+  const doc = win.document;
+  const shop = win.addWorkshop({ id: 'ws79c', x: 4, y: 2, level: 1 });
+  win.state.gold = 100;
+  win.renderAll();
+  const btn = doc.querySelector('[data-workshop-upgrade="ws79c"]');
+  check('Task79: the card has an upgrade button with its cost, disabled while short of gold', !!btn && btn.disabled === true && /Lv\.2/.test(btn.textContent) && /150G/.test(btn.textContent));
+  win.state.gold = 150;
+  win.updateNumbers();
+  check('Task79: the per-tick refresh enables it without rebuilding', doc.querySelector('[data-workshop-upgrade="ws79c"]') === btn && btn.disabled === false);
+  btn.click();
+  check('Task79: clicking upgrades and shows the new level and next cost', shop.level === 2 && /제작소 Lv\.2/.test(doc.querySelector('#workshops .res-name').textContent) && /255G/.test(doc.querySelector('[data-workshop-upgrade="ws79c"]').textContent));
+  shop.level = 6; win.state.products.relicPart = 0; win.renderAll();
+  check('Task79: the button names the products a high level needs', /유물 부품 3개/.test(doc.querySelector('[data-workshop-upgrade="ws79c"]').textContent));
+  shop.level = 8; win.renderAll();
+  const top = doc.querySelector('[data-workshop-upgrade="ws79c"]');
+  check('Task79: at the top it says so and is disabled', /최대 레벨/.test(top.textContent) && top.disabled === true);
+  const tier = (lvl) => { shop.level = lvl; win.renderAll(); return doc.querySelector('[data-world-workshop="ws79c"]').className; };
+  check('Task79: the map look changes at Lv.3 and Lv.6', /tier-1/.test(tier(1)) && /tier-1/.test(tier(2)) && /tier-2/.test(tier(3)) && /tier-2/.test(tier(5)) && /tier-3/.test(tier(6)) && /tier-3/.test(tier(8)));
+  const css = require('fs').readFileSync('css/style.css', 'utf8');
+  check('Task79: all three looks are styled', /world-workshop-node\.tier-2/.test(css) && /world-workshop-node\.tier-3/.test(css));
+})();
+
+
+// ---------------------------------------------------------------------------
+// The page as a browser loads it: separate <script> files in index.html order.
+// (The rest of the suite evaluates all the code as one block, where every
+// function is hoisted — that can hide a function used while loading before the
+// file that defines it has run. This is what broke the page after Task 77.)
+// ---------------------------------------------------------------------------
+(function test_pageLoadsLikeABrowser() {
+  const vm = require('vm');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const scripts = Array.from(html.matchAll(/<script src="([^"]+)"><\/script>/g)).map(m => m[1]);
+  const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.test/' });
+  const ctx = dom.getInternalVMContext();
+  const errors = [];
+  scripts.forEach(file => {
+    try {
+      new vm.Script(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { filename: file }).runInContext(ctx);
+    } catch (e) {
+      errors.push(file + ': ' + e.message);
+    }
+  });
+  check('PageLoad: index.html lists the scripts and every one runs without an error, in page order', scripts.length >= 11 && errors.length === 0, errors.join(' | '));
+  const type = (expr) => { try { return vm.runInContext(expr, ctx); } catch (e) { return 'error: ' + e.message; } };
+  check('PageLoad: the game state exists after loading', type('typeof state') === 'object' && type('state.world.mines.length') > 0, String(type('typeof state')));
+  check('PageLoad: the first screen is drawn (recipes, delivery tab and research tab have content)', type("document.querySelectorAll('#recipes .recipe').length") >= 2 && type("document.querySelectorAll('[data-company-card]').length") === 3 && type("document.querySelectorAll('[data-research-card]').length") >= 4);
+  dom.window.close();
 })();
 
 

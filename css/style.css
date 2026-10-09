@@ -264,6 +264,27 @@
     transform:translate(-50%, -70%);
     pointer-events:none;
   }
+  /* Task 79: the workshop looks bigger and busier as it is upgraded. */
+  .world-workshop-node.tier-2{
+    width:20px; height:18px;
+    background:linear-gradient(180deg, #8a5a2a 0 6px, #6b4a2a 6px 100%);
+    border-color:var(--amber);
+  }
+  .world-workshop-node.tier-2::before{ /* chimney */
+    content:''; position:absolute; right:3px; top:-7px; width:3px; height:7px; background:#4a3320;
+  }
+  .world-workshop-node.tier-3{
+    width:26px; height:22px;
+    background:linear-gradient(180deg, #a0652b 0 8px, #6b4a2a 8px 100%);
+    border-color:var(--amber); border-width:2px;
+    box-shadow:0 3px 0 rgba(0,0,0,0.35), 0 0 8px rgba(255,190,90,0.55);
+  }
+  .world-workshop-node.tier-3::before{
+    content:''; position:absolute; right:4px; top:-9px; width:4px; height:9px; background:#4a3320;
+  }
+  .world-workshop-node.tier-3::after{ /* warm light */
+    content:''; position:absolute; left:50%; bottom:3px; width:8px; height:6px; margin-left:-4px; background:#ffd98a; border-radius:1px 1px 0 0;
+  }
   .world-workshop-label{
     position:absolute; left:100%; top:50%; margin-left:6px; margin-top:-0.5em;
     font-size:0.55rem; line-height:1; color:var(--dim); white-space:nowrap;

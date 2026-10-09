@@ -62,6 +62,13 @@ const BALANCE = {
     BUILD_COST_BASE: 100,
     BUILD_COST_GROWTH: 1.6,
     MAX_COUNT: 6,
+    // Task 79: upgrading one workshop (each level = +WORKSHOP_LEVEL_SPEED_PER_LEVEL craft speed).
+    // Gold: round(UPGRADE_COST_BASE * UPGRADE_COST_GROWTH^(level-1)) to go from `level` to level+1.
+    // Products: UPGRADE_PRODUCTS[target level] is paid in addition (only for the high levels).
+    MAX_LEVEL: 8,
+    UPGRADE_COST_BASE: 150,
+    UPGRADE_COST_GROWTH: 1.7,
+    UPGRADE_PRODUCTS: { 6: { precisionPart: 2 }, 7: { relicPart: 3 }, 8: { quantumCore: 1 } },
   },
   crafting: {
     WORKSHOP_LEVEL_SPEED_PER_LEVEL: 0.25,

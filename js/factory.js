@@ -268,6 +268,35 @@ function buildWorkshop(){
   return workshop;
 }
 
+// Task 79: upgrading a workshop. Costs gold (growing with the level) and, for
+// the highest levels, some high-tier products (BALANCE.workshop.UPGRADE_PRODUCTS).
+function workshopUpgradeCost(workshop){
+  if(!workshop || workshop.level >= BALANCE.workshop.MAX_LEVEL) return null;
+  const b = BALANCE.workshop;
+  return {
+    gold: expCost(b.UPGRADE_COST_BASE, b.UPGRADE_COST_GROWTH, workshop.level - 1),
+    products: { ...(b.UPGRADE_PRODUCTS[workshop.level + 1] || {}) },
+  };
+}
+
+function canUpgradeWorkshop(workshopId){
+  const workshop = workshopById(workshopId);
+  const cost = workshopUpgradeCost(workshop);
+  if(!cost || state.gold < cost.gold) return false;
+  return Object.keys(cost.products).every(k => (state.products[k] || 0) >= cost.products[k]);
+}
+
+function upgradeWorkshop(workshopId){
+  if(!canUpgradeWorkshop(workshopId)) return false;
+  const workshop = workshopById(workshopId);
+  const cost = workshopUpgradeCost(workshop);
+  state.gold -= cost.gold;
+  Object.keys(cost.products).forEach(k => { state.products[k] -= cost.products[k]; });
+  workshop.level += 1;
+  log('제작소가 Lv.' + workshop.level + '이 되었습니다.');
+  return true;
+}
+
 function workshopRecipe(workshopId){
   if(typeof workshopId !== 'string' || workshopId.length === 0) return null;
   const workshop = workshopById(workshopId);
