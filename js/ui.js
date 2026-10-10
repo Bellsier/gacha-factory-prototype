@@ -202,10 +202,14 @@ function recipeRawResources(recipe, seen){
 function recipeNeedsLockedResource(recipe){
   return Array.from(recipeRawResources(recipe)).some(k => !isUnlocked(k));
 }
+// Task 82: same wording as the bottleneck panel (workshopStatus in factory.js).
 function workshopProgressLabel(workshop, recipe){
   if(workshop.progress !== null && recipe) return '제작 중... ' + workshop.progress.toFixed(1) + '초';
-  if(recipe) return workshop.auto ? '자동 제작 중' : '대기 중';
-  return '레시피를 선택하세요';
+  if(!recipe) return '레시피를 선택하세요';
+  const st = workshopStatus(workshop);
+  const auto = workshop.auto === true;
+  if(st.state === 'blocked') return auto ? '자동 제작 중 · 재료 부족' : '재료 부족';
+  return auto ? '자동 제작 중' : '대기 중';
 }
 // Task 79: workshop upgrade button (cost = gold + any high-tier products).
 function workshopUpgradeCostText(workshop){

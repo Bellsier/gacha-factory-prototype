@@ -3565,6 +3565,31 @@ const T79_ONLY = ['specialAlloy', 'steelGear', 'relicOrnament', 'precisionPart',
   check('Task81: refreshing does not change the panel', el.querySelectorAll('[data-idle-workshop]').length === rep.idle.length);
 })();
 
+// Task 82: card wording matches the bottleneck panel; fonts have fallbacks
+(function test_T82_cardWording() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.research.workshopBuild = true; win.state.gold = 10000;
+  win.buildWorkshop();
+  const w = win.state.world.workshops[0];
+  const label = () => win.workshopProgressLabel(w, win.workshopRecipe(w.id));
+  check('Task82: no recipe', label() === '레시피를 선택하세요');
+  win.setWorkshopRecipe(w.id, 'steel');
+  win.state.resources.iron = 0; win.state.resources.coal = 0;
+  check('Task82: short of inputs says 재료 부족, like the panel', label() === '재료 부족' && win.bottleneckReport().idle[0].state === 'blocked');
+  win.state.resources.iron = 5; win.state.resources.coal = 5;
+  check('Task82: with stock it is 대기 중, like the panel waiting state', label() === '대기 중' && win.bottleneckReport().idle[0].state === 'waiting');
+  w.auto = true;
+  win.state.resources.iron = 0;
+  check('Task82: auto on and short says both', label() === '자동 제작 중 · 재료 부족');
+})();
+
+(function test_T82_fonts() {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  check('Task82: no bare font name without a fallback in the stylesheet', !/font-family:\s*'(Space Grotesk|IBM Plex Mono)'\s*[;}]/.test(css) && css.includes('--font-display') && css.includes('--font-mono'));
+  check('Task82: the Google Fonts stylesheet does not block rendering', /fonts\.googleapis\.com\/css2[^>]*media="print"[^>]*onload/.test(html));
+})();
+
 
 // SUMMARY
 // =============================================================================

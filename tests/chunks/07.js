@@ -294,7 +294,7 @@
   win.state.resources.coal = 1;
   win.craftWorkshop(workshop.id);
   win.renderWorkshops();
-  check('Task45: workshop UI shows completed instant craft state', win.document.getElementById('workshops').textContent.includes('대기 중'));
+  check('Task45: workshop UI shows completed instant craft state', win.document.getElementById('workshops').textContent.includes('재료 부족'));
 })();
 
 (function test_T46_workshopSaveLoadState() {
