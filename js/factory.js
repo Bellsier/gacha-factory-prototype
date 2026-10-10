@@ -252,7 +252,7 @@ function workshopBuildSpot(){
 
 function canBuildWorkshop(){
   if(!isWorkshopBuildUnlocked()) return false;
-  if(state.world.workshops.length >= BALANCE.workshop.MAX_COUNT) return false;
+  if(state.world.workshops.length >= maxWorkshops()) return false;
   if(state.gold < workshopBuildCost()) return false;
   return workshopBuildSpot() !== null;
 }

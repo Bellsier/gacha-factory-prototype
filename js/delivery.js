@@ -191,11 +191,12 @@ function tickTrades(){
   COMPANIES.forEach(def => {
     if(!isRegularTrade(def.key)) return;
     const p = companyProgress(def.key);
-    p.tradeTimer = Math.min(b.TRADE_INTERVAL_SEC, p.tradeTimer + 1 / TICKS_PER_SECOND);
-    if(p.tradeTimer < b.TRADE_INTERVAL_SEC) return;
+    const interval = tradeInterval(); // Task 80: 빠른 거래
+    p.tradeTimer = Math.min(interval, p.tradeTimer + 1 / TICKS_PER_SECOND);
+    if(p.tradeTimer < interval) return;
     const productKey = tradeProduct(def.key);
     if(!productKey) return;
-    const qty = Math.min(b.TRADE_QTY, Math.floor(state.products[productKey]));
+    const qty = Math.min(tradeQty(),Math.floor(state.products[productKey]));
     const recipe = recipeByKey(productKey);
     const earned = qty * recipe.sell * b.TRADE_PRICE_MULT * (1 + reputationEffect('tradePrice')) * mult();
     state.products[productKey] -= qty;

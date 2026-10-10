@@ -229,8 +229,8 @@ function renderWorkshopBuild(){
     wrap.innerHTML = '<div class="rate">제작소를 지으려면 연구 탭에서 "제작소 건설"을 연구하세요.</div>';
     return;
   }
-  if(state.world.workshops.length >= BALANCE.workshop.MAX_COUNT){
-    wrap.innerHTML = '<div class="rate">제작소를 더 지을 수 없습니다. (최대 ' + BALANCE.workshop.MAX_COUNT + '곳)</div>';
+  if(state.world.workshops.length >= maxWorkshops()){
+    wrap.innerHTML = '<div class="rate">제작소를 더 지을 수 없습니다. (최대 ' + maxWorkshops() + '곳)</div>';
     return;
   }
   const btn = document.createElement('button');
@@ -380,7 +380,7 @@ function companyScoreText(def){
 
 function tradeStatusText(key){
   const p = companyProgress(key);
-  const left = Math.max(0, BALANCE.delivery.TRADE_INTERVAL_SEC - p.tradeTimer);
+  const left = Math.max(0, tradeInterval() - p.tradeTimer);
   if(left > 0) return Math.ceil(left) + '초 뒤 거래';
   return tradeProduct(key) ? '곧 거래' : '선호 제품을 기다리는 중';
 }

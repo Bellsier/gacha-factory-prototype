@@ -2680,7 +2680,7 @@ function t70Afford(win) {
   const win = newDom(makeMemoryStorage()).window;
   const doc = win.document;
   check('Task71: every research belongs to a known branch', win.RESEARCH.every(r => win.RESEARCH_BRANCHES.some(b => b.key === r.branch)));
-  check('Task71: the tab shows one title per branch with its cards', doc.querySelectorAll('.research-branch-title').length === 4 && doc.querySelectorAll('[data-research-card]').length === 4);
+  check('Task71: the tab shows one title per branch with its cards', doc.querySelectorAll('.research-branch-title').length === 4 && doc.querySelectorAll('[data-research-card]').length === win.RESEARCH.length);
   const titles = Array.from(doc.querySelectorAll('.research-branch-title')).map(e => e.textContent).join();
   check('Task71: branches are 제작/자동화/탐험/납품', titles === '제작,자동화,탐험,납품');
   win.renderAll(); win.renderAll();
@@ -3383,6 +3383,119 @@ const T79_ONLY = ['specialAlloy', 'steelGear', 'relicOrnament', 'precisionPart',
   check('PageLoad: the game state exists after loading', type('typeof state') === 'object' && type('state.world.mines.length') > 0, String(type('typeof state')));
   check('PageLoad: the first screen is drawn (recipes, delivery tab and research tab have content)', type("document.querySelectorAll('#recipes .recipe').length") >= 2 && type("document.querySelectorAll('[data-company-card]').length") === 3 && type("document.querySelectorAll('[data-research-card]').length") >= 4);
   dom.window.close();
+})();
+
+// ---------------------------------------------------------------------------
+// Task 80: late research (탐사 장비, 지질 조사, 제작소 증축, 정기 거래 확대, 빠른 거래)
+// ---------------------------------------------------------------------------
+(function test_T80_data() {
+  const win = newDom(makeMemoryStorage()).window;
+  const keys = ['explorationGear', 'geologicalSurvey', 'workshopExpansion', 'tradeExpansion', 'fastTrade'];
+  check('Task80: the five late researches exist, each with an effect that is implemented', keys.every(k => { const d = win.researchDef(k); return d && typeof win.RESEARCH_EFFECTS[d.effect] === 'function'; }));
+  check('Task80: each costs gold plus upper parts that exist as recipes', keys.every(k => { const c = win.researchDef(k).cost; return c.gold >= 2500 && Object.keys(c.products).length >= 1 && Object.keys(c.products).every(p => win.RECIPES.some(r => r.key === p)); }));
+  check('Task80: the chains require the earlier research', win.researchDef('workshopExpansion').requires.join() === 'workshopBuild' && win.researchDef('tradeExpansion').requires.join() === 'deliveryContract' && win.researchDef('fastTrade').requires.join() === 'tradeExpansion' && win.researchDef('geologicalSurvey').requires.join() === 'tunnelWork');
+  check('Task80: defaults are unchanged without research', win.discoveryRadius() === 2.5 && win.maxWorkshops() === 6 && win.tradeQty() === 5 && win.tradeInterval() === 60);
+})();
+
+(function test_T80_values() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.research.explorationGear = true;
+  win.state.research.workshopExpansion = true;
+  win.state.research.tradeExpansion = true;
+  win.state.research.fastTrade = true;
+  check('Task80: research switches the numbers (radius 4, 8 workshops, 10 units, 40 s)', win.discoveryRadius() === 4 && win.maxWorkshops() === 8 && win.tradeQty() === 10 && win.tradeInterval() === 40);
+})();
+
+(function test_T80_buy() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.gold = 100000;
+  win.state.research.workshopBuild = true;
+  check('Task80: a research is refused while the products are missing, and nothing is spent', win.canResearch('workshopExpansion') === false && win.doResearch('workshopExpansion') === false && win.state.gold === 100000);
+  win.state.products.steelGear = 6; win.state.products.manaEngine = 2;
+  check('Task80: 제작소 증축 can be bought and spends gold and parts', win.doResearch('workshopExpansion') === true && win.state.gold === 96000 && win.state.products.steelGear === 0 && win.state.products.manaEngine === 0 && win.isResearchDone('workshopExpansion'));
+  check('Task80: fastTrade stays locked until 정기 거래 확대', win.researchStatus('fastTrade') === 'locked');
+})();
+
+(function test_T80_workshopCap() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.research.workshopBuild = true;
+  win.state.gold = 1e9;
+  let n = 0;
+  while (win.canBuildWorkshop() && n < 20) { win.buildWorkshop(); n++; }
+  check('Task80: without 증축 the sixth workshop is the last', win.state.world.workshops.length === 6);
+  win.state.research.workshopExpansion = true;
+  while (win.canBuildWorkshop() && n < 20) { win.buildWorkshop(); n++; }
+  check('Task80: with 증축 two more can be built, then it stops at 8', win.state.world.workshops.length === 8);
+})();
+
+(function test_T80_discovery() {
+  const win = newDom(makeMemoryStorage()).window;
+  const mine = win.state.world.mines[win.state.world.mines.length - 1];
+  win.state.world.hiddenMineIds = [mine.id];
+  const mineTotal = win.state.world.mines.length;
+  const p = win.state.world.player;
+  p.x = mine.x + 3.5; p.y = mine.y;
+  win.tickExploration();
+  check('Task80: 3.5 away is too far without 탐사 장비', win.state.world.hiddenMineIds.includes(mine.id));
+  win.state.research.explorationGear = true;
+  win.tickExploration();
+  check('Task80: with 탐사 장비 it is found, and the mine total is unchanged', !win.state.world.hiddenMineIds.includes(mine.id) && win.state.world.mines.length === mineTotal);
+})();
+
+(function test_T80_trade() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.research.deliveryContract = true;
+  win.state.research.tradeExpansion = true;
+  const p = win.companyProgress('forge');
+  p.score = 1000; p.tradeTimer = 59.99;
+  win.state.products.steel = 20;
+  win.tickTrades();
+  check('Task80: at 59.99 s plus one tick the 60 s interval is reached and 10 units go (not 5)', win.state.products.steel === 10);
+  p.tradeTimer = 45; win.state.products.steel = 20;
+  win.tickTrades();
+  check('Task80: at 45 s nothing is bought while 빠른 거래 is not researched', win.state.products.steel === 20);
+  win.state.research.fastTrade = true;
+  p.tradeTimer = 40; win.state.products.steel = 20;
+  win.tickTrades();
+  check('Task80: with 정기 거래 확대 + 빠른 거래 a purchase of 10 happens at 40 s', win.state.products.steel === 10);
+})();
+
+(function test_T80_survey() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.world.mines = win.state.world.mines.filter(m => m.resource !== 'cosmicShard' && m.resource !== 'plasma');
+  const before = win.state.world.mines.length;
+  const added = win.surveyMines();
+  const hidden = win.state.world.hiddenMineIds;
+  check('Task80: 지질 조사 adds three hidden mines', added.length === 3 && win.state.world.mines.length === before + 3 && added.every(m => hidden.includes(m.id)));
+  check('Task80: a missing cosmicShard and plasma mine are placed first', added.some(m => m.resource === 'cosmicShard') && added.some(m => m.resource === 'plasma'));
+  const cells = win.state.world.mines.map(m => m.x + ',' + m.y);
+  check('Task80: no two mines share a cell', new Set(cells).size === cells.length);
+  const ids = win.state.world.mines.map(m => m.id);
+  check('Task80: mine ids stay unique', new Set(ids).size === ids.length);
+  const b = win.state.world.base;
+  check('Task80: the new mines lie in the outer ring', added.every(m => win.worldGenDistance(m.x, m.y, b.x, b.y) >= 10));
+})();
+
+(function test_T80_surveyByResearch() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.gold = 10000; win.state.research.tunnelWork = true;
+  win.state.products.crystalLens = 3; win.state.products.steelGear = 3;
+  const before = win.state.world.mines.length;
+  check('Task80: buying 지질 조사 creates its mines once', win.doResearch('geologicalSurvey') === true && win.state.world.mines.length === before + 3 && win.doResearch('geologicalSurvey') === false && win.state.world.mines.length === before + 3);
+})();
+
+(function test_T80_saveAndPage() {
+  const store = makeMemoryStorage();
+  const win = newDom(store).window;
+  win.state.research.fastTrade = true; win.state.research.tradeExpansion = true;
+  win.state.gold = 10000; win.state.research.tunnelWork = true;
+  win.state.products.crystalLens = 3; win.state.products.steelGear = 3;
+  win.doResearch('geologicalSurvey');
+  const mines = win.state.world.mines.length;
+  win.saveGame();
+  const win2 = newDom(store).window;
+  check('Task80: research and survey mines survive a save and load', win2.state.research.fastTrade === true && win2.state.research.geologicalSurvey === true && win2.state.world.mines.length === mines && win2.tradeInterval() === 40);
+  check('Task80: the research tab shows a card for each research once', win2.document.querySelectorAll('[data-research-card]').length === win2.RESEARCH.length);
 })();
 
 

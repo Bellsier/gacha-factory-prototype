@@ -18,7 +18,68 @@ const RESEARCH_EFFECTS = {
   unlockWorkshopBuild: () => { log('제작소를 지을 수 있게 되었습니다.'); },
   unlockAutoCraft: () => { log('자동 제작 장치가 완성되었습니다.'); },
   unlockDelivery: () => { log('회사와 납품 계약을 맺었습니다.'); },
+  // Task 80: late research. The first four only mark the research done; the
+  // numbers they change are read through the helpers below.
+  widenDiscovery: () => { log('탐사 장비가 완성되었습니다. 더 먼 곳의 광맥도 알아챌 수 있어요.'); },
+  expandWorkshops: () => { log('제작소를 더 지을 수 있게 되었습니다.'); },
+  expandTrade: () => { log('정기 거래 물량이 늘었습니다.'); },
+  fastTrade: () => { log('정기 거래 간격이 짧아졌습니다.'); },
+  surveyGeology: () => { surveyMines(); },
 };
+
+// Task 80: numbers that late research changes. The rest of the game asks these
+// instead of reading BALANCE directly.
+function discoveryRadius(){
+  return isResearchDone('explorationGear') ? BALANCE.research.DISCOVERY_RADIUS : BALANCE.world.DISCOVERY_RADIUS;
+}
+function maxWorkshops(){
+  return isResearchDone('workshopExpansion') ? BALANCE.research.MAX_WORKSHOPS : BALANCE.workshop.MAX_COUNT;
+}
+function tradeQty(){
+  return isResearchDone('tradeExpansion') ? BALANCE.research.TRADE_QTY : BALANCE.delivery.TRADE_QTY;
+}
+function tradeInterval(){
+  return isResearchDone('fastTrade') ? BALANCE.research.TRADE_INTERVAL_SEC : BALANCE.delivery.TRADE_INTERVAL_SEC;
+}
+
+// Task 80: 지질 조사 adds SURVEY_MINES hidden mines in the outer ring (open
+// ground in the start land, never on an occupied cell). A cosmicShard / plasma
+// mine the world still lacks is placed first, so the top recipes can always be
+// supplied. Returns the new mines.
+function surveyMines(options){
+  const opts = options || {};
+  const random = typeof opts.random === 'function' ? opts.random : Math.random;
+  const g = BALANCE.worldGen;
+  const world = state.world;
+  const ring = g.RINGS.find(r => r.key === 'outer');
+  const base = world.base || { x: BALANCE.world.START_BASE_X, y: BALANCE.world.START_BASE_Y };
+  if(!Array.isArray(world.hiddenMineIds)) world.hiddenMineIds = [];
+  const used = new Set(world.mines.map(m => m.x + ',' + m.y));
+  const candidates = worldGenAllCells().filter(c =>
+    isCellOpenForMines(c.x, c.y) && !used.has(c.x + ',' + c.y) &&
+    worldGenDistance(c.x, c.y, base.x, base.y) >= ring.minDist);
+  const have = (r) => world.mines.some(m => m.resource === r);
+  const wanted = ['cosmicShard', 'plasma'].filter(r => !have(r));
+  const placed = [];
+  const added = [];
+  for(let i = 0; i < BALANCE.research.SURVEY_MINES; i++){
+    const open = candidates.filter(c => !used.has(c.x + ',' + c.y));
+    const spaced = open.filter(c => world.mines.concat(added).every(o => worldGenDistance(c.x, c.y, o.x, o.y) >= g.MIN_SPACING));
+    const cell = worldGenPick(spaced.length ? spaced : open, random);
+    if(!cell) break;
+    const resource = wanted.length ? wanted.shift() : worldGenPickWeighted(worldGenRingWeights(ring, placed), random);
+    if(!resource) break;
+    placed.push(resource);
+    used.add(cell.x + ',' + cell.y);
+    const raw = makeGeneratedMine('mine_survey_' + (world.mines.length + 1), cell, resource);
+    const mine = addMine(raw);
+    if(!mine) continue;
+    world.hiddenMineIds.push(mine.id);
+    added.push(mine);
+  }
+  log('지질 조사: 숨은 광맥 ' + added.length + '곳의 단서를 찾았습니다. 돌아다니며 찾아보세요.');
+  return added;
+}
 
 function isAutoCraftUnlocked(){ return isResearchDone('autoCraftDevice'); }
 function isWorkshopBuildUnlocked(){ return isResearchDone('workshopBuild'); }

@@ -78,6 +78,17 @@ const RESEARCH = [
    effect:'unlockDelivery', cost:{gold:200, products:{steel:10}}, requires:[]},
   {key:'tunnelWork', branch:'explore', name:'터널 굴착', desc:'산을 가로지르는 터널을 뚫어 산 너머로 가는 길을 엽니다. 산 너머에는 더 희귀한 광맥이 있어요.',
    effect:'unlockTunnel', cost:{gold:1500, products:{alloy:5}}, requires:[]},
+  // Task 80: late research — paid with upper parts, not only gold.
+  {key:'explorationGear', branch:'explore', name:'탐사 장비', desc:'숨은 광맥을 더 먼 곳에서도 알아챌 수 있게 됩니다. (발견 반경 2.5 → 4.0) 광맥이 늘어나지는 않아요.',
+   effect:'widenDiscovery', cost:{gold:2500, products:{manaLamp:4, steelGear:2}}, requires:[]},
+  {key:'geologicalSurvey', branch:'explore', name:'지질 조사', desc:'시작 땅의 바깥쪽에서 숨은 광맥 3곳의 단서를 찾습니다. 우주 조각이나 플라즈마 광맥이 없으면 먼저 채워 줘요.',
+   effect:'surveyGeology', cost:{gold:3000, products:{crystalLens:3, steelGear:3}}, requires:['tunnelWork']},
+  {key:'workshopExpansion', branch:'craft', name:'제작소 증축', desc:'제작소를 6곳에서 8곳까지 지을 수 있게 됩니다.',
+   effect:'expandWorkshops', cost:{gold:4000, products:{steelGear:6, manaEngine:2}}, requires:['workshopBuild']},
+  {key:'tradeExpansion', branch:'delivery', name:'정기 거래 확대', desc:'정기 거래에서 한 번에 사 가는 물량이 5개에서 10개로 늘어납니다.',
+   effect:'expandTrade', cost:{gold:3000, products:{crystalLens:5, relicOrnament:2}}, requires:['deliveryContract']},
+  {key:'fastTrade', branch:'delivery', name:'빠른 거래', desc:'정기 거래 간격이 60초에서 40초로 줄어듭니다.',
+   effect:'fastTrade', cost:{gold:5000, products:{starLens:2, precisionMachine:1}}, requires:['tradeExpansion']},
 ];
 // Task 72: partner companies (Blueprint 15.1). Content data like SITES.
 //   distance      shipping-cost factor (farther = costlier)

@@ -92,6 +92,14 @@ const BALANCE = {
     // Task 65: a hidden mine is discovered when the player comes this close (world units).
     DISCOVERY_RADIUS: 2.5,
   },
+  // Task 80: values late research switches to (js/research.js helpers).
+  research: {
+    DISCOVERY_RADIUS: 4.0,   // 탐사 장비
+    MAX_WORKSHOPS: 8,        // 제작소 증축
+    TRADE_QTY: 10,           // 정기 거래 확대
+    TRADE_INTERVAL_SEC: 40,  // 빠른 거래
+    SURVEY_MINES: 3,         // 지질 조사: hidden mines added in the outer ring
+  },
   worldGen: {
     // Task 63: new-game mine layout (js/worldgen.js). Starter iron/coal are
     // placed at a random cell this far from the base (world units). Max 3

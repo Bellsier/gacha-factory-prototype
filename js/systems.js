@@ -396,7 +396,7 @@ function tickExploration(){
   const hidden = state.world.hiddenMineIds;
   if(!Array.isArray(hidden) || hidden.length === 0) return [];
   const p = state.world.player;
-  const r = BALANCE.world.DISCOVERY_RADIUS;
+  const r = discoveryRadius(); // Task 80: 탐사 장비 widens it
   const found = state.world.mines
     .filter(m => m && hidden.includes(m.id) && Math.hypot(m.x - p.x, m.y - p.y) <= r)
     .map(m => m.id);
