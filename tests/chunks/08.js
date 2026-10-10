@@ -2833,6 +2833,19 @@ function t72Open(win) {
   check('Task72: the log says so once', win.document.getElementById('log').textContent.split('정기 거래를 시작').length === 2);
 })();
 
+// Task 83 helper: put a company on fixed order `idx` (open at once), or with none open when idx is past the list.
+function t83SetOrder(win, key, idx) {
+  const def = win.COMPANIES.find((c) => c.key === key);
+  const p = win.permanent.companies[key];
+  p.orderIndex = idx;
+  p.open = def.orders[idx] ? [{ product: def.orders[idx].product, qty: def.orders[idx].qty, index: idx }] : [];
+}
+// Task 83 helper: let the company's next order arrive now.
+function t83Arrive(win, key) {
+  win.permanent.companies[key].orderTimer = 1e9;
+  if (win.tickOrders().length) win.renderDelivery();
+}
+
 (function test_T72_orders() {
   const win = newDom(makeMemoryStorage()).window;
   t72Open(win);
@@ -2846,9 +2859,11 @@ function t72Open(win) {
   check('Task72: completing pays 1 reputation', rep === 1 && win.permanent.totalPrestige === 1);
   check('Task72: it spends exactly the order and its shipping', win.state.products.steel === 5 && win.state.gold === g0 - win.shippingCost('forge', 'steel', 20));
   check('Task72: the order also counts as a delivery', Math.abs(win.permanent.companies.forge.score - t72RefScore(5, 1.5, 0, 20)) < 1e-9 && win.permanent.companies.forge.sent.steel === 20);
-  check('Task72: the next order comes up', win.permanent.companies.forge.orderIndex === 1 && win.currentOrder('forge').product === 'coalBrick');
-  check('Task72: the multiplier follows the reputation', Math.abs(win.mult() - 1.15) < 1e-12);
-  win.permanent.companies.forge.orderIndex = win.COMPANIES[0].orders.length;
+  check('Task72: the next order does not come at once (Task 83)', win.permanent.companies.forge.orderIndex === 1 && win.currentOrder('forge') === null);
+  t83Arrive(win, 'forge');
+  check('Task72: the next order comes up after the wait', win.currentOrder('forge').product === 'coalBrick');
+  check('Task72: the multiplier follows the reputation', Math.abs(win.mult() - (1 + win.BALANCE.reputation.MULT_PER_POINT)) < 1e-12);
+  t83SetOrder(win, 'forge', win.COMPANIES[0].orders.length);
   check('Task72: when every order is done there is no current order', win.currentOrder('forge') === null && win.completeOrder('forge') === 0);
   check('Task72: orders of a closed company cannot be completed', win.canCompleteOrder('harbor') === false && win.completeOrder('harbor') === 0);
 })();
@@ -2857,7 +2872,7 @@ function t72Open(win) {
   const win = newDom(makeMemoryStorage()).window;
   t72Open(win);
   win.permanent.totalPrestige = 4;
-  win.permanent.companies.forge.orderIndex = 3;  // alloy x10 -> 200 value -> 1
+  t83SetOrder(win, 'forge', 3);  // alloy x10 -> 200 value -> 1
   win.state.products.alloy = 10;
   win.completeOrder('forge');
   check('Task72: reaching 5 reputation opens the second company', win.permanent.totalPrestige === 5 && win.isCompanyOpen('harbor') === true);
@@ -2905,23 +2920,23 @@ function t73Trade(win, n) { for (let i = 0; i < n; i++) win.tickTrades(); }
   const win = newDom(makeMemoryStorage()).window;
   t72Open(win);
   win.permanent.companies.forge.score = 300;
-  win.state.products.steel = 12;
+  win.state.products.steel = 22;
   const g0 = win.state.gold;
   t73Trade(win, 599);
-  check('Task73: nothing is bought before 60 seconds', win.state.products.steel === 12 && win.state.gold === g0);
+  check('Task73: nothing is bought before 60 seconds', win.state.products.steel === 22 && win.state.gold === g0);
   t73Trade(win, 2);
   const paid = 5 * 5 * 1.3 * win.mult();
-  check('Task73: after 60 s the company buys 5 favorites at 1.3x', win.state.products.steel === 7 && Math.abs(win.state.gold - g0 - paid) < 1e-6);
+  check('Task73: after 60 s the company buys 5 favorites at 1.3x', win.state.products.steel === 17 && Math.abs(win.state.gold - g0 - paid) < 1e-6);
   check('Task73: the timer restarts', win.permanent.companies.forge.tradeTimer < 1);
   t73Trade(win, 1200);
-  check('Task73: it keeps trading every interval until the stock is short', win.state.products.steel === 0);
+  check('Task73: it keeps trading every interval until only the reserve is left (Task 83)', win.state.products.steel === win.BALANCE.delivery.TRADE_RESERVE);
   win.state.products.steel = 0;
   t73Trade(win, 700);
   const g1 = win.state.gold;
   check('Task73: with no stock it waits without penalty', win.state.gold === g1 && win.permanent.companies.forge.tradeTimer === 60);
-  win.state.products.steel = 3;
+  win.state.products.steel = 13;
   t73Trade(win, 2);
-  check('Task73: it buys what exists as soon as stock appears', win.state.products.steel === 0 && win.state.gold > g1);
+  check('Task73: it buys what is above the reserve as soon as stock appears', win.state.products.steel === 10 && win.state.gold > g1);
 })();
 
 (function test_T73_tradeRules() {
@@ -2931,9 +2946,9 @@ function t73Trade(win, n) { for (let i = 0; i < n; i++) win.tickTrades(); }
   t73Trade(win, 1300);
   check('Task73: a company without a regular trade buys nothing', win.state.products.steel === 10);
   win.permanent.companies.forge.score = 300;
-  win.state.products.steel = 0; win.state.products.coalBrick = 4;
+  win.state.products.steel = 0; win.state.products.coalBrick = 14;
   t73Trade(win, 620);
-  check('Task73: it buys the first favorite that is in stock (coal brick)', win.state.products.coalBrick === 0);
+  check('Task73: it buys the first favorite that is in stock (coal brick)', win.state.products.coalBrick === 10);
   win.state.products.alloy = 9;
   check('Task73: it never buys a non-favorite', win.tradeProduct('forge') === null && win.state.products.alloy === 9);
 })();
@@ -2993,7 +3008,9 @@ function t73Trade(win, n) { for (let i = 0; i < n; i++) win.tickTrades(); }
   input.value = '1.9'; input.dispatchEvent(new win.Event('input'));
   check('Task73: a fractional amount is floored', /점수 \+7\.2/.test(doc.querySelector('[data-deliver-preview="forge"]').textContent));
   orderBtn.click();
-  check('Task73: clicking 수주 완수 completes the order and shows the next one', win.permanent.totalPrestige === 1 && /석탄 벽돌 25개/.test(doc.querySelector('[data-company-order="forge"]').textContent));
+  check('Task73: clicking 수주 완수 completes the order and shows the wait', win.permanent.totalPrestige === 1 && !doc.querySelector('[data-company-order="forge"]') && /다음 수주까지/.test(doc.querySelector('[data-company-order-wait="forge"]').textContent));
+  t83Arrive(win, 'forge');
+  check('Task73: the next order shows up in the tab when it arrives', /석탄 벽돌 25개/.test(doc.querySelector('[data-company-order="forge"]').textContent));
   win.renderAll(); win.renderAll();
   check('Task73: re-rendering never duplicates cards', doc.querySelectorAll('[data-company-card]').length === 3);
 })();
@@ -3093,12 +3110,13 @@ const t75Close = (a, b) => Math.abs(a - b) < 1e-9;
   const win = newDom(makeMemoryStorage()).window;
   const m = (n) => { t75Rep(win, n); return win.mult(); };
   check('Task76: no reputation is x1', t75Close(m(0), 1));
-  check('Task76: up to 15 it is +15% per point as before (5 -> 1.75, 15 -> 3.25)', t75Close(m(5), 1.75) && t75Close(m(15), 3.25));
-  check('Task76: above 15 it grows by 5% per point (20 -> 3.5, 30 -> 4.0)', t75Close(m(20), 3.5) && t75Close(m(30), 4.0));
-  check('Task76: it stops at reputation 30', t75Close(m(31), 4.0) && t75Close(m(10000), 4.0));
-  check('Task76: it never decreases', [0, 1, 5, 14, 15, 16, 29, 30, 31].map(m).every((v, i, a) => i === 0 || v >= a[i - 1]));
-  t75Rep(win, 30); win.state.hqLevel = 2;
-  check('Task76: HQ investment still multiplies on top', t75Close(win.mult(), 4.0 * (1 + 2 * 0.08)));
+  const top = 1 + 18 * 0.12 + 18 * 0.045; // Task 83: reputation maximum 36
+  check('Task83: up to 18 it is +12% per point (5 -> 1.6, 18 -> 3.16)', t75Close(m(5), 1.6) && t75Close(m(18), 3.16));
+  check('Task83: above 18 it grows by 4.5% per point (27 -> 3.565, 36 -> 3.97)', t75Close(m(27), 1 + 2.16 + 9 * 0.045) && t75Close(m(36), top));
+  check('Task83: it stops at reputation 36, close to x4', t75Close(m(37), top) && t75Close(m(10000), top) && Math.abs(top - 4) < 0.05);
+  check('Task76: it never decreases', [0, 1, 5, 17, 18, 19, 35, 36, 37].map(m).every((v, i, a) => i === 0 || v >= a[i - 1]));
+  t75Rep(win, 36); win.state.hqLevel = 2;
+  check('Task76: HQ investment still multiplies on top', t75Close(win.mult(), top * (1 + 2 * 0.08)));
 })();
 
 (function test_T75_effectsApplied() {
@@ -3130,7 +3148,7 @@ const t75Close = (a, b) => Math.abs(a - b) < 1e-9;
   const run = (rep) => {
     t75Rep(win, rep);
     win.permanent.companies.forge.tradeTimer = 60;
-    win.state.products.steel = 5;
+    win.state.products.steel = 15; // 5 above the trade reserve
     const g0 = win.state.gold;
     win.tickTrades();
     return win.state.gold - g0;
@@ -3145,7 +3163,7 @@ const t75Close = (a, b) => Math.abs(a - b) < 1e-9;
   const win = newDom(makeMemoryStorage()).window;
   t72Open(win);
   win.permanent.totalPrestige = 2;
-  win.permanent.companies.forge.orderIndex = 3;
+  t83SetOrder(win, 'forge', 3);
   win.state.products.alloy = 10;
   win.completeOrder('forge');
   const log = win.document.getElementById('log').textContent;
@@ -3159,11 +3177,11 @@ const t75Close = (a, b) => Math.abs(a - b) < 1e-9;
   check('Task75: the 납품 tab lists all four effects', doc.querySelectorAll('[data-reputation-effect]').length === 4);
   check('Task75: closed effects say at which reputation they open', /명성 3점에서 열려요/.test(doc.querySelector('[data-reputation-text="shippingDiscount"]').textContent) && doc.querySelector('[data-reputation-effect="shippingDiscount"]').classList.contains('is-closed'));
   check('Task75: the multiplier row is open from the start', /×1\.00/.test(doc.querySelector('[data-reputation-text="multiplier"]').textContent));
-  check('Task75: the reputation line shows progress to the maximum', /0 \/ 30/.test(doc.getElementById('reputationVal').textContent));
+  check('Task75: the reputation line shows progress to the maximum', /0 \/ 36/.test(doc.getElementById('reputationVal').textContent));
   win.permanent.totalPrestige = 10;
   win.updateNumbers();
   check('Task75: the per-tick refresh updates sizes and opens rows without rebuilding', /-20%/.test(doc.querySelector('[data-reputation-text="shippingDiscount"]').textContent) && /\+20%/.test(doc.querySelector('[data-reputation-text="craftSpeed"]').textContent) && !doc.querySelector('[data-reputation-effect="tradePrice"]').classList.contains('is-closed') && /\+20%/.test(doc.querySelector('[data-reputation-text="tradePrice"]').textContent));
-  check('Task75: the multiplier row follows reputation (x2.50 at 10)', /×2\.50/.test(doc.querySelector('[data-reputation-text="multiplier"]').textContent));
+  check('Task75: the multiplier row follows reputation (x2.20 at 10)', /×2\.20/.test(doc.querySelector('[data-reputation-text="multiplier"]').textContent));
   win.permanent.totalPrestige = 40;
   win.updateNumbers();
   check('Task75: at the top it says 최대', /최대/.test(doc.getElementById('reputationVal').textContent));
@@ -3424,8 +3442,9 @@ const T79_ONLY = ['specialAlloy', 'steelGear', 'relicOrnament', 'precisionPart',
   while (win.canBuildWorkshop() && n < 20) { win.buildWorkshop(); n++; }
   check('Task80: without 증축 the sixth workshop is the last', win.state.world.workshops.length === 6);
   win.state.research.workshopExpansion = true;
+  win.state.products.steelGear = 2; win.state.products.manaEngine = 1; // Task 83: the 7th and 8th take parts
   while (win.canBuildWorkshop() && n < 20) { win.buildWorkshop(); n++; }
-  check('Task80: with 증축 two more can be built, then it stops at 8', win.state.world.workshops.length === 8);
+  check('Task80: with 증축 two more can be built, then it stops at 8', win.state.world.workshops.length === 8 && win.state.products.steelGear === 0 && win.state.products.manaEngine === 0);
 })();
 
 (function test_T80_discovery() {
@@ -3588,6 +3607,160 @@ const T79_ONLY = ['specialAlloy', 'steelGear', 'relicOrnament', 'precisionPart',
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   check('Task82: no bare font name without a fallback in the stylesheet', !/font-family:\s*'(Space Grotesk|IBM Plex Mono)'\s*[;}]/.test(css) && css.includes('--font-display') && css.includes('--font-mono'));
   check('Task82: the Google Fonts stylesheet does not block rendering', /fonts\.googleapis\.com\/css2[^>]*media="print"[^>]*onload/.test(html));
+})();
+
+// ---------------------------------------------------------------------------
+// Task 83: reputation maximum, order arrival, repeat orders, trade reserve, workshop 7/8 parts
+// ---------------------------------------------------------------------------
+(function test_T83_reputationMax() {
+  const win = newDom(makeMemoryStorage()).window;
+  const total = win.COMPANIES.reduce((sum, c) => sum + c.orders.reduce((a, o) => a + win.orderReputation({ product: o.product, qty: o.qty, index: 0 }), 0), 0);
+  check('Task83: the reputation maximum equals what all fixed orders pay', total === 36 && win.BALANCE.reputation.MAX === total);
+  win.permanent.totalPrestige = 36;
+  check('Task83: the old effect maxima still hold at the new maximum (craft speed and trade price +60%)', t75Close(win.reputationEffect('craftSpeed'), 0.6) && t75Close(win.reputationEffect('tradePrice'), 0.6) && t75Close(win.reputationEffect('shippingDiscount'), 0.3));
+})();
+
+(function test_T83_arrival() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  const p = win.permanent.companies.forge;
+  check('Task83: every company starts with its first fixed order open', win.COMPANIES.every((c) => win.openOrders(c.key).length === 1 && win.openOrders(c.key)[0].index === 0));
+  check('Task83: the interval is 300 s at reputation 0 and 60 s at the maximum', win.orderArrivalSec() === 300 && (win.permanent.totalPrestige = 36, win.orderArrivalSec() === 60));
+  win.permanent.totalPrestige = 0;
+  check('Task83: the cap is 1 open order per company, 2 from reputation 18', win.orderCap() === 1 && (win.permanent.totalPrestige = 18, win.orderCap() === 2));
+  win.permanent.totalPrestige = 0;
+  check('Task83: with an open order at the cap nothing arrives and the timer stays 0', win.tickOrders().length === 0 && p.orderTimer === 0 && p.open.length === 1);
+  win.state.products.steel = 25; win.completeOrder('forge');
+  // the completed order paid 1 reputation, so the interval is now 300 - 240/36 = 293.3 s
+  for (let i = 0; i < 2900; i++) win.tickOrders();
+  check('Task83: nothing arrives before the interval', p.open.length === 0);
+  for (let i = 0; i < 50; i++) win.tickOrders();
+  check('Task83: the next fixed order arrives after the interval', p.open.length === 1 && p.open[0].index === 1 && p.open[0].product === 'coalBrick');
+  win.permanent.totalPrestige = 18;
+  p.orderTimer = 1e9; win.tickOrders();
+  check('Task83: with reputation 18 there is room for a second order, but it is not a second fixed one', p.open.length <= 2 && p.open.filter((o) => o.index >= 0).length === 1);
+  const fixedOpen = p.open.filter((o) => o.index >= 0).length;
+  check('Task83: only one fixed order is open at a time', fixedOpen === 1);
+})();
+
+(function test_T83_completeSlots() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  t83SetOrder(win, 'forge', win.COMPANIES[0].orders.length);
+  win.permanent.totalPrestige = 18;
+  win.permanent.companies.forge.open = [{ product: 'steel', qty: 10, index: -1 }, { product: 'coalBrick', qty: 10, index: -1 }];
+  win.state.products.steel = 10; win.state.products.coalBrick = 10; win.state.gold = 1000;
+  const g0 = win.state.gold, pay = win.repeatOrderPay({ product: 'coalBrick', qty: 10, index: -1 });
+  const out = win.completeOrder('forge', 1);
+  check('Task83: the second slot can be completed on its own', out > 0 && win.openOrders('forge').length === 1 && win.openOrders('forge')[0].product === 'steel');
+  check('Task83: a repeat order pays gold, no reputation', win.permanent.totalPrestige === 18 && Math.abs(win.state.gold - (g0 - win.shippingCost('forge', 'coalBrick', 10) + pay)) < 1e-6 && win.permanent.companies.forge.repeatDone === 1 && win.permanent.companies.forge.lastRepeat === 'coalBrick');
+  check('Task83: the repeat pay is 1.5x the base value', Math.abs(pay - 10 * win.recipeByKey('coalBrick').sell * 1.5 * (1 + win.reputationEffect('tradePrice')) * win.mult()) < 1e-6);
+})();
+
+(function test_T83_repeatOrders() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  const def = win.COMPANIES[0], p = win.permanent.companies.forge;
+  t83SetOrder(win, 'forge', def.orders.length);
+  const seen = new Set();
+  for (let i = 0; i < 40; i++) {
+    p.open = [];
+    const o = win.issueOrder('forge', Math.random);
+    check('Task83: a repeat order is for a favorite that can be made, index -1', !!o && o.index === -1 && def.favorites.includes(o.product) && !win.recipeNeedsLockedResource(win.recipeByKey(o.product)) && Number.isInteger(o.qty) && o.qty >= 1);
+    seen.add(o.product);
+    p.lastRepeat = o.product;
+  }
+  check('Task83: without the unlocked ingredients only makeable favorites are asked for (steelGear needs ruins)', !seen.has('steelGear') && seen.size >= 2);
+  p.open = []; p.lastRepeat = 'steel';
+  let again = false;
+  for (let i = 0; i < 30; i++) { p.open = []; if (win.issueOrder('forge', Math.random).product === 'steel') again = true; }
+  check('Task83: the same product is not asked twice in a row', again === false);
+  // quantity: grows 20% per lap, capped at 2x and 100
+  const last = def.orders[def.orders.length - 1], base = Math.round(last.qty * win.recipeByKey(last.product).sell / win.recipeByKey('steel').sell);
+  p.repeatDone = 0;
+  const q0 = win.repeatOrderQty(def, p, 'steel');
+  p.repeatDone = def.orders.length;
+  const q1 = win.repeatOrderQty(def, p, 'steel');
+  p.repeatDone = def.orders.length * 50;
+  const qMax = win.repeatOrderQty(def, p, 'steel');
+  check('Task83: quantity starts at the base, grows per lap and stops at the cap', q0 === Math.min(100, base) && q1 >= q0 && qMax === Math.min(100, Math.round(base * 2)) && qMax <= 100);
+  p.repeatDone = def.orders.length * 50;
+  check('Task83: the value of an order never passes 2x the base value', win.repeatOrderQty(def, p, 'coalBrick') * win.recipeByKey('coalBrick').sell <= 2 * last.qty * win.recipeByKey(last.product).sell + win.recipeByKey('coalBrick').sell);
+  t83SetOrder(win, 'forge', 0);
+  check('Task83: a company with fixed orders left asks for the fixed one, not a repeat', (p.open = [], win.issueOrder('forge', Math.random).index === 0));
+})();
+
+(function test_T83_saveAndOldSave() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  t72Open(win);
+  const def = win.COMPANIES[0], p = win.permanent.companies.forge;
+  t83SetOrder(win, 'forge', def.orders.length);
+  p.open = [{ product: 'steel', qty: 30, index: -1 }];
+  p.orderTimer = 42; p.repeatDone = 3; p.lastRepeat = 'steel';
+  win.saveGame();
+  const win2 = newDom(storage).window;
+  const q = win2.permanent.companies.forge;
+  check('Task83: open orders, timer and repeat history survive a save', q.open.length === 1 && q.open[0].product === 'steel' && q.open[0].qty === 30 && q.open[0].index === -1 && q.orderTimer === 42 && q.repeatDone === 3 && q.lastRepeat === 'steel');
+  // a save from before Task 83: no open / orderTimer fields
+  const saved = JSON.parse(storage.getItem('gachaFactorySave'));
+  delete saved.permanent.companies.forge.open; delete saved.permanent.companies.forge.orderTimer;
+  saved.permanent.companies.forge.orderIndex = 2;
+  saved.permanent.companies.harbor.orderIndex = 0;
+  storage.setItem('gachaFactorySave', JSON.stringify(saved));
+  const old = newDom(storage).window;
+  check('Task83: an older save gets the fixed order it was on', old.openOrders('forge').length === 1 && old.openOrders('forge')[0].index === 2 && old.openOrders('forge')[0].product === 'steel' && old.openOrders('forge')[0].qty === 60);
+  // invalid entries
+  [1, 'x', null, {}, [null, 3, 'a'], [{ product: 'nope', qty: 5, index: -1 }], [{ product: 'steel', qty: -4, index: -1 }], [{ product: 'steel', qty: 5, index: -1 }, { product: 'steel', qty: 5, index: -1 }, { product: 'steel', qty: 5, index: -1 }], [{ index: 4, product: 'x', qty: 9 }]].forEach((bad, i) => {
+    const sv = JSON.parse(storage.getItem('gachaFactorySave'));
+    sv.permanent.companies.forge.open = bad;
+    sv.permanent.companies.forge.orderTimer = i === 0 ? -5 : 'x';
+    storage.setItem('gachaFactorySave', JSON.stringify(sv));
+    const w = newDom(storage).window;
+    const f = w.permanent.companies.forge;
+    check('Task83: invalid open orders #' + i + ' load safely', Array.isArray(f.open) && f.open.length <= 2 && f.open.every((o) => w.recipeByKey(o.product) && Number.isInteger(o.qty) && o.qty >= 1) && f.orderTimer >= 0 && Number.isFinite(f.orderTimer));
+  });
+})();
+
+(function test_T83_orderUI() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  const doc = win.document;
+  win.renderAll();
+  check('Task83: the card shows the first order with its button', /강철 20개/.test(doc.querySelector('[data-company-order="forge"]').textContent) && !!doc.querySelector('[data-complete-order="forge"][data-order-slot="0"]'));
+  win.state.products.steel = 20; win.state.gold = 1000;
+  win.updateNumbers();
+  doc.querySelector('[data-complete-order="forge"]').click();
+  check('Task83: after completing, the card says when the next one comes', /다음 수주까지 약 \d+분 \d+초/.test(doc.querySelector('[data-company-order-wait="forge"]').textContent));
+  t83SetOrder(win, 'forge', win.COMPANIES[0].orders.length);
+  win.permanent.companies.forge.open = [{ product: 'steel', qty: 10, index: -1 }];
+  win.renderAll();
+  check('Task83: a repeat order says it pays gold', /추가 수주 · 완수 시 [\d.,]+G/.test(doc.querySelector('[data-company-order="forge"]').textContent));
+})();
+
+(function test_T83_workshopParts() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.research.workshopBuild = true; win.state.research.workshopExpansion = true;
+  win.state.gold = 1e9;
+  for (let i = 0; i < 6; i++) win.buildWorkshop();
+  check('Task83: the 7th workshop needs 2 steel gears and shows it', win.workshopBuildProducts().steelGear === 2 && win.canBuildWorkshop() === false && /강철 기어 2개/.test(win.workshopBuildLabel()));
+  win.state.products.steelGear = 2;
+  const g0 = win.state.gold;
+  win.buildWorkshop();
+  check('Task83: it takes the gold and the parts, and the 8th then needs a mana engine', win.state.world.workshops.length === 7 && win.state.products.steelGear === 0 && win.state.gold === g0 - Math.ceil(100 * Math.pow(1.6, 6)) && win.workshopBuildProducts().manaEngine === 1 && win.canBuildWorkshop() === false);
+})();
+
+(function test_T83_tradeReserve() {
+  const win = newDom(makeMemoryStorage()).window;
+  t72Open(win);
+  win.permanent.companies.forge.score = 300;
+  win.state.products.steel = 10;
+  check('Task83: stock at the reserve is not for sale', win.tradeProduct('forge') === null);
+  win.state.products.steel = 11;
+  check('Task83: one above the reserve is', win.tradeProduct('forge') === 'steel');
+  win.permanent.companies.forge.tradeTimer = 60;
+  win.tickTrades();
+  check('Task83: only the part above the reserve is sold', win.state.products.steel === 10);
 })();
 
 

@@ -121,8 +121,8 @@ const COMPANIES = [
 const REPUTATION_EFFECTS = [
   {key:'multiplier',       name:'채굴·판매 배율',  unlock:0, unit:'multiplier', desc:'모든 채굴과 판매 수익이 늘어요.'},
   {key:'shippingDiscount', name:'배송비 할인',     unlock:3, perPoint:0.02, max:0.30, unit:'percent', desc:'납품 배송비가 줄어요.'},
-  {key:'craftSpeed',       name:'제작 속도',       unlock:6, perPoint:0.02, unit:'percent', desc:'제작이 빨라져요. (레시피와 제작소)'},
-  {key:'tradePrice',       name:'정기 거래 가격',  unlock:9, perPoint:0.02, unit:'percent', desc:'정기 거래에서 더 높은 값을 받아요.'},
+  {key:'craftSpeed',       name:'제작 속도',       unlock:6, perPoint:0.02, max:0.60, unit:'percent', desc:'제작이 빨라져요. (레시피와 제작소)'},
+  {key:'tradePrice',       name:'정기 거래 가격',  unlock:9, perPoint:0.02, max:0.60, unit:'percent', desc:'정기 거래에서 더 높은 값을 받아요.'},
 ];
 const RARITY = [
   {key:'common', label:'일반', chance:60, mining:1, carry:2, move:1, cls:'common'},

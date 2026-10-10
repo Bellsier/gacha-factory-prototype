@@ -230,6 +230,11 @@ function workshopBuildCost(){
   return Math.ceil(b.BUILD_COST_BASE * Math.pow(b.BUILD_COST_GROWTH, state.world.workshops.length));
 }
 
+// Task 83: parts the next workshop costs on top of gold ({} for the first six).
+function workshopBuildProducts(){
+  return BALANCE.workshop.BUILD_PRODUCTS[state.world.workshops.length + 1] || {};
+}
+
 function workshopBuildSpot(){
   const base = state.world.base;
   const taken = (x, y) =>
@@ -254,6 +259,8 @@ function canBuildWorkshop(){
   if(!isWorkshopBuildUnlocked()) return false;
   if(state.world.workshops.length >= maxWorkshops()) return false;
   if(state.gold < workshopBuildCost()) return false;
+  const parts = workshopBuildProducts();
+  if(!Object.keys(parts).every(k => (state.products[k] || 0) >= parts[k])) return false;
   return workshopBuildSpot() !== null;
 }
 
@@ -261,9 +268,11 @@ function buildWorkshop(){
   if(!canBuildWorkshop()) return null;
   const spot = workshopBuildSpot();
   const cost = workshopBuildCost();
+  const parts = workshopBuildProducts(); // before the workshop exists: it is keyed by the next workshop's number
   const workshop = addWorkshop({ x: spot.x, y: spot.y, level: 1 });
   if(!workshop) return null;
   state.gold -= cost;
+  Object.keys(parts).forEach(k => { state.products[k] -= parts[k]; });
   log('제작소를 지었습니다. (' + spot.x + ', ' + spot.y + ')');
   return workshop;
 }

@@ -223,7 +223,9 @@ function workshopUpgradeButton(workshop){
   return '<button class="ghost" data-workshop-upgrade="' + workshop.id + '" ' + dis(!canUpgradeWorkshop(workshop.id)) + '>' + workshopUpgradeCostText(workshop) + '</button>';
 }
 function workshopBuildLabel(){
-  return '제작소 짓기 (' + fmt(workshopBuildCost()) + 'G)';
+  const parts = workshopBuildProducts();
+  const extra = Object.keys(parts).map(k => ' + ' + recipeByKey(k).name + ' ' + parts[k] + '개').join('');
+  return '제작소 짓기 (' + fmt(workshopBuildCost()) + 'G' + extra + ')';
 }
 function renderWorkshopBuild(){
   const wrap = document.getElementById('workshopBuild');
@@ -414,11 +416,28 @@ function tradeStatusText(key){
   return tradeProduct(key) ? '곧 거래' : '선호 제품을 기다리는 중';
 }
 
-function orderText(def){
-  const order = currentOrder(def.key);
-  if(!order) return '모든 수주를 완수했어요. 자유 납품은 계속 할 수 있어요.';
+// Task 83: text of one open order.
+function orderText(def, order){
   const recipe = recipeByKey(order.product);
-  return '수주: ' + recipe.name + ' ' + order.qty + '개 (보유 ' + fmt(state.products[order.product] || 0) + '개) · 배송비 ' + fmt(shippingCost(def.key, order.product, order.qty)) + 'G · 완수 시 명성 +' + orderReputation(order);
+  const reward = order.index >= 0 ? '완수 시 명성 +' + orderReputation(order) : '추가 수주 · 완수 시 ' + fmt(repeatOrderPay(order)) + 'G';
+  return '수주: ' + recipe.name + ' ' + order.qty + '개 (보유 ' + fmt(state.products[order.product] || 0) + '개) · 배송비 ' + fmt(shippingCost(def.key, order.product, order.qty)) + 'G · ' + reward;
+}
+
+// Text under the open orders: when the next one arrives, or why none will.
+function orderWaitText(def){
+  const p = companyProgress(def.key);
+  if(p.open.length >= orderCap()) return '';
+  if(p.orderIndex >= def.orders.length && repeatCandidates(def, p).length === 0) return '지금은 새 수주가 없어요.';
+  const left = Math.max(0, Math.ceil(orderArrivalSec() - p.orderTimer));
+  return '다음 수주까지 약 ' + Math.floor(left / 60) + '분 ' + (left % 60) + '초';
+}
+
+function orderRowsHtml(def){
+  const rows = openOrders(def.key).map((order, i) =>
+    '<div class="rate" data-company-order="' + def.key + '" data-order-slot="' + i + '">' + orderText(def, order) + '</div>' +
+    '<button data-complete-order="' + def.key + '" data-order-slot="' + i + '" ' + dis(!canCompleteOrder(def.key, i)) + '>수주 완수</button>'
+  ).join('');
+  return rows + '<div class="rate" data-company-order-wait="' + def.key + '">' + orderWaitText(def) + '</div>';
 }
 
 function deliverySelection(key){
@@ -494,8 +513,7 @@ function renderDelivery(){
     html +=
       '<div class="rate" data-company-score="' + def.key + '">' + companyScoreText(def) + '</div>' +
       '<div class="rate">좋아하는 것: ' + def.favorites.map(k => (recipeByKey(k) || { name: k }).name).join(', ') + ' (★ 점수 ×' + BALANCE.delivery.FAVORITE_MULT + ')</div>' +
-      '<div class="rate" data-company-order="' + def.key + '">' + orderText(def) + '</div>' +
-      (currentOrder(def.key) ? '<button data-complete-order="' + def.key + '" ' + dis(!canCompleteOrder(def.key)) + '>수주 완수</button>' : '') +
+      orderRowsHtml(def) +
       '<div class="row">' +
         '<select data-deliver-product="' + def.key + '">' + options + '</select>' +
         '<input type="number" min="1" step="1" value="1" data-deliver-qty="' + def.key + '">' +
@@ -507,7 +525,7 @@ function renderDelivery(){
   });
   wrap.querySelectorAll('[data-complete-order]').forEach(btn => {
     btn.onclick = () => {
-      if(!completeOrder(btn.dataset.completeOrder)) return;
+      if(!completeOrder(btn.dataset.completeOrder, Number(btn.dataset.orderSlot))) return;
       renderAll();
     };
   });
@@ -531,10 +549,14 @@ function updateDeliveryNumbers(){
     const key = def.key;
     const score = document.querySelector('[data-company-score="' + key + '"]');
     if(score) score.textContent = companyScoreText(def);
-    const order = document.querySelector('[data-company-order="' + key + '"]');
-    if(order) order.textContent = orderText(def);
-    const orderBtn = document.querySelector('[data-complete-order="' + key + '"]');
-    if(orderBtn) orderBtn.disabled = !canCompleteOrder(key);
+    openOrders(key).forEach((order, i) => {
+      const text = document.querySelector('[data-company-order="' + key + '"][data-order-slot="' + i + '"]');
+      if(text) text.textContent = orderText(def, order);
+      const orderBtn = document.querySelector('[data-complete-order="' + key + '"][data-order-slot="' + i + '"]');
+      if(orderBtn) orderBtn.disabled = !canCompleteOrder(key, i);
+    });
+    const wait = document.querySelector('[data-company-order-wait="' + key + '"]');
+    if(wait) wait.textContent = orderWaitText(def);
     const preview = document.querySelector('[data-deliver-preview="' + key + '"]');
     if(preview) preview.textContent = deliveryPreviewText(key);
     const btn = document.querySelector('[data-deliver="' + key + '"]');

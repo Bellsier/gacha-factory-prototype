@@ -425,7 +425,9 @@ function sanitizeRunState(raw){
 // Task 72: per-company delivery progress. Lives in `permanent` because
 // deliveries no longer reset with a run (Blueprint 15.1).
 //   score       delivery score (regular trade starts at company.regularScore)
-//   orderIndex  how many of the company's orders were completed
+//   orderIndex  how many of the company's fixed orders were completed
+//   open        open orders (Task 83: fixed or repeat, see delivery.js), orderTimer: seconds
+//               since the company had room, repeatDone / lastRepeat: repeat order history
 //   sent        units delivered per product (scoring decay for repeats)
 //   tradeTimer  seconds since the last regular-trade purchase (Task 73)
 function freshCompaniesState(){
@@ -433,10 +435,32 @@ function freshCompaniesState(){
   COMPANIES.forEach(c => {
     const sent = {};
     RECIPES.forEach(r => { sent[r.key] = 0; });
-    out[c.key] = { score: 0, orderIndex: 0, sent, tradeTimer: 0 };
+    // Task 83: the first fixed order is open from the start.
+    out[c.key] = { score: 0, orderIndex: 0, sent, tradeTimer: 0, open: [{ product: c.orders[0].product, qty: c.orders[0].qty, index: 0 }], orderTimer: 0, repeatDone: 0, lastRepeat: null };
   });
   return out;
 }
+// Task 83: open orders. A save from before Task 83 has none: it gets the
+// fixed order it was on. A fixed entry must be the company's next fixed order
+// (its product and quantity come from the company, not the save); a repeat
+// entry needs a real product and a quantity within the cap.
+function sanitizeOpenOrders(raw, def, orderIndex){
+  const fixedNow = () => def.orders[orderIndex] ? [{ product: def.orders[orderIndex].product, qty: def.orders[orderIndex].qty, index: orderIndex }] : [];
+  if(!Array.isArray(raw)) return fixedNow();
+  const out = [];
+  raw.forEach(o => {
+    if(!isPlainObject(o) || out.length >= 2) return;
+    if(Number.isInteger(o.index) && o.index >= 0){
+      const fixed = fixedNow()[0];
+      if(fixed && o.index === orderIndex && !out.some(x => x.index >= 0)) out.push(fixed);
+    } else if(typeof o.product === 'string' && RECIPES.some(r => r.key === o.product) &&
+              Number.isInteger(o.qty) && o.qty >= 1 && o.qty <= BALANCE.orders.REPEAT_MAX_QTY && orderIndex >= def.orders.length){
+      out.push({ product: o.product, qty: o.qty, index: -1 });
+    }
+  });
+  return out;
+}
+
 function sanitizeCompaniesState(raw){
   const out = freshCompaniesState();
   if(!isPlainObject(raw)) return out;
@@ -447,6 +471,10 @@ function sanitizeCompaniesState(raw){
     out[c.key].orderIndex = (Number.isInteger(r.orderIndex) && r.orderIndex >= 0) ? Math.min(r.orderIndex, c.orders.length) : 0;
     out[c.key].tradeTimer = isNonNegativeFinite(r.tradeTimer) ? Math.min(r.tradeTimer, BALANCE.delivery.TRADE_INTERVAL_SEC) : 0;
     out[c.key].sent = sanitizeNumberMap(r.sent, RECIPES.map(x => x.key), 0, isNonNegativeFinite);
+    out[c.key].open = sanitizeOpenOrders(r.open, c, out[c.key].orderIndex);
+    out[c.key].orderTimer = isNonNegativeFinite(r.orderTimer) ? r.orderTimer : 0;
+    out[c.key].repeatDone = (Number.isInteger(r.repeatDone) && r.repeatDone >= 0) ? r.repeatDone : 0;
+    out[c.key].lastRepeat = (typeof r.lastRepeat === 'string' && RECIPES.some(x => x.key === r.lastRepeat)) ? r.lastRepeat : null;
   });
   return out;
 }

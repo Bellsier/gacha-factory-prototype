@@ -14,10 +14,13 @@ const BALANCE = {
   // effect in REPUTATION_EFFECTS (data.js) opens at its own reputation and
   // grows with it; nothing counts reputation beyond MAX.
   reputation: {
-    MAX: 30,                    // reputation beyond this adds nothing
-    MULT_PER_POINT: 0.15,       // mult(): +15% per point up to MULT_SOFT_AT ...
-    MULT_SOFT_AT: 15,
-    MULT_PER_POINT_SOFT: 0.05,  // ... and +5% per point above it (Task 76: gentler growth)
+    // Task 83: MAX = the total reputation of all fixed orders (36), so finishing
+    // every order reaches it exactly. The multiplier is ~x4.0 there, as before:
+    // 18 * 0.12 + 18 * 0.045 = +2.97.
+    MAX: 36,                    // reputation beyond this adds nothing
+    MULT_PER_POINT: 0.12,       // mult(): +12% per point up to MULT_SOFT_AT ...
+    MULT_SOFT_AT: 18,
+    MULT_PER_POINT_SOFT: 0.045, // ... and +4.5% per point above it (Task 76: gentler growth)
   },
   // Task 72: delivery and partner companies (Blueprint 15.1).
   delivery: {
@@ -31,6 +34,21 @@ const BALANCE = {
     TRADE_INTERVAL_SEC: 60,        // regular trade: one purchase per company every this many seconds (waits for stock)
     TRADE_QTY: 5,                  // regular trade: units bought per purchase
     TRADE_PRICE_MULT: 1.3,         // regular trade: price paid = sell price * this * mult()
+    TRADE_RESERVE: 10,             // Task 83: regular trade never sells the last this many units of a product (research / site / upgrade costs)
+  },
+  // Task 83: how orders arrive. Each company starts with its first fixed order
+  // open; after that a new one arrives every arrival interval while the company
+  // has fewer than orderCap() open orders. The interval shrinks linearly with
+  // reputation (START at 0, MIN at reputation MAX). Once a company's fixed
+  // list is done, its orders are random repeat orders: gold only, no reputation.
+  orders: {
+    ARRIVAL_SEC_START: 300,
+    ARRIVAL_SEC_MIN: 60,
+    SECOND_SLOT_AT: 18,         // reputation at which a company can hold 2 open orders (1 before)
+    REPEAT_PAY_MULT: 1.5,       // repeat order pays qty * sell * this * (1 + tradePrice effect) * mult()
+    REPEAT_LAP_GROWTH: 0.2,     // repeat quantity grows this much per lap (a lap = the company's fixed order count)
+    REPEAT_QTY_CAP_MULT: 2,     // ... but never above this times the base quantity
+    REPEAT_MAX_QTY: 100,        // hard cap on one repeat order's quantity
   },
   hq: {
     MULTIPLIER_PER_LEVEL: 0.08, // hqMult(): run-scoped multiplier gained per HQ level
@@ -62,6 +80,8 @@ const BALANCE = {
     BUILD_COST_BASE: 100,
     BUILD_COST_GROWTH: 1.6,
     MAX_COUNT: 6,
+    // Task 83: the 7th and 8th workshop (after 제작소 증축) also take upper parts, keyed by the workshop's number.
+    BUILD_PRODUCTS: { 7: { steelGear: 2 }, 8: { manaEngine: 1 } },
     // Task 79: upgrading one workshop (each level = +WORKSHOP_LEVEL_SPEED_PER_LEVEL craft speed).
     // Gold: round(UPGRADE_COST_BASE * UPGRADE_COST_GROWTH^(level-1)) to go from `level` to level+1.
     // Products: UPGRADE_PRODUCTS[target level] is paid in addition (only for the high levels).

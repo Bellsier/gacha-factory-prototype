@@ -430,6 +430,7 @@ function tickLoop(){
   tickCrafting();
   tickWorkshops();
   tickTrades(); // Task 73: regular trade with partner companies
+  if(tickOrders().length && typeof renderDelivery === 'function') renderDelivery(); // Task 83: new orders
   tickAutoSell();
   tickPlayer();
   tickExploration(); // Task 65

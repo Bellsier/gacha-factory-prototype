@@ -136,54 +136,157 @@ function isRegularTrade(key){
   return !!def && !!p && p.score >= def.regularScore;
 }
 
-// The company's next order, or null when all are done or it is not open.
+// ---------------------------------------------------------------------------
+// Task 83: orders. A company holds its open orders in permanent.companies[key].open:
+//   { product, qty, index }  index >= 0: the company's fixed order number `index`
+//                            (pays reputation, in list order, one open at a time)
+//                            index -1: a random repeat order (gold only)
+// New orders arrive over time (tickOrders). See BALANCE.orders.
+// ---------------------------------------------------------------------------
+function orderCap(){
+  return permanent.totalPrestige >= BALANCE.orders.SECOND_SLOT_AT ? 2 : 1;
+}
+
+// Seconds between order arrivals right now: START at reputation 0, MIN at the cap.
+function orderArrivalSec(){
+  const o = BALANCE.orders;
+  const share = Math.min(1, permanent.totalPrestige / BALANCE.reputation.MAX);
+  return o.ARRIVAL_SEC_START + (o.ARRIVAL_SEC_MIN - o.ARRIVAL_SEC_START) * share;
+}
+
+function openOrders(key){
+  const p = companyProgress(key);
+  return p && Array.isArray(p.open) ? p.open : [];
+}
+
+// The company's first open order, or null when it has none (yet).
 function currentOrder(key){
-  const def = companyDef(key), p = companyProgress(key);
-  if(!def || !p || p.orderIndex >= def.orders.length) return null;
-  return def.orders[p.orderIndex];
+  return openOrders(key)[0] || null;
 }
 
 // Reputation an order pays: floor(sqrt(base value / divisor)), at most the cap.
+// A repeat order pays none.
 function orderReputation(order){
   const recipe = order && recipeByKey(order.product);
-  if(!recipe) return 0;
+  if(!recipe || order.index < 0) return 0;
   const b = BALANCE.delivery;
   const rep = Math.floor(Math.sqrt(order.qty * recipe.sell / b.ORDER_VALUE_DIVISOR));
   return Math.min(b.ORDER_REPUTATION_CAP, Math.max(0, rep));
 }
 
-function canCompleteOrder(key){
-  const order = currentOrder(key);
+// Gold a repeat order pays on completion.
+function repeatOrderPay(order){
+  const recipe = order && recipeByKey(order.product);
+  if(!recipe) return 0;
+  return order.qty * recipe.sell * BALANCE.orders.REPEAT_PAY_MULT * (1 + reputationEffect('tradePrice')) * mult();
+}
+
+// The company's next fixed order if one is still to come and none is open.
+function nextFixedOrder(def, p){
+  if(p.open.some(o => o.index >= 0)) return null;
+  const o = def.orders[p.orderIndex];
+  return o ? { product: o.product, qty: o.qty, index: p.orderIndex } : null;
+}
+
+// Products a repeat order may ask for: the company's favorites that can be
+// made now, not the same as the last repeat order when there is a choice.
+function repeatCandidates(def, p){
+  const all = def.favorites.filter(k => recipeByKey(k) && !recipeNeedsLockedResource(recipeByKey(k)));
+  const other = all.filter(k => k !== p.lastRepeat);
+  return other.length ? other : all;
+}
+
+// Base quantity: the value of the company's last fixed order, in this product.
+// It grows by REPEAT_LAP_GROWTH per lap, up to REPEAT_QTY_CAP_MULT times.
+function repeatOrderQty(def, p, productKey){
+  const o = BALANCE.orders;
+  const last = def.orders[def.orders.length - 1];
+  const sell = recipeByKey(productKey).sell;
+  const base = Math.max(1, Math.round(last.qty * recipeByKey(last.product).sell / sell));
+  const lap = Math.floor(p.repeatDone / def.orders.length);
+  const factor = Math.min(o.REPEAT_QTY_CAP_MULT, 1 + o.REPEAT_LAP_GROWTH * lap);
+  return Math.min(o.REPEAT_MAX_QTY, Math.max(1, Math.round(base * factor)));
+}
+
+function makeRepeatOrder(def, p, random){
+  const list = repeatCandidates(def, p);
+  if(!list.length) return null;
+  const productKey = list[Math.min(list.length - 1, Math.floor(random() * list.length))];
+  return { product: productKey, qty: repeatOrderQty(def, p, productKey), index: -1 };
+}
+
+// Opens one new order for the company (the next fixed one, else a repeat).
+// Returns it, or null when the company is full or has nothing to ask for.
+function issueOrder(key, random){
+  const def = companyDef(key), p = companyProgress(key);
+  if(!def || !p || p.open.length >= orderCap()) return null;
+  const order = nextFixedOrder(def, p) || (p.orderIndex >= def.orders.length ? makeRepeatOrder(def, p, random || Math.random) : null);
+  if(order) p.open.push(order);
+  return order;
+}
+
+// One tick: a company with room waits the arrival interval, then gets an order.
+// Returns the keys of the companies that got one.
+function tickOrders(random){
+  const got = [];
+  COMPANIES.forEach(def => {
+    if(!isCompanyOpen(def.key)) return;
+    const p = companyProgress(def.key);
+    if(p.open.length >= orderCap()){ p.orderTimer = 0; return; }
+    p.orderTimer += 1 / TICKS_PER_SECOND;
+    if(p.orderTimer < orderArrivalSec()) return;
+    p.orderTimer = 0;
+    if(issueOrder(def.key, random)) got.push(def.key);
+  });
+  return got;
+}
+
+function canCompleteOrder(key, slot){
+  const order = openOrders(key)[slot || 0];
   return !!order && isCompanyOpen(key) && canDeliver(key, order.product, order.qty);
 }
 
-// Completes the company's current order in one go. Returns the reputation
-// gained (0 on failure; nothing is spent then).
-function completeOrder(key){
-  if(!canCompleteOrder(key)) return 0;
-  const def = companyDef(key), p = companyProgress(key), order = currentOrder(key);
-  const rep = orderReputation(order);
+// Completes one of the company's open orders (the first by default) in one go.
+// Returns a positive number on success — the reputation gained for a fixed
+// order, the gold paid for a repeat order — and 0 on failure (nothing is spent).
+function completeOrder(key, slot){
+  const i = slot || 0;
+  if(!canCompleteOrder(key, i)) return 0;
+  const def = companyDef(key), p = companyProgress(key), order = p.open[i];
   const wasRegular = isRegularTrade(key);
   const slotsBefore = companySlots();
   const effectsBefore = REPUTATION_EFFECTS.filter(e => isReputationEffectOpen(e.key));
   applyDelivery(key, order.product, order.qty);
-  p.orderIndex += 1;
-  permanent.totalPrestige += rep;
-  log(def.name + '의 수주를 완수했습니다. 명성 +' + rep);
+  p.open.splice(i, 1);
+  let result;
+  if(order.index >= 0){
+    result = orderReputation(order);
+    p.orderIndex += 1;
+    permanent.totalPrestige += result;
+    log(def.name + '의 수주를 완수했습니다. 명성 +' + result);
+  } else {
+    result = repeatOrderPay(order);
+    p.repeatDone += 1;
+    p.lastRepeat = order.product;
+    state.gold += result;
+    log(def.name + '의 추가 수주를 완수했습니다. +' + fmt(result) + 'G');
+  }
   logRegularTradeStart(def, wasRegular);
   if(companySlots() > slotsBefore) log('명성이 올라 새 회사와 거래할 수 있게 되었습니다.');
   REPUTATION_EFFECTS.filter(e => isReputationEffectOpen(e.key) && !effectsBefore.includes(e)).forEach(e => log('명성 효과가 열렸습니다: ' + e.name));
-  return rep;
+  return result;
 }
 
 // Task 73: regular trade. Every TRADE_INTERVAL_SEC a company with a regular
 // trade buys up to TRADE_QTY units of the first favorite product in stock and
 // pays above the normal price. With nothing in stock it simply waits (no
-// penalty); the purchase happens as soon as stock exists.
+// penalty); the purchase happens as soon as stock exists. Task 83: the last
+// TRADE_RESERVE units of a product are never sold this way.
 function tradeProduct(key){
   const def = companyDef(key);
   if(!def) return null;
-  return def.favorites.find(k => (state.products[k] || 0) >= 1) || null;
+  const reserve = BALANCE.delivery.TRADE_RESERVE;
+  return def.favorites.find(k => (state.products[k] || 0) >= reserve + 1) || null;
 }
 
 function tickTrades(){
@@ -196,7 +299,7 @@ function tickTrades(){
     if(p.tradeTimer < interval) return;
     const productKey = tradeProduct(def.key);
     if(!productKey) return;
-    const qty = Math.min(tradeQty(),Math.floor(state.products[productKey]));
+    const qty = Math.min(tradeQty(), Math.floor(state.products[productKey]) - b.TRADE_RESERVE);
     const recipe = recipeByKey(productKey);
     const earned = qty * recipe.sell * b.TRADE_PRICE_MULT * (1 + reputationEffect('tradePrice')) * mult();
     state.products[productKey] -= qty;
