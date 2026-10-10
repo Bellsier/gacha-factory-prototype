@@ -297,6 +297,46 @@ function upgradeWorkshop(workshopId){
   return true;
 }
 
+// Task 81: bottleneck report. What a recipe is short of, what each workshop is
+// doing, and which items are missing across the workshops that are stuck.
+function itemName(key){
+  const res = resourceByKey(key);
+  if(res) return res.name;
+  const rec = recipeByKey(key);
+  return rec ? rec.name : key;
+}
+function recipeShortages(recipe){
+  if(!recipe) return [];
+  return Object.entries(recipe.need)
+    .map(([k, v]) => ({ key: k, name: itemName(k), need: v, have: Math.floor(stockOf(k) || 0) }))
+    .filter(s => s.have < s.need);
+}
+// 'working' | 'noRecipe' | 'blocked' (short of inputs) | 'waiting' (can start, nobody told it to)
+function workshopStatus(workshop){
+  const recipe = recipeByKey(workshop.recipeKey);
+  if(workshop.progress !== null && recipe) return { state: 'working', recipe, shortages: [] };
+  if(!recipe) return { state: 'noRecipe', recipe: null, shortages: [] };
+  const shortages = recipeShortages(recipe);
+  if(shortages.length) return { state: 'blocked', recipe, shortages };
+  return { state: workshop.auto && isAutoCraftUnlocked() ? 'working' : 'waiting', recipe, shortages: [] };
+}
+function bottleneckReport(){
+  const idle = [];
+  const missing = {};
+  state.world.workshops.forEach((w, i) => {
+    const st = workshopStatus(w);
+    if(st.state === 'working') return;
+    idle.push({ index: i + 1, id: w.id, state: st.state, recipe: st.recipe, shortages: st.shortages });
+    st.shortages.forEach(s => {
+      const m = missing[s.key] || (missing[s.key] = { key: s.key, name: s.name, short: 0, workshops: 0 });
+      m.short += s.need - s.have;
+      m.workshops += 1;
+    });
+  });
+  const items = Object.keys(missing).map(k => missing[k]).sort((a, b) => b.workshops - a.workshops || b.short - a.short);
+  return { idle, items };
+}
+
 function workshopRecipe(workshopId){
   if(typeof workshopId !== 'string' || workshopId.length === 0) return null;
   const workshop = workshopById(workshopId);

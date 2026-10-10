@@ -125,6 +125,21 @@ function newDom(storage, opts) {
     TICK_MS: { get: () => win.__expose.TICK_MS(), configurable: true },
     TICKS_PER_SECOND: { get: () => win.__expose.TICKS_PER_SECOND(), configurable: true },
   });
+  // Task 81: sites also cost upper parts. Older tests only care about gold, so
+  // by default the parts check always passes and unlockSite is given the parts
+  // right before it runs. Task 81 tests set win.__strictSites = true to test
+  // the real rule.
+  const realSiteProductsMet = win.siteProductsMet;
+  const realUnlockSite = win.unlockSite;
+  win.siteProductsMet = (site) => win.__strictSites ? realSiteProductsMet(site) : true;
+  win.unlockSite = (key) => {
+    const site = win.SITES.find((x) => x.key === key);
+    if (site && !win.__strictSites) {
+      const need = site.unlockProducts || {};
+      Object.keys(need).forEach((k) => { if ((win.state.products[k] || 0) < need[k]) win.state.products[k] = need[k]; });
+    }
+    return realUnlockSite(key);
+  };
   if (!options.fullWorld && !hadSave) {
     win.state.world.mines = win.state.world.mines.filter(m => !(m && typeof m.id === 'string' && m.id.startsWith('mine_ring_')));
     // Task 65: drop the stripped mines' undiscovered entries too.

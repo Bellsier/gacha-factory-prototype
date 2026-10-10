@@ -1,8 +1,11 @@
+// Task 81: unlockProducts = products paid on top of the gold. Each one must be
+// makeable before the site is open (no circular cost): steelGear needs rareMetal
+// (ruins), so the ruins cost only uses parts of the earlier sites.
 const SITES = [
-  {key:'abandonedMine', name:'폐광 지대', unlockCost:0},
-  {key:'manaVein', name:'마정석 광맥', unlockCost:700},
-  {key:'ruins', name:'고대 유적', unlockCost:2500},
-  {key:'spaceStation', name:'우주 정거장', unlockCost:9000},
+  {key:'abandonedMine', name:'폐광 지대', unlockCost:0, unlockProducts:{}},
+  {key:'manaVein', name:'마정석 광맥', unlockCost:700, unlockProducts:{steel:5}},
+  {key:'ruins', name:'고대 유적', unlockCost:2500, unlockProducts:{manaLamp:3, crystalLens:2}},
+  {key:'spaceStation', name:'우주 정거장', unlockCost:9000, unlockProducts:{steelGear:3, relicOrnament:2}},
 ];
 const RESOURCES = [
   {key:'iron', name:'철광석', base:1, site:'abandonedMine'},

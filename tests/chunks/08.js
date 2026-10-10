@@ -3498,6 +3498,73 @@ const T79_ONLY = ['specialAlloy', 'steelGear', 'relicOrnament', 'precisionPart',
   check('Task80: the research tab shows a card for each research once', win2.document.querySelectorAll('[data-research-card]').length === win2.RESEARCH.length);
 })();
 
+// ---------------------------------------------------------------------------
+// Task 81: site costs with upper parts, and the bottleneck display
+// ---------------------------------------------------------------------------
+(function test_T81_siteCosts() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.__strictSites = true;
+  const S = (k) => win.SITES.find((s) => s.key === k);
+  check('Task81: later sites ask for products as well as gold', Object.keys(S('manaVein').unlockProducts).length >= 1 && Object.keys(S('ruins').unlockProducts).length >= 1 && Object.keys(S('spaceStation').unlockProducts).length >= 1 && Object.keys(S('abandonedMine').unlockProducts).length === 0);
+  // every part must be makeable before its own site opens: raw chain only from earlier sites
+  const order = win.SITES.map((s) => s.key);
+  const ok = win.SITES.every((site) => Object.keys(site.unlockProducts).every((p) => {
+    const raws = win.recipeRawResources(win.recipeByKey(p));
+    return Array.from(raws).every((r) => order.indexOf(win.RESOURCES.find((x) => x.key === r).site) < order.indexOf(site.key));
+  }));
+  check('Task81: no site needs a part that can only be made after that site', ok);
+  win.state.gold = 100000;
+  check('Task81: gold alone is not enough', win.canUnlockSite(S('manaVein')) === false && win.unlockSite('manaVein') === false && win.state.gold === 100000 && win.state.unlockedSites.manaVein === false);
+  win.state.products.steel = 5;
+  check('Task81: with the parts it opens and spends both', win.unlockSite('manaVein') === true && win.state.gold === 99300 && win.state.products.steel === 0 && win.state.unlockedSites.manaVein === true);
+  win.state.products.manaLamp = 3; win.state.products.crystalLens = 1;
+  check('Task81: one part short blocks base expansion and nothing changes', win.expandBase() === false && win.state.products.manaLamp === 3 && win.state.world.base.level === 1);
+  win.state.products.crystalLens = 2;
+  check('Task81: expansion pays the parts too', win.expandBase() === true && win.state.products.manaLamp === 0 && win.state.products.crystalLens === 0 && win.state.world.base.level === 2);
+  check('Task81: the cost text names gold and parts', win.siteCostText(S('ruins')).includes('2500G') && win.siteCostText(S('ruins')).includes('마정 램프 3개'));
+})();
+
+(function test_T81_siteButton() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.__strictSites = true;
+  win.state.gold = 5000;
+  win.renderAll();
+  const btn = () => win.document.querySelector('[data-expand-base]');
+  check('Task81: the expand button lists the parts and is disabled without them', btn().textContent.includes('강철') && btn().disabled === true);
+  win.state.products.steel = 5;
+  win.updateNumbers();
+  check('Task81: ...and turns on once they are in stock', btn().disabled === false);
+})();
+
+(function test_T81_bottleneck() {
+  const win = newDom(makeMemoryStorage()).window;
+  win.state.research.workshopBuild = true;
+  win.state.unlockedSites.manaVein = true;
+  win.state.gold = 100000;
+  win.buildWorkshop(); win.buildWorkshop(); win.buildWorkshop();
+  const [a, b, c] = win.state.world.workshops;
+  win.setWorkshopRecipe(a.id, 'steel');
+  win.setWorkshopRecipe(b.id, 'steel');
+  win.state.resources.iron = 0; win.state.resources.coal = 0;
+  let rep = win.bottleneckReport();
+  check('Task81: a workshop without a recipe is reported', rep.idle.some((w) => w.id === c.id && w.state === 'noRecipe'));
+  check('Task81: a workshop short of inputs lists exactly what is missing', rep.idle.find((w) => w.id === a.id).state === 'blocked' && rep.idle.find((w) => w.id === a.id).shortages.every((s) => s.need > s.have));
+  check('Task81: the totals count how many workshops lack each item', rep.items.length >= 1 && rep.items[0].workshops === 2);
+  win.state.resources.iron = 100; win.state.resources.coal = 100;
+  win.state.products.steel = 0;
+  rep = win.bottleneckReport();
+  check('Task81: with stock a workshop is waiting (not blocked)', rep.idle.find((w) => w.id === a.id).state === 'waiting' && rep.items.length === 0);
+  win.setWorkshopRecipe(a.id, 'ironTool'); win.state.products.coalBrick = 2;
+  check('Task81: the timed craft starts', win.craftWorkshop(a.id) === true && a.progress !== null);
+  rep = win.bottleneckReport();
+  check('Task81: a working workshop is not listed', !rep.idle.some((w) => w.id === a.id));
+  win.updateBottleneck();
+  const el = win.document.getElementById('bottleneck');
+  check('Task81: the panel shows the idle workshops and no duplicate lines after a refresh', el.querySelectorAll('[data-idle-workshop]').length === rep.idle.length);
+  win.updateBottleneck();
+  check('Task81: refreshing does not change the panel', el.querySelectorAll('[data-idle-workshop]').length === rep.idle.length);
+})();
+
 
 // SUMMARY
 // =============================================================================

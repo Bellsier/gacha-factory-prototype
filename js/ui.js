@@ -57,12 +57,12 @@ function renderBaseInfo(){
       '<div class="res-name">거점 Lv.' + state.world.base.level + '</div>' +
       '<div class="rate">위치 (' + state.world.base.x + ', ' + state.world.base.y + ')</div>' +
       (nextSite
-        ? '<button class="ghost" data-expand-base>다음 지역 확장 (' + nextSite.unlockCost + 'G)</button>'
+        ? '<button class="ghost" data-expand-base>다음 지역 확장 (' + siteCostText(nextSite) + ')</button>'
         : '<div class="rate">모든 지역을 개척했습니다.</div>') +
     '</div>';
   const btn = wrap.querySelector('[data-expand-base]');
   if(btn){
-    btn.disabled = state.gold < nextSite.unlockCost;
+    btn.disabled = !canUnlockSite(nextSite);
     btn.onclick = ()=>{
       if(!expandBase()) return;
       renderAll();
@@ -130,7 +130,7 @@ function buildLines(){
         <div class="lines">
           <div class="line locked">
             <div class="rate">이 채굴장은 아직 탐사하지 않았습니다.<br>탐사하면 이곳만의 고유 광물(${siteResources.map(r=>r.name).join(', ')})을 캘 수 있어요.${relatedRecipes.length ? '<br>관련 제작품: ' + relatedRecipes.join(', ') : ''}</div>
-            <button data-unlocksite="${site.key}" ${dis(state.gold < site.unlockCost)}>채굴장 탐사 (${site.unlockCost}G)</button>
+            <button data-unlocksite="${site.key}" ${dis(!canUnlockSite(site))}>채굴장 탐사 (${siteCostText(site)})</button>
           </div>
         </div>
       `;
@@ -242,6 +242,31 @@ function renderWorkshopBuild(){
     renderAll();
   };
   wrap.appendChild(btn);
+}
+
+// Task 81: shows which workshops stand idle and what they lack. The HTML is
+// only replaced when it changed, so the tick stays cheap.
+function bottleneckHtml(){
+  if(state.world.workshops.length === 0) return '';
+  const rep = bottleneckReport();
+  if(rep.idle.length === 0) return '<div class="rate">모든 제작소가 일하고 있습니다.</div>';
+  const label = { noRecipe: '레시피를 정하지 않았어요', waiting: '재료는 있지만 제작을 시작하지 않았어요' };
+  const lines = rep.idle.map(w => '<div class="rate" data-idle-workshop="' + w.id + '">제작소 ' + w.index + ': ' +
+    (w.state === 'blocked'
+      ? w.recipe.name + ' — ' + w.shortages.map(s => s.name + ' ' + (s.need - s.have) + '개 부족').join(', ')
+      : label[w.state]) + '</div>').join('');
+  const top = rep.items.length
+    ? '<div class="rate" data-bottleneck-top>가장 필요한 재료: ' + rep.items.slice(0, 3).map(i => i.name + ' (' + i.workshops + '곳)').join(', ') + '</div>'
+    : '';
+  return top + lines;
+}
+function updateBottleneck(){
+  const wrap = document.getElementById('bottleneck');
+  if(!wrap) return;
+  const html = bottleneckHtml();
+  if(wrap.dataset.html === html) return;
+  wrap.dataset.html = html;
+  wrap.innerHTML = html;
 }
 
 function renderWorkshops(){
@@ -701,7 +726,7 @@ function updateNumbers(){
   });
   SITES.forEach(s=>{
     const unlockBtn = document.querySelector(`[data-unlocksite="${s.key}"]`);
-    if(unlockBtn) unlockBtn.disabled = state.gold < s.unlockCost;
+    if(unlockBtn) unlockBtn.disabled = !canUnlockSite(s);
   });
   RECIPES.forEach(r=>{
     const stockEl = document.querySelector(`[data-stock="${r.key}"]`);
@@ -742,6 +767,7 @@ function updateNumbers(){
   });
   updateDeliveryNumbers();
   updateReputationNumbers();
+  updateBottleneck();
   const buildBtn = document.querySelector('[data-build-workshop]');
   if(buildBtn){ buildBtn.disabled = !canBuildWorkshop(); buildBtn.textContent = workshopBuildLabel(); }
   RESEARCH.forEach(def=>{
@@ -753,7 +779,7 @@ function updateNumbers(){
   const expandBtn = document.querySelector('[data-expand-base]');
   if(expandBtn){
     const nextSite = nextExpansionSite();
-    expandBtn.disabled = !nextSite || state.gold < nextSite.unlockCost;
+    expandBtn.disabled = !nextSite || !canUnlockSite(nextSite);
   }
   document.querySelectorAll('[data-upstat]').forEach(btn=>{
     const workerId = btn.dataset.workerId;

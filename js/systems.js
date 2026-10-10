@@ -131,10 +131,26 @@ function seedWorldMinesForSite(siteKey){
   });
 }
 
+// Task 81: a site costs gold plus (for later sites) upper parts.
+function siteProductsMet(site){
+  const need = site.unlockProducts || {};
+  return Object.keys(need).every(k => (state.products[k] || 0) >= need[k]);
+}
+function canUnlockSite(site){
+  return !!site && !state.unlockedSites[site.key] && state.gold >= site.unlockCost && siteProductsMet(site);
+}
+function siteCostText(site){
+  const need = site.unlockProducts || {};
+  const parts = [site.unlockCost + 'G'];
+  Object.keys(need).forEach(k => { const r = recipeByKey(k); parts.push((r ? r.name : k) + ' ' + need[k] + '개'); });
+  return parts.join(' + ');
+}
+
 function unlockSite(key){
   const site = SITES.find(s=>s.key===key);
   if(!site || state.unlockedSites[key]) return false;
-  if(state.gold < site.unlockCost) return false;
+  if(!canUnlockSite(site)) return false;
+  Object.keys(site.unlockProducts || {}).forEach(k => { state.products[k] -= site.unlockProducts[k]; });
   state.gold -= site.unlockCost;
   state.unlockedSites[key] = true;
   seedWorldMinesForSite(key);
@@ -148,7 +164,7 @@ function expandBase(){
   if(!nextKey) return false;
   const site = SITES.find(s=>s.key===nextKey);
   if(!site) return false;
-  if(state.gold < site.unlockCost) return false;
+  if(!canUnlockSite(site)) return false;
   if(!unlockSite(nextKey)) return false;
   state.world.base.level += 1;
   log(`거점 확장 Lv.${state.world.base.level}`);
