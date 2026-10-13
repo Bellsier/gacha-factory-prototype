@@ -695,18 +695,19 @@ function renderWorldTerrain(){
     layer.appendChild(el);
   });
   const t = terrainTunnel();
+  const unlocked = isBeyondAccessible();
   const tunnel = document.createElement('div');
-  tunnel.className = 'world-tunnel' + (t.locked ? ' is-locked' : '');
+  tunnel.className = 'world-tunnel' + (unlocked ? ' is-open' : ' is-locked');
   tunnel.setAttribute('data-tunnel', '');
-  tunnel.setAttribute('data-tunnel-locked', t.locked ? 'true' : 'false');
-  tunnel.title = t.locked ? '터널 (잠김) — 아직 통과할 수 없습니다' : '터널';
+  tunnel.setAttribute('data-tunnel-locked', unlocked ? 'false' : 'true');
+  tunnel.title = unlocked ? '산악 터널 (개통)' : '산악 터널 (잠김)';
   placeOnStage(tunnel, t.gateX + 0.15, t.y + t.halfWidth);
   layer.appendChild(tunnel);
   // The label is its own element above the terrain so nearer peaks never hide it.
   const label = document.createElement('div');
   label.className = 'world-tunnel-label';
   label.setAttribute('data-tunnel-label', '');
-  label.textContent = t.locked ? '🔒 잠긴 터널' : '터널';
+  label.textContent = unlocked ? '열린 터널' : '🔒 잠긴 터널';
   placeOnStage(label, t.mouthX + 0.2, t.y + t.halfWidth);
   label.style.zIndex = '4500';
   layer.appendChild(label);
@@ -778,7 +779,7 @@ function renderExplorationMap(){
   const faceLine = terrainFaceOutline(b.BOUNDS_MIN_Y, b.BOUNDS_MAX_Y);
   el('polygon', { class: 'world-map-mountain', 'data-map-mountain': '', points: [{ x: b.BOUNDS_MIN_X, y: b.BOUNDS_MIN_Y }, ...faceLine, { x: b.BOUNDS_MIN_X, y: b.BOUNDS_MAX_Y }].map(p => p.x + ',' + p.y).join(' ') });
   const tn = terrainTunnel();
-  el('rect', { class: 'world-map-tunnel', 'data-map-tunnel': '', x: tn.gateX, y: tn.y - tn.halfWidth, width: tn.mouthX - tn.gateX, height: tn.halfWidth * 2 });
+  el('rect', { class: 'world-map-tunnel ' + (isBeyondAccessible() ? 'is-open' : 'is-locked'), 'data-map-tunnel': '', 'data-map-tunnel-locked': isBeyondAccessible() ? 'false' : 'true', x: terrainRangeBackX(tn.y), y: tn.y - tn.halfWidth, width: tn.mouthX - terrainRangeBackX(tn.y), height: tn.halfWidth * 2 });
   const base = state.world.base;
   el('rect', { class: 'world-map-base', 'data-map-base': '', x: base.x - 0.6, y: base.y - 0.6, width: 1.2, height: 1.2 });
   state.world.mines.forEach(mine => {
@@ -834,6 +835,7 @@ function renderWorldWorkshopMarkers(){
 //   null                      -> nothing selected
 //   { type: 'base' }          -> the base
 //   { type: 'mine', id }      -> the mine with that id in state.world.mines
+//   { type: 'tunnel' }        -> the mountain tunnel
 // ---------------------------------------------------------------------------
 let worldSelection = null;
 
@@ -844,6 +846,7 @@ function getWorldSelection(){
 function isWorldSelectionValid(sel){
   if(!sel) return true;
   if(sel.type === 'base') return true;
+  if(sel.type === 'tunnel') return true;
   if(sel.type === 'mine') return state.world.mines.some(m => m && m.id === sel.id);
   return false;
 }
@@ -851,6 +854,7 @@ function isWorldSelectionValid(sel){
 function selectWorldObject(type, id){
   let next = null;
   if(type === 'base') next = { type: 'base' };
+  else if(type === 'tunnel') next = { type: 'tunnel' };
   else if(type === 'mine' && typeof id === 'string') next = { type: 'mine', id };
   if(!next || !isWorldSelectionValid(next)) return false;
   worldSelection = next;
@@ -870,9 +874,12 @@ function applyWorldSelection(){
   const stage = document.getElementById('worldStage');
   if(!stage) return;
   const sel = worldSelection;
-  stage.setAttribute('data-world-selected', sel ? (sel.type === 'mine' ? 'mine:' + sel.id : 'base') : '');
+  stage.setAttribute('data-world-selected', sel ? (sel.type === 'mine' ? 'mine:' + sel.id : sel.type) : '');
   const marker = stage.querySelector('.world-base-marker');
   if(marker) marker.classList.toggle('is-selected', !!sel && sel.type === 'base');
+  stage.querySelectorAll('[data-tunnel], [data-tunnel-label]').forEach(node=>{
+    node.classList.toggle('is-selected', !!sel && sel.type === 'tunnel');
+  });
   stage.querySelectorAll('[data-world-mine]').forEach(node=>{
     node.classList.toggle('is-selected', !!sel && sel.type === 'mine' && node.getAttribute('data-world-mine') === sel.id);
   });
@@ -917,6 +924,23 @@ function worldInfoLines(sel){
       { key: 'state', text: mine.developmentState === 'secured' ? '확보됨' : '미확보' },
     ];
   }
+  if(sel.type === 'tunnel'){
+    const unlocked = isBeyondAccessible();
+    const prerequisiteMet = !!state.unlockedSites[BALANCE.world.TUNNEL_PREREQUISITE_SITE];
+    const lines = unlocked ? [
+      { key: 'title', text: '🔓 산악 터널' },
+      { key: 'description', text: '외주 공사가 완료되었습니다.' },
+      { key: 'state', text: '산 너머로 이동할 수 있습니다.' },
+    ] : [
+      { key: 'title', text: '🔒 산악 터널' },
+      { key: 'description', text: '산 너머로 이어지는 터널입니다.' },
+      { key: 'contract', text: '전문 굴착 기업에 공사를 의뢰할 수 있습니다.' },
+      { key: 'cost', text: '공사비: ' + fmt(BALANCE.world.TUNNEL_CONSTRUCTION_COST) + 'G' },
+    ];
+    if(!unlocked && !prerequisiteMet) lines.push({ key: 'state', text: '고대 유적 개척 후 공사를 의뢰할 수 있습니다.' });
+    else if(!unlocked && state.gold < BALANCE.world.TUNNEL_CONSTRUCTION_COST) lines.push({ key: 'state', text: '공사비가 부족합니다.' });
+    return lines;
+  }
   return null;
 }
 
@@ -937,6 +961,20 @@ function renderWorldInfo(){
     row.textContent = line.text;
     box.appendChild(row);
   });
+  if(worldSelection.type === 'tunnel' && !isBeyondAccessible() && state.unlockedSites[BALANCE.world.TUNNEL_PREREQUISITE_SITE]){
+    const button = document.createElement('button');
+    button.className = 'ghost world-tunnel-contract';
+    button.setAttribute('data-tunnel-contract', '');
+    button.textContent = '터널 공사 의뢰 · ' + fmt(BALANCE.world.TUNNEL_CONSTRUCTION_COST) + 'G';
+    button.disabled = state.gold < BALANCE.world.TUNNEL_CONSTRUCTION_COST;
+    button.onclick = (e)=>{
+      e.stopPropagation();
+      if(!requestTunnelConstruction()) return;
+      renderAll();
+      selectWorldObject('tunnel');
+    };
+    box.appendChild(button);
+  }
   box.setAttribute('data-world-info-type', worldSelection.type);
   box.hidden = false;
 }
@@ -948,6 +986,11 @@ function renderWorldInfo(){
 function onWorldStageClick(e){
   const stage = e.currentTarget;
   const target = e.target && e.target.closest ? e.target : null;
+  const tunnelNode = target ? target.closest('[data-tunnel], [data-tunnel-label]') : null;
+  if(tunnelNode && stage.contains(tunnelNode)){
+    selectWorldObject('tunnel');
+    return;
+  }
   const mineNode = target ? target.closest('[data-world-mine]') : null;
   if(mineNode && stage.contains(mineNode)){
     selectWorldObject('mine', mineNode.getAttribute('data-world-mine'));
@@ -976,4 +1019,3 @@ function updatePlayerSprite(){
   el.setAttribute('data-player-facing', p.facing);
   updateExplorationMapPlayer(); // Task 65
 }
-

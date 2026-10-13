@@ -8,11 +8,9 @@
 //     no way around it. Its east face is at x = terrainFaceX(y) (a few
 //     irregular segments, roughly x -4.5 .. -3.5, i.e. ~6 units west of the
 //     new-game base at (2,0)).
-//   - Everything west of the face (the range itself and the land beyond it)
-//     is not walkable for now: "산 너머" is reserved for later exploration.
+//   - Everything west of the face is blocked except for the tunnel corridor.
 //   - The tunnel is a recess cut into the east face around y = TUNNEL.Y. The
-//     player can walk into the recess up to the gate; the gate is locked, so
-//     nothing behind it is reachable. Unlocking is a later Task.
+//     player can walk into the recess up to the gate while it is locked.
 //
 // Task 67: the world is split into regions (terrainRegionAt):
 //   open     — east of the face: the current exploration area
@@ -45,7 +43,6 @@ const WORLD_TERRAIN = {
     Y: 1,               // centre of the tunnel mouth
     HALF_WIDTH: 0.8,    // recess spans Y ± HALF_WIDTH
     DEPTH: 1,           // how far the recess cuts into the face
-    LOCKED: true,       // gate closed — passing through is not possible yet
     KEEP_CLEAR: 2,      // new-game mines stay this far from the tunnel mouth
   },
   // Task 67: the land beyond the range. Environment zones, nearest the tunnel
@@ -86,7 +83,7 @@ function terrainFaceX(y){
 function terrainTunnel(){
   const t = WORLD_TERRAIN.TUNNEL;
   const faceX = terrainRockFaceX(t.Y);
-  return { mouthX: faceX, gateX: faceX - t.DEPTH, y: t.Y, halfWidth: t.HALF_WIDTH, locked: t.LOCKED };
+  return { mouthX: faceX, gateX: faceX - t.DEPTH, y: t.Y, halfWidth: t.HALF_WIDTH };
 }
 
 // Task 67: west (back) edge of the range at row y — where "beyond" starts.
@@ -123,9 +120,9 @@ function terrainBeyondZoneAt(x, y){
   return zone ? zone.key : null;
 }
 
-// Task 67: "beyond" is open only once the tunnel is (a later Task).
+// Task 68: tunnel progress is saved in the world state, not static terrain.
 function isBeyondAccessible(){
-  return !WORLD_TERRAIN.TUNNEL.LOCKED;
+  return !!(state && state.world && state.world.tunnelUnlocked);
 }
 
 function terrainInBounds(x, y){
@@ -135,9 +132,15 @@ function terrainInBounds(x, y){
 
 // Can the player stand at (x, y)? Inside the world bounds and east of the
 // face (with the player margin). West of the face = mountain / beyond / gate.
-function isWorldPointWalkable(x, y){
+function isWorldPointWalkable(x, y, tunnelUnlocked){
   if(!Number.isFinite(x) || !Number.isFinite(y)) return false;
   if(!terrainInBounds(x, y)) return false;
+  const unlocked = typeof tunnelUnlocked === 'boolean' ? tunnelUnlocked : isBeyondAccessible();
+  if(unlocked){
+    const region = terrainRegionAt(x, y);
+    if(region === 'beyond') return true;
+    if(region === 'tunnel' && terrainInTunnelRows(y)) return true;
+  }
   return x >= terrainFaceX(y) + WORLD_TERRAIN.PLAYER_MARGIN;
 }
 

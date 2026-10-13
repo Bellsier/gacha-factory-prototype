@@ -95,6 +95,8 @@ function newDom(storage, opts) {
   RECIPES: () => RECIPES,
   RARITY: () => RARITY,
   SITES: () => SITES,
+  BALANCE: () => BALANCE,
+  WORLD_TERRAIN: () => WORLD_TERRAIN,
   TICK_MS: () => TICK_MS,
   TICKS_PER_SECOND: () => TICKS_PER_SECOND,
 };
@@ -112,6 +114,8 @@ function newDom(storage, opts) {
     RECIPES: { get: () => win.__expose.RECIPES(), configurable: true },
     RARITY: { get: () => win.__expose.RARITY(), configurable: true },
     SITES: { get: () => win.__expose.SITES(), configurable: true },
+    BALANCE: { get: () => win.__expose.BALANCE(), configurable: true },
+    WORLD_TERRAIN: { get: () => win.__expose.WORLD_TERRAIN(), configurable: true },
     TICK_MS: { get: () => win.__expose.TICK_MS(), configurable: true },
     TICKS_PER_SECOND: { get: () => win.__expose.TICKS_PER_SECOND(), configurable: true },
   });
@@ -353,4 +357,3 @@ function advanceTicks(win, n) {
 // reference values (the values approved for BALANCE in Task 2), not values
 // re-read from window.BALANCE. This way a regression IN BALANCE is caught.
 // =============================================================================
-

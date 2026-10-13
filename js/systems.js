@@ -152,6 +152,19 @@ function expandBase(){
   return true;
 }
 
+// Task 68: an instant, one-time outsourced construction purchase. Terrain
+// shape stays static; only this saved world-progress flag changes.
+function requestTunnelConstruction(){
+  if(state.world.tunnelUnlocked) return false;
+  const prerequisite = BALANCE.world.TUNNEL_PREREQUISITE_SITE;
+  const cost = BALANCE.world.TUNNEL_CONSTRUCTION_COST;
+  if(!state.unlockedSites[prerequisite] || state.gold < cost) return false;
+  state.gold -= cost;
+  state.world.tunnelUnlocked = true;
+  log('전문 굴착 기업의 공사가 완료되어 산악 터널이 개통되었습니다.');
+  return true;
+}
+
 function mineResource(key){
   state.resources[key] += manualAmount(key);
   return true;

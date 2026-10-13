@@ -57,6 +57,8 @@ const BALANCE = {
     BOUNDS_MAX_Y: 10,
     START_BASE_X: 2,
     START_BASE_Y: 0,
+    TUNNEL_CONSTRUCTION_COST: 5000,
+    TUNNEL_PREREQUISITE_SITE: 'ruins',
     // Task 65: a hidden mine is discovered when the player comes this close (world units).
     DISCOVERY_RADIUS: 2.5,
   },
@@ -90,4 +92,3 @@ const BALANCE = {
     TICKET_TRICKLE_MS: 45000,        // passive automatic ticket grant interval
   },
 };
-
