@@ -61,10 +61,12 @@ function tdInteract(target){
       return { ok: true, text: '확보!' };
     }
     if(target.action === 'mine'){
-      const amount = mine.miningPower * mult();
+      const amount = mine.miningPower * mult(), relicsBefore = state.village ? state.village.unidentified : 0;
       if(!mineMine(mine.id)) return { ok: false, text: '' };
       if(typeof updateNumbers === 'function') updateNumbers();
-      return { ok: true, text: '+' + fmt(amount) + ' ' + (res ? res.name : '') };
+      const relic = state.village && state.village.unidentified > relicsBefore; // Task 116
+      if(relic && typeof renderVillage === 'function') renderVillage();
+      return { ok: true, text: '+' + fmt(amount) + ' ' + (res ? res.name : '') + (relic ? ' · 미감정 유물!' : '') };
     }
     return { ok: false, text: target.label };
   }

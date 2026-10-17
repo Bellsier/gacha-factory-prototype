@@ -909,6 +909,7 @@ function renderVillage(){
     if(step){
       html += '<div class="village-actions"><button data-village-restore="' + k + '">' + step.name + ' (' + villageCostText(step.cost) + ')</button></div>' +
         '<div class="rate" data-village-why="' + k + '"></div>';
+      if(k === 'appraiser') html += villageRelicLine(v) + '<div class="rate">감정소를 복구하면 감정할 수 있어요.</div>'; // Task 116
     } else html += villageOpenSection(k);
     html += '</div>';
   });
@@ -919,14 +920,43 @@ function renderVillage(){
   refreshVillageButtons();
 }
 
+// Task 116: unidentified relics held, and how much hand mining until the next one.
+function villageRelicLine(v){
+  return '<div class="rate">미감정 유물 <b data-village-unidentified>' + v.unidentified + '</b>개 · 다음 유물까지 채굴 <b data-village-progress>' +
+    (VILLAGE.RELIC.EVERY - v.digProgress) + '</b>점</div>';
+}
+
 // What an open facility's card shows (Task 116 appraiser, Task 117 museum).
-function villageOpenSection(k){ return '<div class="rate">운영 중</div>'; }
-function bindVillageOpenSections(wrap){}
+function villageOpenSection(k){
+  const v = villageState();
+  if(k === 'appraiser'){
+    let html = villageRelicLine(v) +
+      '<div class="village-actions"><button data-village-appraise>유물 감정</button></div>' +
+      '<div class="rate">도감 <b data-village-codex-count>' + v.codex.length + '</b> / ' + VILLAGE_RELICS.length + '</div><div class="village-codex">';
+    VILLAGE_RELICS.forEach(r => {
+      const known = v.codex.includes(r.key);
+      html += '<div class="village-relic' + (known ? '' : ' is-unknown') + '" data-village-relic="' + r.key + '">' +
+        (known ? '<b>' + r.name + '</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span><br>' + r.desc + '<br><span class="rarity">보유 ' + (v.owned[r.key] || 0) + '</span>'
+          : '<b>???</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span>') + '</div>';
+    });
+    return html + '</div>';
+  }
+  return '<div class="rate">운영 중</div>';
+}
+function bindVillageOpenSections(wrap){
+  const ap = wrap.querySelector('[data-village-appraise]');
+  if(ap) ap.onclick = () => { if(villageAppraise()){ renderVillage(); updateNumbers(); } };
+}
 
 // Per tick: which village buttons can be pressed now, and why not.
 function refreshVillageButtons(){
   const wrap = document.getElementById('villagePanel');
   if(!wrap || typeof VILLAGE === 'undefined') return;
+  const ap = wrap.querySelector('[data-village-appraise]');
+  if(ap) ap.disabled = !!villageAppraiseBlocker();
+  const un = wrap.querySelector('[data-village-unidentified]'), pr = wrap.querySelector('[data-village-progress]'), vs = villageState();
+  if(un && un.textContent !== String(vs.unidentified)) un.textContent = String(vs.unidentified);
+  if(pr && pr.textContent !== String(VILLAGE.RELIC.EVERY - vs.digProgress)) pr.textContent = String(VILLAGE.RELIC.EVERY - vs.digProgress);
   wrap.querySelectorAll('[data-village-restore]').forEach(btn => {
     const why = villageRestoreBlocker(btn.dataset.villageRestore);
     btn.disabled = !!why;

@@ -247,6 +247,70 @@ function villageRestore(key){
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Task 116: unidentified relics and the appraiser. Mining by hand (the panel
+// button or E at a vein: mineMine) adds dig progress; every RELIC.EVERY points
+// turn up one unidentified relic (a collectible of its own, not the crafting
+// resource). No randomness: veins beyond the mountain and 고대 유물 veins give
+// more progress. Production and resources are not changed. At the open
+// appraiser a relic is appraised: it becomes one relic of the codex, chosen
+// by a fixed sequence (the appraisal count), weighted by rarity and three
+// times likelier while not yet registered.
+// ---------------------------------------------------------------------------
+VILLAGE.RELIC = {
+  EVERY: 8,                 // dig progress per unidentified relic
+  STEP: 1,                  // per manual mining
+  BEYOND_STEP: 2,           // per manual mining beyond the mountain
+  RELIC_VEIN_STEP: 3,       // per manual mining of a 고대 유물 vein
+  MAX_UNIDENTIFIED: 20,     // held at once; mining past this finds none
+  NEW_BOOST: 3,             // weight factor for a relic not yet in the codex
+};
+
+// After a successful manual mining of `mine`: returns how many relics turned up (0 or 1).
+function villageOnManualMine(mine){
+  const v = villageState(), R = VILLAGE.RELIC;
+  if(v.unidentified >= R.MAX_UNIDENTIFIED) return 0; // full: no progress either
+  const step = mine && mine.resource === 'relic' ? R.RELIC_VEIN_STEP : mine && terrainRegionAt(mine.x, mine.y) === 'beyond' ? R.BEYOND_STEP : R.STEP;
+  v.digProgress += step;
+  if(v.digProgress < R.EVERY) return 0;
+  v.digProgress -= R.EVERY;
+  v.unidentified += 1;
+  log('미감정 유물을 찾았어요 (보유 ' + v.unidentified + ')');
+  return 1;
+}
+
+function villageHash01(n){
+  let h = Math.imul((n + 1) ^ 0x9e3779b9, 2654435761);
+  h ^= h >>> 15; h = Math.imul(h, 2246822519); h ^= h >>> 13;
+  return (h >>> 0) / 4294967296;
+}
+
+// Which relic the next appraisal turns up (no state change).
+function villageNextRelic(){
+  const v = villageState(), weights = VILLAGE_RELICS.map(r => r.weight * (v.codex.includes(r.key) ? 1 : VILLAGE.RELIC.NEW_BOOST));
+  let roll = villageHash01(v.appraised) * weights.reduce((a, b) => a + b, 0);
+  for(let i = 0; i < VILLAGE_RELICS.length; i++){ roll -= weights[i]; if(roll < 0) return VILLAGE_RELICS[i]; }
+  return VILLAGE_RELICS[VILLAGE_RELICS.length - 1];
+}
+
+function villageAppraiseBlocker(){
+  if(!villageIsOpen('appraiser')) return '감정소가 아직 복구되지 않았어요';
+  if(villageState().unidentified <= 0) return '감정할 유물이 없어요';
+  return null;
+}
+
+// Appraises one unidentified relic. Returns { relic, isNew } or null.
+function villageAppraise(){
+  if(villageAppraiseBlocker()) return null;
+  const v = villageState(), relic = villageNextRelic(), isNew = !v.codex.includes(relic.key);
+  v.unidentified -= 1;
+  v.appraised += 1;
+  v.owned[relic.key] = (v.owned[relic.key] || 0) + 1;
+  if(isNew) v.codex.push(relic.key);
+  log('감정 결과: ' + relic.name + (isNew ? ' (도감 등록 ' + v.codex.length + '/' + VILLAGE_RELICS.length + ')' : ''));
+  return { relic, isNew };
+}
+
 // What walking up to a facility's door offers:
 //   { action: 'restore' | 'locked' | 'open', label }
 function villageTargetFor(key){
@@ -255,6 +319,10 @@ function villageTargetFor(key){
     if(f.requires && !villageIsOpen(f.requires)) return { action: 'locked', label: name + ' · ' + villageFacilityName(f.requires) + ' 먼저 복구' };
     const step = villageNextStep(key);
     return { action: 'restore', label: name + ' ' + step.name + ' · ' + villageCostText(step.cost) };
+  }
+  if(key === 'appraiser'){
+    const n = villageState().unidentified;
+    return n > 0 ? { action: 'appraise', label: name + ' · 유물 감정 (미감정 ' + n + ')' } : { action: 'open', label: name + ' · 감정할 유물 없음' };
   }
   return { action: 'open', label: name };
 }

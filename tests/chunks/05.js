@@ -1124,3 +1124,98 @@ function t114Rules(win) {
   win.document.querySelector('[data-village-restore="appraiser"]').click();
   check('Task115: on the classic screen the panel button restores too', win.state.village.stage.appraiser === 1 && win.state.gold === 400);
 })();
+
+// -----------------------------------------------------------------------------
+// Task 116: unidentified relics (found by hand mining) and the appraiser (appraisal, codex)
+// -----------------------------------------------------------------------------
+function t116OpenVillage(win, which) {
+  const s = win.state; s.gold += 1e6; s.products.steel += 100; s.products.coalBrick += 100; s.products.ironTool += 100;
+  (which || ['appraiser', 'museum']).forEach((k) => { while (!win.villageIsOpen(k)) if (!win.villageRestore(k)) break; });
+}
+
+(function test_T116_relics() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, v = s.village, R = win.VILLAGE.RELIC, doc = win.document;
+  win.secureMine('mine_start_iron');
+  const iron = win.mineById('mine_start_iron');
+  const rates = JSON.stringify(win.RESOURCES.map((r) => win.autoRate(r.key)));
+  // mining by hand: the resource gain is exactly as before, relics come on top
+  let ironGot = 0, found = 0;
+  for (let i = 0; i < R.EVERY * 3; i++) { const before = s.resources.iron; win.mineMine(iron.id); ironGot += s.resources.iron - before; }
+  check('Task116: hand mining still gives exactly its usual amount (no change to resources)', Math.abs(ironGot - R.EVERY * 3 * iron.miningPower * win.mult()) < 1e-9);
+  check('Task116: every 8 hand minings of an ordinary vein turn up one unidentified relic', v.unidentified === 3 && v.digProgress === 0);
+  check('Task116: the crafting resource 고대 유물 is not touched', s.resources.relic === 0);
+  check('Task116: worker output (autoRate) is unchanged', JSON.stringify(win.RESOURCES.map((r) => win.autoRate(r.key))) === rates);
+  check('Task116: finding one writes a log line', Array.from(doc.querySelectorAll('#log > *')).some((e) => /미감정 유물을 찾았어요/.test(e.textContent)));
+  // automatic income never finds relics
+  const before = v.unidentified;
+  for (let i = 0; i < 50; i++) win.tickMining();
+  check('Task116: automatic mining (the tick) finds none', v.unidentified === before);
+  // more beyond the mountain and on relic veins
+  const relicVein = win.addMine({ id: 'mine_t116_relic', x: s.world.base.x + 3, y: s.world.base.y + 3, resource: 'relic', grade: 3, miningPower: 1, developmentState: 'secured' });
+  v.digProgress = 0; win.mineMine(relicVein.id);
+  check('Task116: a 고대 유물 vein counts 3, and still gives its resource', v.digProgress === 3 && s.resources.relic === 1 * win.mult());
+  s.world.tunnelUnlocked = true;
+  const far = win.addMine({ id: 'mine_t116_far', x: -8, y: 4, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'secured' });
+  v.digProgress = 0; win.mineMine(far.id);
+  check('Task116: a vein beyond the mountain counts 2', v.digProgress === 2);
+  // the cap
+  v.unidentified = R.MAX_UNIDENTIFIED; v.digProgress = 5;
+  for (let i = 0; i < 20; i++) win.mineMine(iron.id);
+  check('Task116: at most 20 are held; while full, mining finds none and adds no progress', v.unidentified === R.MAX_UNIDENTIFIED && v.digProgress === 5);
+  v.unidentified = 3; v.digProgress = 0;
+  // E at a vein says so when one turns up
+  s.world.player.x = iron.x + 0.4; s.world.player.y = iron.y;
+  v.digProgress = R.EVERY - 1;
+  const r = win.tdInteract(win.tdInteractTarget(s.world.player.x, s.world.player.y));
+  check('Task116: mining with E shows "미감정 유물!" when one turns up', r.ok && /미감정 유물!/.test(r.text) && v.unidentified === 4);
+  // appraisal needs the appraiser open
+  check('Task116: no appraisal before the appraiser is open', /감정소/.test(win.villageAppraiseBlocker()) && win.villageAppraise() === null && v.unidentified === 4);
+  t116OpenVillage(win, ['appraiser']);
+  const a = v.sites.appraiser;
+  const t = win.tdInteractTarget(a.x, a.y + 0.2);
+  win.TD.target = t; win.tdUpdateActionButton();
+  check('Task116: at the open appraiser the target offers appraisal with the count; the button reads 감정', t.action === 'appraise' && /미감정 4/.test(t.label) && doc.getElementById('tdAction').textContent === '감정');
+  s.world.player.x = a.x; s.world.player.y = a.y + 0.2;
+  const expected = win.villageNextRelic();
+  win.tdInteractNow();
+  check('Task116: E appraises one: it becomes a known relic, registered in the codex', v.unidentified === 3 && v.appraised === 1 && v.owned[expected.key] === 1 && v.codex.includes(expected.key) &&
+    win.TD.floats.some((f) => f.text.includes(expected.name)));
+  // the panel: codex and the appraisal button (the same function)
+  win.renderVillage();
+  const cards = doc.querySelectorAll('[data-village-relic]');
+  check('Task116: the codex shows all 12, unknown ones as ???', cards.length === 12 && doc.querySelectorAll('.village-relic.is-unknown').length === 11 &&
+    doc.querySelector('[data-village-relic="' + expected.key + '"]').textContent.includes(expected.name) && doc.querySelector('[data-village-codex-count]').textContent === '1');
+  doc.querySelector('[data-village-appraise]').click();
+  check('Task116: the panel button appraises too', v.appraised === 2 && v.unidentified === 2);
+  // all relics turn up over time, deterministically
+  v.unidentified = 60;
+  const seq = [];
+  for (let i = 0; i < 60; i++) seq.push(win.villageAppraise().relic.key);
+  check('Task116: appraising 60 registers the whole codex (new ones are likelier), every relic owned at least once', v.codex.length === 12 &&
+    win.VILLAGE_RELIC_KEYS.every((k) => (v.owned[k] || 0) >= 1) && Object.values(v.owned).reduce((x, y) => x + y, 0) === v.appraised);
+  const counts = {}; seq.forEach((k) => { counts[k] = (counts[k] || 0) + 1; });
+  check('Task116: rare relics stay rarer than common ones', win.VILLAGE_RELICS.filter((r) => r.rarity === 'rare').every((r) => (counts[r.key] || 0) <= Math.max(...win.VILLAGE_RELICS.filter((x) => x.rarity === 'common').map((x) => counts[x.key] || 0))));
+  win.updateNumbers();
+  check('Task116: with nothing left, the button is disabled and the door target just opens the panel', doc.querySelector('[data-village-appraise]').disabled && win.villageAppraise() === null &&
+    win.tdInteractTarget(a.x, a.y + 0.2).action === 'open');
+  // saved and loaded back
+  const kept = JSON.stringify({ u: v.unidentified, d: v.digProgress, n: v.appraised, o: v.owned, c: v.codex });
+  win.saveGame();
+  const w2 = newDom(storage).window, v2 = w2.state.village;
+  check('Task116: relics, the codex and progress are saved and come back exactly', JSON.stringify({ u: v2.unidentified, d: v2.digProgress, n: v2.appraised, o: v2.owned, c: v2.codex }) === kept);
+  check('Task116: the same appraisal count gives the same next relic after loading (no randomness)', w2.villageNextRelic().key === win.villageNextRelic().key);
+})();
+
+(function test_T116_classic() {
+  const win = tdDomAt('https://example.test/?view=classic', makeMemoryStorage());
+  t116OpenVillage(win, ['appraiser']);
+  win.state.village.unidentified = 2;
+  win.renderVillage(); win.updateNumbers();
+  win.document.querySelector('[data-village-appraise]').click();
+  check('Task116: on the classic screen the panel appraises too', win.state.village.appraised === 1 && win.state.village.codex.length === 1);
+  win.secureMine('mine_start_iron'); win.buildMines();
+  for (let i = 0; i < 8; i++) win.document.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  check('Task116: the classic mine button finds relics too (the same mineMine)', win.state.village.unidentified === 2);
+})();
