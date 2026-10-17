@@ -311,6 +311,45 @@ function villageAppraise(){
   return { relic, isNew };
 }
 
+// ---------------------------------------------------------------------------
+// Task 117: the museum. An appraised relic can be donated once per kind: it
+// leaves the owned relics and goes on display (state.village.donated). The
+// building's display niches light up as the collection grows. No rewards yet
+// (further upgrades are on hold, blueprint 24.8); no gold.
+// ---------------------------------------------------------------------------
+// Relic keys owned and not yet on display, in codex order.
+function villageDonatable(){
+  const v = villageState();
+  return VILLAGE_RELIC_KEYS.filter(k => (v.owned[k] || 0) > 0 && !v.donated.includes(k));
+}
+
+function villageDonateBlocker(key){
+  if(!villageIsOpen('museum')) return '박물관이 아직 복구되지 않았어요';
+  const v = villageState();
+  if(key === undefined) return villageDonatable().length ? null : '기증할 새 유물이 없어요';
+  if(!VILLAGE_RELIC_KEYS.includes(key)) return '알 수 없는 유물';
+  if(v.donated.includes(key)) return '이미 전시 중이에요';
+  if(!((v.owned[key] || 0) > 0)) return '가진 유물이 아니에요';
+  return null;
+}
+
+// Donates one relic of `key`. Returns true when it went on display.
+function villageDonate(key){
+  if(villageDonateBlocker(key)) return false;
+  const v = villageState();
+  v.owned[key] -= 1;
+  if(v.owned[key] <= 0) delete v.owned[key];
+  v.donated.push(key);
+  log('박물관 기증: ' + villageRelicByKey(key).name + ' (전시 ' + v.donated.length + '/' + VILLAGE_RELICS.length + ')');
+  return true;
+}
+
+// Donates every relic that can go on display. Returns how many.
+function villageDonateAll(){
+  if(villageDonateBlocker()) return 0;
+  return villageDonatable().filter(k => villageDonate(k)).length;
+}
+
 // What walking up to a facility's door offers:
 //   { action: 'restore' | 'locked' | 'open', label }
 function villageTargetFor(key){
@@ -323,6 +362,10 @@ function villageTargetFor(key){
   if(key === 'appraiser'){
     const n = villageState().unidentified;
     return n > 0 ? { action: 'appraise', label: name + ' · 유물 감정 (미감정 ' + n + ')' } : { action: 'open', label: name + ' · 감정할 유물 없음' };
+  }
+  if(key === 'museum'){
+    const n = villageDonatable().length, d = villageState().donated.length;
+    return n > 0 ? { action: 'donate', label: name + ' · 유물 기증 (' + n + '점)' } : { action: 'open', label: name + ' · 전시 ' + d + '/' + VILLAGE_RELICS.length };
   }
   return { action: 'open', label: name };
 }

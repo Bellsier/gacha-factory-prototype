@@ -941,11 +941,32 @@ function villageOpenSection(k){
     });
     return html + '</div>';
   }
+  if(k === 'museum'){
+    // Task 117: what is on display, and what can be donated
+    const can = villageDonatable();
+    let html = '<div class="rate">전시 <b data-village-exhibits>' + v.donated.length + '</b> / ' + VILLAGE_RELICS.length + ' · 감정한 유물을 종류마다 하나씩 기증해 전시해요.</div>' +
+      '<div class="village-actions"><button data-village-donate-all' + (can.length ? '' : ' disabled') + '>모두 기증 (' + can.length + '점)</button></div>';
+    if(can.length){
+      html += '<div class="village-codex">';
+      can.forEach(key => { const r = villageRelicByKey(key); html += '<div class="village-relic" data-village-donatable="' + key + '"><b>' + r.name + '</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span><br><button data-village-donate="' + key + '">기증</button></div>'; });
+      html += '</div>';
+    }
+    html += '<div class="rate" style="margin-top:8px;">전시실</div><div class="village-codex">';
+    VILLAGE_RELICS.forEach(r => {
+      const on = v.donated.includes(r.key);
+      html += '<div class="village-relic' + (on ? '' : ' is-unknown') + '" data-village-exhibit="' + r.key + '">' +
+        (on ? '<b>' + r.name + '</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span><br>' + r.desc : '<b>빈 진열장</b>') + '</div>';
+    });
+    return html + '</div>';
+  }
   return '<div class="rate">운영 중</div>';
 }
 function bindVillageOpenSections(wrap){
   const ap = wrap.querySelector('[data-village-appraise]');
   if(ap) ap.onclick = () => { if(villageAppraise()){ renderVillage(); updateNumbers(); } };
+  const all = wrap.querySelector('[data-village-donate-all]');
+  if(all) all.onclick = () => { if(villageDonateAll()){ renderVillage(); updateNumbers(); } };
+  wrap.querySelectorAll('[data-village-donate]').forEach(btn => { btn.onclick = () => { if(villageDonate(btn.dataset.villageDonate)){ renderVillage(); updateNumbers(); } }; });
 }
 
 // Per tick: which village buttons can be pressed now, and why not.

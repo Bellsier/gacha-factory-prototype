@@ -152,7 +152,9 @@ function tdDrawSprite(g, img, sx, sy, zoom, anchorY){
 }
 
 function tdAddFloat(text, wx, wy, color, lift){
-  TD.floats.push({ text, x: wx, y: wy, t0: performance.now(), color: color || '#fff3b0', lift: lift || 34 });
+  // Task 117: floats still rising from the same point stack above each other
+  const now = performance.now(), stack = TD.floats.filter(f => f.x === wx && f.y === wy && now - f.t0 < 1200).length;
+  TD.floats.push({ text, x: wx, y: wy, t0: now, color: color || '#fff3b0', lift: lift || 34, stack });
 }
 
 // How high (sprite pixels) the interaction bubble sits above a target's point: above its picture.
@@ -265,7 +267,7 @@ function tdRender(now){
   TD.floats = TD.floats.filter(f => now - f.t0 < 1200);
   TD.floats.forEach(f => {
     const k = (now - f.t0) / 1200, sp = topdownToScreen(f.x, f.y, cam, w, h, zoom);
-    const fy = sp.y - (f.lift || 34) * zoom - 26 - k * 34; // starts above the interaction bubble and rises
+    const fy = sp.y - (f.lift || 34) * zoom - 26 - (f.stack || 0) * 22 - k * 34; // starts above the interaction bubble and rises
     g.globalAlpha = 1 - k * k; g.font = 'bold ' + (13 + zoom) + 'px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = '#000'; g.fillText(f.text, sp.x + 1, fy + 1);

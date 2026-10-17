@@ -1219,3 +1219,75 @@ function t116OpenVillage(win, which) {
   for (let i = 0; i < 8; i++) win.document.querySelector('[data-mine-mine="mine_start_iron"]').click();
   check('Task116: the classic mine button finds relics too (the same mineMine)', win.state.village.unidentified === 2);
 })();
+
+// -----------------------------------------------------------------------------
+// Task 117: the museum (donation and display)
+// -----------------------------------------------------------------------------
+(function test_T117_museum() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, v = s.village, doc = win.document;
+  t116OpenVillage(win, ['appraiser']);
+  v.unidentified = 8;
+  for (let i = 0; i < 8; i++) win.villageAppraise();
+  const owned0 = JSON.stringify(v.owned), kinds = Object.keys(v.owned).length;
+  check('Task117: no donations before the museum is open', /박물관/.test(win.villageDonateBlocker()) && win.villageDonateAll() === 0 && v.donated.length === 0 && JSON.stringify(v.owned) === owned0);
+  t116OpenVillage(win, ['museum']);
+  const m = v.sites.museum, gold = s.gold;
+  const t = win.tdInteractTarget(m.x, m.y + 0.2);
+  win.TD.target = t; win.tdUpdateActionButton();
+  check('Task117: at the open museum the target offers to donate the new relics; the button reads 기증', t.action === 'donate' && new RegExp('\\(' + kinds + '점\\)').test(t.label) && doc.getElementById('tdAction').textContent === '기증');
+  s.world.player.x = m.x; s.world.player.y = m.y + 0.2;
+  win.tdInteractNow();
+  check('Task117: E donates one of each kind owned: they go on display and leave the owned relics (duplicates stay)', v.donated.length === kinds &&
+    v.donated.every((k) => win.VILLAGE_RELIC_KEYS.includes(k)) && Object.keys(v.owned).every((k) => v.donated.includes(k)) &&
+    Object.values(v.owned).reduce((a, b) => a + b, 0) === 8 - kinds);
+  check('Task117: donating gives no gold (no rewards yet)', s.gold === gold);
+  check('Task117: a kind already on display cannot be donated again', /이미 전시/.test(win.villageDonateBlocker(v.donated[0])) && !win.villageDonate(v.donated[0]));
+  check('Task117: with nothing new the door shows the display count', win.tdInteractTarget(m.x, m.y + 0.2).action === 'open' && new RegExp('전시 ' + kinds + '/12').test(win.tdInteractTarget(m.x, m.y + 0.2).label));
+  // the display: niches on the building, cases in the panel
+  const item = win.tdDrawList(null).find((it) => it.kind === 'village' && it.id === 'museum');
+  check('Task117: the museum lights one display niche per two relics on show', item.exhibits === Math.ceil(kinds / 2));
+  const lit = (n) => JSON.stringify(win.tdVillageSprite('museum', 2, n).rects);
+  check('Task117: its picture changes as niches light up', lit(0) !== lit(1) && lit(1) !== lit(6) && lit(6) === lit(9));
+  win.renderVillage();
+  check('Task117: the panel shows the display room: cases for what is on show, empty cases for the rest', doc.querySelectorAll('[data-village-exhibit]').length === 12 &&
+    doc.querySelectorAll('[data-village-exhibit]:not(.is-unknown)').length === kinds && doc.querySelector('[data-village-exhibits]').textContent === String(kinds));
+  // donate a new one through the panel button
+  const fresh = win.VILLAGE_RELIC_KEYS.find((k) => !v.donated.includes(k));
+  v.owned[fresh] = 1; if (!v.codex.includes(fresh)) v.codex.push(fresh);
+  win.renderVillage();
+  check('Task117: a new relic is listed for donation', !!doc.querySelector('[data-village-donatable="' + fresh + '"]') && !doc.querySelector('[data-village-donate-all]').disabled);
+  doc.querySelector('[data-village-donate="' + fresh + '"]').click();
+  check('Task117: its 기증 button donates it', v.donated.includes(fresh) && !v.owned[fresh] && doc.querySelector('[data-village-donate-all]').disabled);
+  // the whole collection
+  win.VILLAGE_RELIC_KEYS.forEach((k) => { if (!v.donated.includes(k)) v.owned[k] = 1; });
+  check('Task117: the whole collection can be put on show (12/12)', win.villageDonateAll() === 12 - kinds - 1 && v.donated.length === 12 && win.tdDrawList(null).find((it) => it.id === 'museum').exhibits === 6);
+  // saved and loaded back
+  win.saveGame();
+  const w2 = newDom(storage).window;
+  check('Task117: the display is saved and comes back', w2.state.village.donated.length === 12 && JSON.stringify(w2.state.village.donated) === JSON.stringify(v.donated));
+  check('Task117: the crafting resource 고대 유물 was never used', s.resources.relic === 0);
+})();
+
+(function test_T117_classicAndOldSave() {
+  const win = tdDomAt('https://example.test/?view=classic', makeMemoryStorage());
+  t116OpenVillage(win);
+  win.state.village.owned = { bell: 1 }; win.state.village.codex = ['bell'];
+  win.renderVillage();
+  win.document.querySelector('[data-village-donate-all]').click();
+  check('Task117: on the classic screen the panel donates too', win.state.village.donated.join() === 'bell');
+  // an older save goes through the whole village from scratch, with its own world kept
+  const st = makeMemoryStorage(); st.setItem('gachaFactorySave', T103_FIXTURE_RAW);
+  const fx = newDom(st).window, s = fx.state;
+  const mines = t103Canon(s.world.mines), huts = t103Canon(s.world.workshops), res = t103Canon(s.resources);
+  t116OpenVillage(fx);
+  s.village.unidentified = 3;
+  for (let i = 0; i < 3; i++) fx.villageAppraise();
+  fx.villageDonateAll();
+  fx.saveGame();
+  const back = JSON.parse(st.getItem('gachaFactorySave'));
+  check('Task117: an older save restores, appraises and donates; its mines, huts and resources are untouched (saveVersion 1)',
+    back.saveVersion === 1 && back.run.village.stage.museum === 2 && back.run.village.donated.length >= 1 && t103Canon(back.run.world.mines) === mines &&
+    t103Canon(back.run.world.workshops) === huts && t103Canon(back.run.resources) === res);
+})();
