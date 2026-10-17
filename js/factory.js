@@ -107,7 +107,9 @@ function workshopBuildSpot(){
   const taken = (x, y) =>
     (x === base.x && y === base.y) ||
     state.world.mines.some(m => m.x === x && m.y === y) ||
-    state.world.workshops.some(w => w.x === x && w.y === y);
+    state.world.workshops.some(w => w.x === x && w.y === y) ||
+    // Task 114: a new craft hut keeps clear of the village facility sites
+    (typeof villageSiteNear === 'function' && villageSiteNear(x, y, VILLAGE.SITE.WORKSHOP_CLEAR));
   for(let r = 1; r <= 4; r++){
     for(let dy = -r; dy <= r; dy++){
       for(let dx = -r; dx <= r; dx++){

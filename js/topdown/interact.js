@@ -34,6 +34,15 @@ function tdInteractTarget(px, py){
     if(!w) return;
     consider({ type: 'workshop', id: w.id, x: w.x, y: w.y, action: 'open', label: '제작소 Lv.' + w.level }, Math.hypot(w.x - px, w.y - py));
   });
+  // Task 114: the village facilities (their door step is the site point)
+  if(typeof villageTargetFor === 'function' && state.village && state.village.sites){
+    VILLAGE.ORDER.forEach(k => {
+      const site = state.village.sites[k];
+      if(!site) return;
+      const t = villageTargetFor(k);
+      consider({ type: 'village', id: k, x: site.x, y: site.y, action: t.action, label: t.label }, Math.hypot(site.x - px, site.y - py));
+    });
+  }
   return best;
 }
 
@@ -59,6 +68,7 @@ function tdInteract(target){
     }
     return { ok: false, text: target.label };
   }
+  if(target.type === 'village') return { ok: true, text: '', open: 'village' }; // Task 114: the village panel
   return { ok: true, text: '', open: 'dev' };
 }
 

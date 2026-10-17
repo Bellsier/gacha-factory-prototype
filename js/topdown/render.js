@@ -25,6 +25,15 @@ function tdDrawList(player){
   list.push({ kind: 'base', x: base.x, y: base.y, sortY: base.y + front('base') });
   list.push({ kind: 'prop', prop: 'lamp', x: base.x + 0.62, y: base.y + 0.02, sortY: base.y + 0.02, light: true });
   state.world.workshops.forEach(w => { if(w) list.push({ kind: 'workshop', id: w.id, tier: workshopTier(w.level), x: w.x, y: w.y, sortY: w.y + front('workshop') }); });
+  // Task 114: the village facilities (sorted by the front of their walls, like the huts)
+  if(typeof VILLAGE !== 'undefined' && state.village && state.village.sites){
+    VILLAGE.ORDER.forEach(k => {
+      const site = state.village.sites[k];
+      if(!site) return;
+      list.push({ kind: 'village', id: k, stage: Math.min(2, state.village.stage[k] || 0), exhibits: Math.ceil((state.village.donated || []).length / 2),
+        x: site.x, y: site.y, sortY: site.y + VILLAGE.FACILITIES[k].box.maxY });
+    });
+  }
   state.world.mines.forEach(m => {
     if(!m) return;
     const look = !isMineDiscovered(m) ? 'undiscovered' : m.developmentState === 'secured' ? 'secured' : 'unsecured';
@@ -47,10 +56,20 @@ function tdDrawList(player){
   return list.sort((a, b) => a.sortY - b.sortY);
 }
 
+// Task 114: baked village facility images, cached by facility, stage and lit niches.
+function tdVillageImage(key, stage, exhibits){
+  TD.villageImages = TD.villageImages || {};
+  const id = key + '|' + stage + '|' + (key === 'museum' && stage >= 2 ? exhibits : 0);
+  if(!(id in TD.villageImages)) TD.villageImages[id] = tdSpriteImage(tdVillageSprite(key, stage, exhibits));
+  return TD.villageImages[id];
+}
+
 // Task 108: a sprinkle of grass tufts on the open land that sway in the wind
 // (fixed pattern; kept clear of veins, huts and the workshop yard). Cached.
 function tdOpenLandTufts(){
-  const w = state.world, key = w.base.x + ',' + w.base.y + '|' + w.mines.length + '|' + w.workshops.length;
+  const w = state.world, vs = (state.village && state.village.sites) || {};
+  const sites = ['appraiser', 'museum'].map(k => vs[k]).filter(Boolean); // Task 114: none on a village site
+  const key = w.base.x + ',' + w.base.y + '|' + w.mines.length + '|' + w.workshops.length + '|' + sites.map(p => p.x + ',' + p.y).join(';');
   if(TD.tuftKey === key && TD.tufts) return TD.tufts;
   const out = [], b = BALANCE.world;
   for(let y = b.BOUNDS_MIN_Y + 0.25; y <= b.BOUNDS_MAX_Y; y += 0.5){
@@ -62,6 +81,7 @@ function tdOpenLandTufts(){
       if(Math.hypot(jx - w.base.x, jy - w.base.y) < 1.5) continue;
       if(w.mines.some(m => m && Math.hypot(m.x - jx, m.y - jy) < 0.6)) continue;
       if(w.workshops.some(ws => ws && Math.hypot(ws.x - jx, ws.y - jy) < 0.8)) continue;
+      if(sites.some(p => Math.hypot(p.x - jx, p.y - jy) < 1.0)) continue;
       out.push({ x: jx, y: jy });
     }
   }
@@ -174,6 +194,7 @@ function tdRender(now){
       if(swaying && TD.quality < 2) tdDrawSway(g, sheet.prop[it.prop], sp.x, sp.y, zoom, 2, tdSway(now, it.x, it.y, it.kind === 'decor' ? 'tuft' : it.prop));
       else tdDrawSprite(g, sheet.prop[it.prop], sp.x, sp.y, zoom, 2);
     }
+    else if(it.kind === 'village') tdDrawSprite(g, tdVillageImage(it.id, it.stage, it.exhibits), sp.x, sp.y, zoom, 3);
     else if(it.kind === 'torch') tdDrawSprite(g, sheet.torch && sheet.torch[Math.floor(now / 130 + it.seed) % 3], sp.x, sp.y, zoom, 2);
     else if(it.kind === 'gate'){
       const t = terrainTunnel(), top = topdownToScreen(it.x, t.y - t.halfWidth, cam, w, h, zoom);
@@ -209,7 +230,7 @@ function tdRender(now){
     const sp = topdownToScreen(TD.target.x, TD.target.y, cam, w, h, zoom);
     const label = (TD.touch ? '' : '[E] ') + TD.target.label;
     g.font = 'bold ' + (12 + zoom) + 'px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
-    const tw = g.measureText(label).width + 14, bx = Math.round(sp.x - tw / 2), by = Math.round(sp.y - (TD.target.type === 'base' ? 64 : 34) * zoom);
+    const tw = g.measureText(label).width + 14, bx = Math.round(sp.x - tw / 2), by = Math.round(sp.y - (TD.target.type === 'base' ? 64 : TD.target.type === 'village' ? (TD.target.id === 'museum' ? 54 : 46) : 34) * zoom);
     g.fillStyle = TD.target.action === 'locked' ? 'rgba(40,36,34,0.88)' : 'rgba(22,28,32,0.9)';
     g.fillRect(bx, by, tw, 22); g.fillStyle = TD.target.action === 'locked' ? '#8b98a1' : '#ffd27a';
     g.fillRect(bx, by + 21, tw, 2);
@@ -248,6 +269,13 @@ function tdRenderMinimap(cam){
     if(m.developmentState === 'secured'){ g.fillStyle = '#3fc9b0'; g.fillRect(Math.round(x) - 2, Math.round(y) + 2, 4, 1); }
   });
   (state.world.torches || []).forEach(t => { const [x, y] = at(t.x, t.y); g.fillStyle = '#ffb04a'; g.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 2); });
+  // Task 114: village facilities: grey while ruined, coloured once open
+  if(typeof VILLAGE !== 'undefined' && state.village && state.village.sites) VILLAGE.ORDER.forEach(k => {
+    const site = state.village.sites[k];
+    if(!site) return;
+    const [x, y] = at(site.x, site.y), open = (state.village.stage[k] || 0) >= 2;
+    g.fillStyle = open ? (k === 'museum' ? '#e6e1d8' : '#5fa0d8') : '#7a746c'; g.fillRect(Math.round(x) - 2, Math.round(y) - 3, 5, 4);
+  });
   const [bx, by] = at(state.world.base.x, state.world.base.y);
   g.fillStyle = '#d68b3d'; g.fillRect(Math.round(bx) - 3, Math.round(by) - 3, 6, 6);
   const p = state.world.player, [px, py] = at(p.x, p.y);

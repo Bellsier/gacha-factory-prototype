@@ -888,6 +888,25 @@ function updateNumbers(){
 }
 
 // Structural rebuild after state changes. Render helpers only read `state`.
+// Task 114: the village panel (마을 탭). Lists each facility with its site and
+// restoration state; later Tasks add the actions. Rebuilt by renderAll and
+// after a village action; never from the tick loop.
+function renderVillage(){
+  const wrap = document.getElementById('villagePanel');
+  if(!wrap || typeof VILLAGE === 'undefined') return;
+  const v = villageState();
+  let html = '<div class="village-list">';
+  VILLAGE.ORDER.forEach(k => {
+    const f = VILLAGE.FACILITIES[k], stage = villageStage(k), site = v.sites[k];
+    html += '<div class="village-card" data-village="' + k + '">' +
+      '<div class="village-head"><b>' + f.name + '</b> <span class="village-stage" data-village-stage="' + k + '">' + VILLAGE.STAGE_NAMES[Math.min(stage, 2)] + '</span></div>' +
+      '<div class="rate">' + (site ? '공방 근처 (' + site.x.toFixed(1) + ', ' + site.y.toFixed(1) + ')' : '자리를 찾는 중') + '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
 function renderAll(){
   renderCurrencies();
   renderBaseInfo();
@@ -902,6 +921,7 @@ function renderAll(){
   renderWorkshopBuild();
   renderDelivery();
   renderReputation();
+  renderVillage();
   renderLastPull();
   updateNumbers();
   renderWorldGround();

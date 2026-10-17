@@ -158,7 +158,7 @@ function tdKey(win, target, key) {
   const doc = win.document, body = doc.body;
   check('Task106: the top-down view is the default — world canvas, HUD, minimap, dock', body.classList.contains('view-topdown') &&
     !!doc.getElementById('tdCanvas') && body.firstElementChild.id === 'tdCanvas' && !!doc.getElementById('tdMinimap') && !!doc.querySelector('.tabbar .td-log-btn'));
-  check('Task106: the five tabs stay in the dock with their content', doc.querySelectorAll('.tabbar .tab-btn').length === 5 && !!doc.querySelector('#tab-research #researchList'));
+  check('Task106: the five tabs stay in the dock with their content (Task 114 adds 마을 as a sixth)', ['mining', 'dev', 'workers', 'research', 'delivery'].every((t) => !!doc.querySelector('.tabbar .tab-btn[data-tab="' + t + '"]')) && doc.querySelectorAll('.tabbar .tab-btn').length === 6 && !!doc.querySelector('.tabbar .tab-btn[data-tab="village"]') && !!doc.querySelector('#tab-research #researchList'));
   check('Task106: no panel is open at the start (the world is the screen)', !body.classList.contains('td-panel-open') && !body.classList.contains('td-log-open'));
   const devBtn = doc.querySelector('.tab-btn[data-tab="dev"]');
   devBtn.click();
@@ -937,4 +937,114 @@ function t110Arrived(win) {
   check('Task113: village.js loads after player.js and before ui.js (index.html, tests and the simulator agree)',
     win.document.querySelectorAll('script[src="js/village.js"]').length === 1 &&
     Array.from(win.document.querySelectorAll('script[src]')).map((e) => e.getAttribute('src')).join().includes('js/player.js,js/village.js,js/ui.js'));
+})();
+
+// -----------------------------------------------------------------------------
+// Task 114: village sites, ruins, collision and door access
+// -----------------------------------------------------------------------------
+// The flood fill used for reachability (foot positions on a 0.1 grid, from the workshop door).
+function t114Reach(win) {
+  const b = win.BALANCE.world, st = 0.1, n = Math.round((b.BOUNDS_MAX_X - b.BOUNDS_MIN_X) / st) + 1;
+  const P = (i) => b.BOUNDS_MIN_X + i * st, idx = (i, j) => j * n + i;
+  const can = new Uint8Array(n * n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) can[idx(i, j)] = win.playerCanStand(P(i), P(j)) ? 1 : 0;
+  const base = win.state.world.base, seen = new Uint8Array(n * n);
+  const at = (x, y) => idx(Math.round((x - b.BOUNDS_MIN_X) / st), Math.round((y - b.BOUNDS_MIN_Y) / st));
+  const q = [at(base.x, base.y + 0.05)]; seen[q[0]] = 1;
+  while (q.length) { const c = q.pop(), i = c % n; [i > 0 ? c - 1 : -1, i < n - 1 ? c + 1 : -1, c - n, c + n].forEach((d) => { if (d < 0 || d >= n * n || seen[d] || !can[d]) return; seen[d] = 1; q.push(d); }); }
+  let pockets = 0; for (let k = 0; k < n * n; k++) if (can[k] && !seen[k]) pockets++;
+  const near = (x, y, r) => { for (let j = Math.round((y - r - b.BOUNDS_MIN_Y) / st); j <= Math.round((y + r - b.BOUNDS_MIN_Y) / st); j++) for (let i = Math.round((x - r - b.BOUNDS_MIN_X) / st); i <= Math.round((x + r - b.BOUNDS_MIN_X) / st); i++) { if (i < 0 || j < 0 || i >= n || j >= n) continue; if (seen[idx(i, j)] && Math.hypot(P(i) - x, P(j) - y) <= r) return true; } return false; };
+  const v = win.state.village;
+  return { pockets, minesOk: win.state.world.mines.every((m) => near(m.x, m.y, win.TOPDOWN.INTERACT_RANGE - 0.15)),
+    doorsOk: win.VILLAGE.ORDER.every((k) => v.sites[k] && near(v.sites[k].x, v.sites[k].y + 0.1, 0.12)) };
+}
+function t114Rules(win) {
+  const v = win.state.village, S = win.VILLAGE.SITE, w = win.state.world;
+  return win.VILLAGE.ORDER.every((k) => { const p = v.sites[k]; return p &&
+    w.mines.every((m) => Math.hypot(m.x - p.x, m.y - p.y) >= S.MINE_CLEAR) && w.workshops.every((h) => Math.hypot(h.x - p.x, h.y - p.y) >= S.WORKSHOP_CLEAR - 1e-9) &&
+    win.worldGenExpansionSeedCells(w.base).every((c) => Math.hypot(c.x - p.x, c.y - p.y) >= S.MINE_CLEAR) && Math.hypot(p.x - w.base.x, p.y - w.base.y) >= S.RMIN &&
+    win.terrainRegionAt(p.x, p.y) === 'open'; }) && Math.hypot(v.sites.appraiser.x - v.sites.museum.x, v.sites.appraiser.y - v.sites.museum.y) >= S.GAP;
+}
+
+(function test_T114_sites() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, v = s.village, b = s.world.base;
+  check('Task114: a new game gives both facilities a site near the workshop when it starts', !!v.sites.appraiser && !!v.sites.museum &&
+    win.VILLAGE.ORDER.every((k) => Math.hypot(v.sites[k].x - b.x, v.sites[k].y - b.y) <= 7));
+  check('Task114: the sites keep clear of mines, later expansion mines, craft huts, the workshop yard and each other', t114Rules(win));
+  const r = t114Reach(win);
+  check('Task114: both doors can be walked to from the workshop door, every vein is still reachable and nothing is cut off', r.doorsOk && r.minesOk && r.pockets === 0);
+  // walls block, the door step stays free
+  const obs = win.worldObstacles().filter((o) => o.kind === 'village');
+  check('Task114: each facility\'s walls are an obstacle, ruined or not (ids appraiser, museum)', obs.length === 2 && obs.map((o) => o.id).sort().join() === 'appraiser,museum');
+  check('Task114: the door step is free to stand on', win.VILLAGE.ORDER.every((k) => win.playerCanStand(v.sites[k].x, v.sites[k].y + 0.02)));
+  const p = s.world.player, a = v.sites.appraiser, F = win.PLAYER_FOOT, box = win.VILLAGE.FACILITIES.appraiser.box;
+  p.x = a.x; p.y = a.y + 0.6; t107Hold(win, ['up'], 10);
+  check('Task114: walking up to the appraiser stops at its wall (at the door), never inside', Math.abs(p.y - (a.y + box.maxY + F.HALF_H)) < 1e-3 && !win.worldObstacles(p.x, p.y, 1).some((o) => win.playerFootOverlaps(o, p.x, p.y)));
+  // proximity: the facility is a target at its door and opens the village panel
+  const t = win.tdInteractTarget(a.x, a.y + 0.2);
+  check('Task114: at the door the facility is the interaction target, named with its state', t && t.type === 'village' && t.id === 'appraiser' && /감정소 \(폐허\)/.test(t.label));
+  const res = win.tdInteract(t);
+  check('Task114: acting on it opens the village panel (마을)', res.ok && res.open === 'village');
+  win.tdInteractNow();
+  check('Task114: ...in the top-down screen', win.document.querySelector('.tab-btn.active').dataset.tab === 'village' && win.document.getElementById('tab-village').classList.contains('active'));
+  check('Task114: the panel lists both facilities with their state', win.document.querySelectorAll('#villagePanel .village-card').length === 2 &&
+    win.document.querySelector('[data-village-stage="museum"]').textContent === '폐허');
+  // drawn: in the draw list, behind/in front by their wall front
+  const items = win.tdDrawList(null).filter((it) => it.kind === 'village');
+  check('Task114: both facilities are in the draw list as ruins, sorted by the front of their walls', items.length === 2 && items.every((it) => it.stage === 0 && Math.abs(it.sortY - (it.y + win.VILLAGE.FACILITIES[it.id].box.maxY)) < 1e-9));
+  const sp = [0, 1, 2].map((st) => [win.tdVillageSprite('appraiser', st, 0), win.tdVillageSprite('museum', st, 3)]);
+  const inside = (x) => x.rects.length > 10 && x.rects.every(([rx, ry, rw, rh]) => rx >= 0 && ry >= 0 && rx + rw <= x.w && ry + rh <= x.h);
+  check('Task114: each facility has its own picture for ruin, cleared and open (inside 44x40 / 60x48)', sp.every(([ap, mu]) => ap.w === 44 && ap.h === 40 && mu.w === 60 && mu.h === 48 && inside(ap) && inside(mu)) &&
+    new Set(sp.map(([ap]) => JSON.stringify(ap.rects))).size === 3 && new Set(sp.map(([, mu]) => JSON.stringify(mu.rects))).size === 3);
+  // new craft huts keep clear of the sites
+  s.research.workshopBuild = true; s.research.workshopExpansion = true; s.gold = 1e12; Object.keys(s.products).forEach((k) => { s.products[k] = 1e6; });
+  for (let i = 0; i < 8; i++) win.buildWorkshop();
+  check('Task114: craft huts built afterwards keep clear of the sites (8 built)', s.world.workshops.length === 8 &&
+    s.world.workshops.every((h) => win.VILLAGE.ORDER.every((k) => Math.hypot(h.x - v.sites[k].x, h.y - v.sites[k].y) >= win.VILLAGE.SITE.WORKSHOP_CLEAR)));
+  // the sites are saved and come back exactly
+  const kept = JSON.stringify(v.sites);
+  win.saveGame();
+  const w2 = newDom(storage).window;
+  check('Task114: the sites are saved and come back exactly (never moved)', JSON.stringify(w2.state.village.sites) === kept && JSON.stringify(JSON.parse(storage.getItem('gachaFactorySave')).run.village.sites) === kept);
+})();
+
+(function test_T114_oldSaveAndManyWorlds() {
+  // the fixture: sites are chosen round its 26 mines and 2 huts, which stay exactly where they were
+  const st = makeMemoryStorage(); st.setItem('gachaFactorySave', T103_FIXTURE_RAW);
+  const fx = newDom(st).window;
+  check('Task114: an older save gets sites when it loads; its mines and huts are not moved or removed',
+    !!fx.state.village.sites.appraiser && !!fx.state.village.sites.museum && t103Canon(fx.state.world.mines) === t103Canon(T103_FIXTURE.run.world.mines) &&
+    t103Canon(fx.state.world.workshops) === t103Canon(T103_FIXTURE.run.world.workshops));
+  const rf = t114Reach(fx);
+  check('Task114: in the fixture both doors and every vein can be reached, nothing is cut off', t114Rules(fx) && rf.doorsOk && rf.minesOk && rf.pockets === 0);
+  // generated worlds, with 8 huts built first (old saves) or after (new games), the tunnel open and all sites unlocked
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  let bad = 0, worlds = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const rnd = t103Random(seed * 6151);
+    const fresh = win.freshRunState(), s = win.state;
+    Object.keys(fresh).forEach((k) => { s[k] = fresh[k]; });
+    s.world.hiddenMineIds = [];
+    s.world.mines = win.generateInitialWorldMines(s.world.base, { random: rnd });
+    s.research.workshopBuild = true; s.research.workshopExpansion = true; s.gold = 1e12;
+    Object.keys(s.products).forEach((k) => { s.products[k] = 1e6; });
+    const hutsFirst = seed % 2 === 0;
+    if (hutsFirst) for (let i = 0; i < 8; i++) win.buildWorkshop();
+    const ok = win.villageEnsureSites();
+    if (!hutsFirst) for (let i = 0; i < 8; i++) win.buildWorkshop();
+    ['manaVein', 'ruins', 'spaceStation'].forEach((k) => { s.unlockedSites[k] = true; win.seedWorldMinesForSite(k); });
+    win.unlockTunnel({ random: rnd }); win.surveyMines({ random: rnd });
+    const r = t114Reach(win);
+    worlds++;
+    if (!ok || !t114Rules(win) || !r.doorsOk || !r.minesOk || r.pockets || s.world.workshops.length !== 8) bad++;
+  }
+  check('Task114: in 12 generated worlds (8 huts before or after, expansions, tunnel, survey) the sites follow the rules and everything stays reachable', worlds === 12 && bad === 0);
+})();
+
+(function test_T114_classic() {
+  const win = tdDomAt('https://example.test/?view=classic', makeMemoryStorage());
+  check('Task114: the classic screen keeps working and has the village panel too', !win.document.body.classList.contains('view-topdown') &&
+    !!win.document.querySelector('.tab-btn[data-tab="village"]') && win.document.querySelectorAll('#villagePanel .village-card').length === 2);
 })();
