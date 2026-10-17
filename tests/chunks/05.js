@@ -891,3 +891,50 @@ function t110Arrived(win) {
   const st3 = makeMemoryStorage(); bad.run.world.torches = 'lots'; st3.setItem('gachaFactorySave', JSON.stringify(bad));
   check('Task112: a torch field that is not a list means no torches', newDom(st3).window.state.world.torches.length === 0);
 })();
+
+// -----------------------------------------------------------------------------
+// Task 113: the village save skeleton (run.village, additive, saveVersion 1)
+// -----------------------------------------------------------------------------
+(function test_T113_villageState() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, V = win.VILLAGE;
+  check('Task113: two facilities to restore beside the workshop: the appraiser (감정소) and the museum (박물관)',
+    V.ORDER.join() === 'appraiser,museum' && V.FACILITIES.appraiser.name === '감정소' && V.FACILITIES.museum.name === '박물관' && V.FACILITIES.museum.requires === 'appraiser');
+  check('Task113: each is restored in two steps (clearing, then rebuilding), paid in gold and early products only',
+    V.ORDER.every((k) => V.FACILITIES[k].stages.length === 2 && V.FACILITIES[k].stages.every((st) => st.cost.gold > 0 &&
+      Object.keys(st.cost.products || {}).every((p) => win.RECIPES.some((r) => r.key === p) && ['steel', 'coalBrick', 'ironTool'].includes(p)))));
+  check('Task113: a relic codex of 12, each with a name, a rarity and a weight', win.VILLAGE_RELICS.length === 12 &&
+    new Set(win.VILLAGE_RELIC_KEYS).size === 12 && win.VILLAGE_RELICS.every((r) => r.name && ['common', 'uncommon', 'rare'].includes(r.rarity) && r.weight > 0));
+  check('Task113: unidentified relics are their own collectible: the crafting resource 고대 유물 stays as it was',
+    win.RESOURCES.some((r) => r.key === 'relic' && r.name === '고대 유물') && !win.VILLAGE_RELIC_KEYS.includes('relic') &&
+    win.RECIPES.filter((r) => r.need.relic).map((r) => r.key).join() === 'relicPart,relicOrnament');
+  const v = s.village;
+  check('Task113: a new game starts with a ruined village and no relics', v && v.stage.appraiser === 0 && v.stage.museum === 0 &&
+    v.unidentified === 0 && v.digProgress === 0 && v.appraised === 0 && Object.keys(v.owned).length === 0 && v.codex.length === 0 && v.donated.length === 0);
+  // a save from before the village loads with a ruined village, everything else unchanged
+  const st = makeMemoryStorage(); st.setItem('gachaFactorySave', T103_FIXTURE_RAW);
+  const old = newDom(st).window;
+  check('Task113: a save without a village (the fixture) loads with a ruined village', !('village' in T103_FIXTURE.run) &&
+    old.state.village.stage.appraiser === 0 && old.state.village.unidentified === 0 && old.state.gold >= T103_FIXTURE.run.gold && old.state.world.mines.length === 26);
+  // bad values are cleaned up, good ones kept exactly
+  const bad = JSON.parse(T103_FIXTURE_RAW);
+  bad.run.village = { sites: { appraiser: { x: 3.5, y: 2 }, museum: { x: 'a', y: 1 } }, stage: { appraiser: 2, museum: 7 },
+    unidentified: 3, digProgress: -1, appraised: 4.5, owned: { bell: 2, nope: 1, tile: 0 }, codex: ['tile', 'tile', 'zzz'], donated: ['potsherd', 5] };
+  const st2 = makeMemoryStorage(); st2.setItem('gachaFactorySave', JSON.stringify(bad));
+  const w2 = newDom(st2).window, v2 = w2.state.village;
+  check('Task113: broken village values are dropped or reset, good ones kept exactly',
+    v2.sites.appraiser.x === 3.5 && v2.sites.appraiser.y === 2 && v2.stage.appraiser === 2 && v2.stage.museum === 0 && v2.unidentified === 3 &&
+    v2.digProgress === 0 && v2.appraised === 0 && JSON.stringify(v2.owned) === '{"bell":2}' && JSON.stringify(v2.donated) === '["potsherd"]' &&
+    v2.codex.slice().sort().join() === 'bell,potsherd,tile');
+  check('Task113: a museum site that is not a point is not kept', v2.sites.museum === null || (typeof v2.sites.museum.x === 'number' && v2.sites.museum.x !== 'a'));
+  const st3 = makeMemoryStorage(); bad.run.village = 'ruins'; st3.setItem('gachaFactorySave', JSON.stringify(bad));
+  check('Task113: a village field that is not an object means a fresh ruined village', newDom(st3).window.state.village.stage.museum === 0);
+  win.saveGame();
+  const sv = JSON.parse(storage.getItem('gachaFactorySave'));
+  check('Task113: the village is saved in run.village with saveVersion 1', sv.saveVersion === 1 && sv.run.village &&
+    Object.keys(sv.run.village).sort().join() === 'appraised,codex,digProgress,donated,owned,sites,stage,unidentified');
+  check('Task113: village.js loads after player.js and before ui.js (index.html, tests and the simulator agree)',
+    win.document.querySelectorAll('script[src="js/village.js"]').length === 1 &&
+    Array.from(win.document.querySelectorAll('script[src]')).map((e) => e.getAttribute('src')).join().includes('js/player.js,js/village.js,js/ui.js'));
+})();
