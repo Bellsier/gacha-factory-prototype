@@ -18,7 +18,7 @@ const VILLAGE = {
       requires: null,
       stages: [
         { name: '잔해 치우기', cost: { gold: 100 } },
-        { name: '감정소 복구', cost: { gold: 400, products: { steel: 8, coalBrick: 4 } } },
+        { name: '건물 복구', cost: { gold: 400, products: { steel: 8, coalBrick: 4 } } },
       ],
     },
     museum: {
@@ -27,7 +27,7 @@ const VILLAGE = {
       requires: 'appraiser', // the appraiser must be open first
       stages: [
         { name: '잔해 치우기', cost: { gold: 1200 } },
-        { name: '박물관 복구', cost: { gold: 3000, products: { steel: 20, ironTool: 5 } } },
+        { name: '건물 복구', cost: { gold: 3000, products: { steel: 20, ironTool: 5 } } },
       ],
     },
   },
@@ -204,9 +204,57 @@ function villageEnsureSites(){
   return ok;
 }
 
-// What walking up to a facility's door offers (Task 114: look; later Tasks add the actions).
-//   { action: 'open', label }
+// ---------------------------------------------------------------------------
+// Task 115: staged restoration. Each facility is cleared, then rebuilt; the
+// museum needs the appraiser open first. The cost (gold and products from the
+// shared store) is paid once per step, when the step is done.
+// ---------------------------------------------------------------------------
+function villageNextStep(key){
+  const f = VILLAGE.FACILITIES[key];
+  return f ? (f.stages[villageStage(key)] || null) : null;
+}
+
+function villageCostText(cost){
+  const parts = [];
+  if(cost.gold) parts.push(fmt(cost.gold) + 'G');
+  Object.keys(cost.products || {}).forEach(p => { const r = RECIPES.find(x => x.key === p); parts.push((r ? r.name : p) + ' ' + cost.products[p]); });
+  return parts.join(' · ');
+}
+
+// Why the next step cannot be done now, or null when it can.
+function villageRestoreBlocker(key){
+  const f = VILLAGE.FACILITIES[key];
+  if(!f) return '알 수 없는 시설';
+  const v = villageState();
+  if(!v.sites[key]) return '자리를 찾는 중';
+  const step = villageNextStep(key);
+  if(!step) return '이미 운영 중';
+  if(f.requires && !villageIsOpen(f.requires)) return villageFacilityName(f.requires) + '를 먼저 복구해야 해요';
+  if(state.gold < (step.cost.gold || 0)) return '골드가 모자라요';
+  const short = Object.keys(step.cost.products || {}).find(p => (state.products[p] || 0) < step.cost.products[p]);
+  if(short){ const r = RECIPES.find(x => x.key === short); return (r ? r.name : short) + '이(가) 모자라요'; }
+  return null;
+}
+
+// Does the next restoration step. Returns true when it was done (and paid).
+function villageRestore(key){
+  if(villageRestoreBlocker(key)) return false;
+  const step = villageNextStep(key), v = villageState();
+  state.gold -= step.cost.gold || 0;
+  Object.keys(step.cost.products || {}).forEach(p => { state.products[p] -= step.cost.products[p]; });
+  v.stage[key] += 1;
+  log(villageFacilityName(key) + ': ' + step.name + (villageIsOpen(key) ? ' — 운영을 시작합니다' : ' 완료'));
+  return true;
+}
+
+// What walking up to a facility's door offers:
+//   { action: 'restore' | 'locked' | 'open', label }
 function villageTargetFor(key){
-  const stage = villageStage(key), name = villageFacilityName(key);
-  return { action: 'open', label: name + ' (' + VILLAGE.STAGE_NAMES[Math.min(stage, 2)] + ')' };
+  const f = VILLAGE.FACILITIES[key], name = f.name;
+  if(!villageIsOpen(key)){
+    if(f.requires && !villageIsOpen(f.requires)) return { action: 'locked', label: name + ' · ' + villageFacilityName(f.requires) + ' 먼저 복구' };
+    const step = villageNextStep(key);
+    return { action: 'restore', label: name + ' ' + step.name + ' · ' + villageCostText(step.cost) };
+  }
+  return { action: 'open', label: name };
 }

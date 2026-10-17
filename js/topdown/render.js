@@ -56,6 +56,19 @@ function tdDrawList(player){
   return list.sort((a, b) => a.sortY - b.sortY);
 }
 
+// Task 115: an open facility's windows glow warm (the museum's display niches too).
+function tdVillageLights(now){
+  const out = [], v = state.village;
+  if(typeof VILLAGE === 'undefined' || !v || !v.sites) return out;
+  VILLAGE.ORDER.forEach((k, i) => {
+    const site = v.sites[k];
+    if(!site || (v.stage[k] || 0) < 2) return;
+    if(k === 'appraiser') out.push({ kind: 'village', x: site.x - 0.2, y: site.y - 0.2, r: 0.6, rgb: [255, 210, 130], strength: 0.5 * tdFlicker(now, 20 + i) });
+    else out.push({ kind: 'village', x: site.x, y: site.y - 0.25, r: 0.9, rgb: [255, 220, 150], strength: 0.4 + 0.04 * Math.min(6, Math.ceil((v.donated || []).length / 2)) });
+  });
+  return out;
+}
+
 // Task 114: baked village facility images, cached by facility, stage and lit niches.
 function tdVillageImage(key, stage, exhibits){
   TD.villageImages = TD.villageImages || {};
@@ -138,8 +151,16 @@ function tdDrawSprite(g, img, sx, sy, zoom, anchorY){
   g.drawImage(img, Math.round(sx - w / 2), Math.round(sy - h + (anchorY || 0) * zoom), w, h);
 }
 
-function tdAddFloat(text, wx, wy, color){
-  TD.floats.push({ text, x: wx, y: wy, t0: performance.now(), color: color || '#fff3b0' });
+function tdAddFloat(text, wx, wy, color, lift){
+  TD.floats.push({ text, x: wx, y: wy, t0: performance.now(), color: color || '#fff3b0', lift: lift || 34 });
+}
+
+// How high (sprite pixels) the interaction bubble sits above a target's point: above its picture.
+function tdBubbleLift(target){
+  if(!target) return 34;
+  if(target.type === 'base') return 64;
+  if(target.type === 'village') return target.id === 'museum' ? 54 : 46;
+  return 34;
 }
 
 function tdFrame(now){
@@ -219,28 +240,32 @@ function tdRender(now){
   if(TD.quality < 2) tdRenderClouds(g, cam, w, h, zoom, now);
   const darkness = typeof TD.forceDarkness === 'number' ? TD.forceDarkness : tdAmbientDarkness(Date.now());
   TD.darkness = darkness;
-  const extraLights = typeof tdWorkerLights === 'function' ? tdWorkerLights(now) : [];
+  const extraLights = (typeof tdWorkerLights === 'function' ? tdWorkerLights(now) : []).concat(tdVillageLights(now));
   tdRenderLighting(g, tdLightList({ x: pos.x, y: pos.y, dir: p.facing }, now, extraLights), darkness, cam, w, h, zoom, TD.quality, now);
   const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.4, w / 2, h / 2, Math.max(w, h) * 0.78);
   vg.addColorStop(0, 'rgba(10,14,12,0)'); vg.addColorStop(1, 'rgba(10,14,12,0.32)');
   g.fillStyle = vg; g.fillRect(0, 0, w, h);
-  // interaction bubble over the target
+  // interaction bubble over the target (Task 115: kept on screen; a label too wide splits after its name)
   TD.target = typeof tdInteractTarget === 'function' ? tdInteractTarget(p.x, p.y) : null;
   if(TD.target){
     const sp = topdownToScreen(TD.target.x, TD.target.y, cam, w, h, zoom);
     const label = (TD.touch ? '' : '[E] ') + TD.target.label;
     g.font = 'bold ' + (12 + zoom) + 'px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
-    const tw = g.measureText(label).width + 14, bx = Math.round(sp.x - tw / 2), by = Math.round(sp.y - (TD.target.type === 'base' ? 64 : TD.target.type === 'village' ? (TD.target.id === 'museum' ? 54 : 46) : 34) * zoom);
+    let lines = [label];
+    if(g.measureText(label).width + 14 > w - 12 && label.includes(' · ')){ const cut = label.indexOf(' · '); lines = [label.slice(0, cut), label.slice(cut + 3)]; }
+    const tw = Math.min(w - 12, Math.max(...lines.map(l => g.measureText(l).width)) + 14), bh = 22 * lines.length;
+    const bx = Math.round(Math.max(6, Math.min(w - tw - 6, sp.x - tw / 2))), by = Math.round(sp.y - tdBubbleLift(TD.target) * zoom) - (lines.length - 1) * 22;
     g.fillStyle = TD.target.action === 'locked' ? 'rgba(40,36,34,0.88)' : 'rgba(22,28,32,0.9)';
-    g.fillRect(bx, by, tw, 22); g.fillStyle = TD.target.action === 'locked' ? '#8b98a1' : '#ffd27a';
-    g.fillRect(bx, by + 21, tw, 2);
-    g.fillStyle = TD.target.action === 'locked' ? '#b8c0c6' : '#fff6dc'; g.textBaseline = 'middle'; g.fillText(label, bx + 7, by + 11);
+    g.fillRect(bx, by, tw, bh); g.fillStyle = TD.target.action === 'locked' ? '#8b98a1' : '#ffd27a';
+    g.fillRect(bx, by + bh - 1, tw, 2);
+    g.fillStyle = TD.target.action === 'locked' ? '#b8c0c6' : '#fff6dc'; g.textBaseline = 'middle';
+    lines.forEach((l, i) => g.fillText(l, bx + 7, by + 11 + i * 22, tw - 14));
   }
   // floating texts (+1 철광석 ...)
   TD.floats = TD.floats.filter(f => now - f.t0 < 1200);
   TD.floats.forEach(f => {
     const k = (now - f.t0) / 1200, sp = topdownToScreen(f.x, f.y, cam, w, h, zoom);
-    const fy = sp.y - 34 * zoom - 26 - k * 34; // starts above the interaction bubble and rises
+    const fy = sp.y - (f.lift || 34) * zoom - 26 - k * 34; // starts above the interaction bubble and rises
     g.globalAlpha = 1 - k * k; g.font = 'bold ' + (13 + zoom) + 'px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = '#000'; g.fillText(f.text, sp.x + 1, fy + 1);

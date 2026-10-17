@@ -68,12 +68,44 @@ function tdInteract(target){
     }
     return { ok: false, text: target.label };
   }
-  if(target.type === 'village') return { ok: true, text: '', open: 'village' }; // Task 114: the village panel
+  if(target.type === 'village') return tdVillageInteract(target);
   return { ok: true, text: '', open: 'dev' };
 }
 
 function tdRefreshAfterMineChange(){
   if(typeof buildMines === 'function') buildMines();
   if(typeof renderWorldObjects === 'function') renderWorldObjects();
+  if(typeof updateNumbers === 'function') updateNumbers();
+}
+
+// Task 115~117: a village facility. Restoring, appraising and donating go
+// through the same game functions as the 마을 panel buttons (js/village.js).
+function tdVillageInteract(target){
+  const k = target.id;
+  if(target.action === 'restore'){
+    const why = villageRestoreBlocker(k);
+    if(why || !villageRestore(k)) return { ok: false, text: why || '' };
+    tdRefreshAfterVillageChange();
+    return { ok: true, text: villageIsOpen(k) ? villageFacilityName(k) + ' 운영 시작!' : '잔해를 치웠어요' };
+  }
+  if(target.action === 'locked') return { ok: false, text: target.label };
+  if(target.action === 'appraise' && typeof villageAppraise === 'function'){
+    const r = villageAppraise();
+    if(!r) return { ok: false, text: '' };
+    tdRefreshAfterVillageChange();
+    return { ok: true, text: (r.isNew ? '도감 등록! ' : '') + r.relic.name };
+  }
+  if(target.action === 'donate' && typeof villageDonateAll === 'function'){
+    const n = villageDonateAll();
+    if(!n) return { ok: false, text: '' };
+    tdRefreshAfterVillageChange();
+    return { ok: true, text: '유물 ' + n + '점 기증 · 전시' };
+  }
+  return { ok: true, text: '', open: 'village' };
+}
+
+function tdRefreshAfterVillageChange(){
+  if(typeof renderVillage === 'function') renderVillage();
+  if(typeof renderCurrencies === 'function') renderCurrencies();
   if(typeof updateNumbers === 'function') updateNumbers();
 }

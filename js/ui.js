@@ -885,26 +885,54 @@ function updateNumbers(){
   craftFacilityBtn.textContent = craftFacilityAtMax() ? '제작 시설 강화 — 최대' : `제작 시설 강화 — ${craftFacilityCost()}G`;
   craftFacilityBtn.disabled = craftFacilityAtMax() || state.gold < craftFacilityCost();
   renderCurrencies();
+  refreshVillageButtons(); // Task 115
 }
 
 // Structural rebuild after state changes. Render helpers only read `state`.
-// Task 114: the village panel (마을 탭). Lists each facility with its site and
-// restoration state; later Tasks add the actions. Rebuilt by renderAll and
-// after a village action; never from the tick loop.
+// Task 114~117: the village panel (마을 탭). The workshop (the village's
+// production centre) and each facility with its state and next step; the
+// actions call the same functions as walking up to the door (js/village.js).
+// Rebuilt by renderAll and after a village action; the tick only refreshes
+// which buttons can be pressed (refreshVillageButtons).
 function renderVillage(){
   const wrap = document.getElementById('villagePanel');
   if(!wrap || typeof VILLAGE === 'undefined') return;
   const v = villageState();
-  let html = '<div class="village-list">';
+  let html = '<div class="village-list">' +
+    '<div class="village-card" data-village="workshop"><div class="village-head"><b>공방</b> <span class="village-stage">운영 중</span></div>' +
+    '<div class="rate">마을의 중심 생산 시설. 제작과 판매는 개발 탭에서 합니다.</div></div>';
   VILLAGE.ORDER.forEach(k => {
-    const f = VILLAGE.FACILITIES[k], stage = villageStage(k), site = v.sites[k];
+    const f = VILLAGE.FACILITIES[k], stage = villageStage(k), site = v.sites[k], step = villageNextStep(k);
     html += '<div class="village-card" data-village="' + k + '">' +
       '<div class="village-head"><b>' + f.name + '</b> <span class="village-stage" data-village-stage="' + k + '">' + VILLAGE.STAGE_NAMES[Math.min(stage, 2)] + '</span></div>' +
-      '<div class="rate">' + (site ? '공방 근처 (' + site.x.toFixed(1) + ', ' + site.y.toFixed(1) + ')' : '자리를 찾는 중') + '</div>' +
-      '</div>';
+      '<div class="rate">' + (site ? '공방 근처 (' + site.x.toFixed(1) + ', ' + site.y.toFixed(1) + ')' : '자리를 찾는 중') + '</div>';
+    if(step){
+      html += '<div class="village-actions"><button data-village-restore="' + k + '">' + step.name + ' (' + villageCostText(step.cost) + ')</button></div>' +
+        '<div class="rate" data-village-why="' + k + '"></div>';
+    } else html += villageOpenSection(k);
+    html += '</div>';
   });
   html += '</div>';
   wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-village-restore]').forEach(btn => { btn.onclick = () => { if(villageRestore(btn.dataset.villageRestore)){ renderVillage(); renderCurrencies(); updateNumbers(); } }; });
+  bindVillageOpenSections(wrap);
+  refreshVillageButtons();
+}
+
+// What an open facility's card shows (Task 116 appraiser, Task 117 museum).
+function villageOpenSection(k){ return '<div class="rate">운영 중</div>'; }
+function bindVillageOpenSections(wrap){}
+
+// Per tick: which village buttons can be pressed now, and why not.
+function refreshVillageButtons(){
+  const wrap = document.getElementById('villagePanel');
+  if(!wrap || typeof VILLAGE === 'undefined') return;
+  wrap.querySelectorAll('[data-village-restore]').forEach(btn => {
+    const why = villageRestoreBlocker(btn.dataset.villageRestore);
+    btn.disabled = !!why;
+    const note = wrap.querySelector('[data-village-why="' + btn.dataset.villageRestore + '"]');
+    if(note && note.textContent !== (why || '')) note.textContent = why || '';
+  });
 }
 
 function renderAll(){

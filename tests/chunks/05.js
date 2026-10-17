@@ -195,12 +195,18 @@ function tdKey(win, target, key) {
   // a spot at least 2 units from every vein and building (the starter veins are random, so search for one)
   let farSpot = null;
   for (let y = -9; y <= 9 && !farSpot; y += 0.5) for (let x = -3; x <= 9 && !farSpot; x += 0.5) {
-    const clear = s.world.mines.every((m) => Math.hypot(m.x - x, m.y - y) > 2) && Math.hypot(s.world.base.x - x, s.world.base.y - y) > 2;
+    const doors = ['appraiser', 'museum'].map((k) => s.village && s.village.sites[k]).filter(Boolean); // Task 114: village doors are targets too
+    const clear = s.world.mines.every((m) => Math.hypot(m.x - x, m.y - y) > 2) && Math.hypot(s.world.base.x - x, s.world.base.y - y) > 2 && doors.every((d) => Math.hypot(d.x - x, d.y - y) > 2);
     if (clear && win.playerCanStand(x, y)) farSpot = [x, y];
   }
   stand(farSpot[0], farSpot[1]);
   check('Task106: far from everything there is nothing to act on', win.tdInteractTarget(p.x, p.y) === null);
-  stand(iron.x + 1.1, iron.y);
+  // 1.1 from the vein on a side where nothing else to act on is near: the workshop door, another vein or
+  // (Task 114) a village door would be the nearer target (the starter veins are random)
+  const others = [s.world.base].concat(s.world.mines.filter((m) => m.id !== iron.id), ['appraiser', 'museum'].map((k) => s.village.sites[k]).filter(Boolean));
+  const side = [[1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]].find(([dx, dy]) => win.playerCanStand(iron.x + dx, iron.y + dy) &&
+    others.every((o) => Math.hypot(o.x - iron.x - dx, o.y - iron.y - dy) > 1.2));
+  stand(iron.x + side[0], iron.y + side[1]);
   check('Task106: within reach (1.1) of an unsecured vein the action is "secure"', win.tdInteractTarget(p.x, p.y).action === 'secure' && win.tdInteractTarget(p.x, p.y).id === iron.id);
   stand(iron.x + 1.3, iron.y);
   const t13 = win.tdInteractTarget(p.x, p.y);
@@ -984,12 +990,12 @@ function t114Rules(win) {
   check('Task114: walking up to the appraiser stops at its wall (at the door), never inside', Math.abs(p.y - (a.y + box.maxY + F.HALF_H)) < 1e-3 && !win.worldObstacles(p.x, p.y, 1).some((o) => win.playerFootOverlaps(o, p.x, p.y)));
   // proximity: the facility is a target at its door and opens the village panel
   const t = win.tdInteractTarget(a.x, a.y + 0.2);
-  check('Task114: at the door the facility is the interaction target, named with its state', t && t.type === 'village' && t.id === 'appraiser' && /감정소 \(폐허\)/.test(t.label));
+  check('Task114: at the door the facility is the interaction target, named (Task 115: with its next step)', t && t.type === 'village' && t.id === 'appraiser' && /감정소/.test(t.label));
   const res = win.tdInteract(t);
-  check('Task114: acting on it opens the village panel (마을)', res.ok && res.open === 'village');
-  win.tdInteractNow();
-  check('Task114: ...in the top-down screen', win.document.querySelector('.tab-btn.active').dataset.tab === 'village' && win.document.getElementById('tab-village').classList.contains('active'));
-  check('Task114: the panel lists both facilities with their state', win.document.querySelectorAll('#villagePanel .village-card').length === 2 &&
+  check('Task114: acting on it goes through the village rules (no gold yet: nothing happens, the reason is given)', res.ok === false && /골드/.test(res.text) && s.village.stage.appraiser === 0);
+  win.tdOpenTab('village');
+  check('Task114: the 마을 panel opens from the dock in the top-down screen', win.document.querySelector('.tab-btn.active').dataset.tab === 'village' && win.document.getElementById('tab-village').classList.contains('active'));
+  check('Task114: the panel lists the workshop and both facilities with their state', win.document.querySelectorAll('#villagePanel .village-card').length === 3 &&
     win.document.querySelector('[data-village-stage="museum"]').textContent === '폐허');
   // drawn: in the draw list, behind/in front by their wall front
   const items = win.tdDrawList(null).filter((it) => it.kind === 'village');
@@ -1046,5 +1052,75 @@ function t114Rules(win) {
 (function test_T114_classic() {
   const win = tdDomAt('https://example.test/?view=classic', makeMemoryStorage());
   check('Task114: the classic screen keeps working and has the village panel too', !win.document.body.classList.contains('view-topdown') &&
-    !!win.document.querySelector('.tab-btn[data-tab="village"]') && win.document.querySelectorAll('#villagePanel .village-card').length === 2);
+    !!win.document.querySelector('.tab-btn[data-tab="village"]') && win.document.querySelectorAll('#villagePanel .village-card').length === 3);
+})();
+
+// -----------------------------------------------------------------------------
+// Task 115: staged restoration (clear, then rebuild; the museum after the appraiser)
+// -----------------------------------------------------------------------------
+(function test_T115_restore() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, v = s.village, F = win.VILLAGE.FACILITIES, doc = win.document;
+  const a = v.sites.appraiser, m = v.sites.museum, p = s.world.player;
+  // nothing can be paid for yet
+  check('Task115: with no gold the first step is blocked and says why', /골드/.test(win.villageRestoreBlocker('appraiser')) && !win.villageRestore('appraiser') && v.stage.appraiser === 0);
+  check('Task115: the museum waits for the appraiser', /감정소를 먼저/.test(win.villageRestoreBlocker('museum')));
+  p.x = m.x; p.y = m.y + 0.2;
+  const tm = win.tdInteractTarget(p.x, p.y);
+  check('Task115: at the museum door before that, the target is locked and says so', tm && tm.id === 'museum' && tm.action === 'locked' && /감정소 먼저 복구/.test(tm.label));
+  // the first step by walking up and pressing E (the same as the action button)
+  s.gold = 1000;
+  p.x = a.x; p.y = a.y + 0.2;
+  const ta = win.tdInteractTarget(p.x, p.y);
+  check('Task115: at the appraiser door the target offers the next step with its cost', ta && ta.action === 'restore' && /잔해 치우기/.test(ta.label) && /100G/.test(ta.label));
+  win.TD.target = ta; win.tdUpdateActionButton();
+  check('Task115: the phone action button reads 복구', doc.getElementById('tdAction').textContent === '복구');
+  win.tdInteractNow();
+  check('Task115: E clears the rubble: stage 1, exactly 100G paid', v.stage.appraiser === 1 && s.gold === 900);
+  // the second step needs products
+  const t2 = win.tdInteractTarget(p.x, p.y);
+  check('Task115: the next step is the rebuild, paid in gold and products', t2.action === 'restore' && /건물 복구/.test(t2.label) && /강철 8/.test(t2.label) && /석탄 벽돌 4/.test(t2.label));
+  const floats = win.TD.floats.length;
+  win.tdInteractNow();
+  check('Task115: without the products nothing is paid and the reason floats up', v.stage.appraiser === 1 && s.gold === 900 && win.TD.floats.length === floats + 1 && /강철/.test(win.TD.floats[win.TD.floats.length - 1].text));
+  s.products.steel = 10; s.products.coalBrick = 5;
+  win.tdInteractNow();
+  check('Task115: with them, the appraiser opens: 400G, 8 steel and 4 coal bricks paid once', v.stage.appraiser === 2 && win.villageIsOpen('appraiser') && s.gold === 500 && s.products.steel === 2 && s.products.coalBrick === 1);
+  check('Task115: an open facility takes no more payments', !win.villageRestore('appraiser') && s.gold === 500 && /이미 운영/.test(win.villageRestoreBlocker('appraiser')));
+  // the museum, through the 마을 panel buttons
+  win.renderVillage();
+  let btn = doc.querySelector('[data-village-restore="museum"]');
+  win.updateNumbers();
+  check('Task115: the panel shows the museum step with its cost, disabled while short, with the reason', !!btn && /1,200G/.test(btn.textContent) && btn.disabled &&
+    /골드/.test(doc.querySelector('[data-village-why="museum"]').textContent));
+  s.gold = 10000; s.products.steel = 25; s.products.ironTool = 6;
+  win.updateNumbers();
+  check('Task115: ...and enabled once affordable', !btn.disabled && doc.querySelector('[data-village-why="museum"]').textContent === '');
+  btn.click();
+  btn = doc.querySelector('[data-village-restore="museum"]');
+  check('Task115: the panel button clears the museum rubble (1,200G)', v.stage.museum === 1 && s.gold === 8800 && !!btn && /건물 복구/.test(btn.textContent));
+  btn.click();
+  check('Task115: ...and rebuilds it (3,000G, 20 steel, 5 iron tools); the card then shows it open', v.stage.museum === 2 && s.gold === 5800 && s.products.steel === 5 && s.products.ironTool === 1 &&
+    !doc.querySelector('[data-village-restore="museum"]') && doc.querySelector('[data-village-stage="museum"]').textContent === '운영 중');
+  check('Task115: each step wrote a log line', Array.from(doc.querySelectorAll('#log > *')).filter((e) => /감정소|박물관/.test(e.textContent)).length >= 4);
+  // drawn by stage, lit when open
+  const items = win.tdDrawList(null).filter((it) => it.kind === 'village');
+  check('Task115: both are drawn as open buildings now', items.every((it) => it.stage === 2));
+  check('Task115: open facilities light their windows', win.tdVillageLights(0).length === 2);
+  check('Task115: the walls still block and the door step stays free once rebuilt', win.worldObstacles().filter((o) => o.kind === 'village').length === 2 && win.playerCanStand(a.x, a.y + 0.02));
+  // saved and loaded back
+  win.saveGame();
+  const w2 = newDom(storage).window;
+  check('Task115: restoration is saved and comes back', w2.state.village.stage.appraiser === 2 && w2.state.village.stage.museum === 2 && JSON.stringify(w2.state.village.sites) === JSON.stringify(v.sites));
+  check('Task115: the workshop is listed first as the village\'s production centre', doc.querySelector('#villagePanel .village-card').dataset.village === 'workshop');
+})();
+
+(function test_T115_classicRestore() {
+  // the classic screen restores through the same panel buttons
+  const win = tdDomAt('https://example.test/?view=classic', makeMemoryStorage());
+  win.state.gold = 500;
+  win.renderVillage(); win.updateNumbers();
+  win.document.querySelector('[data-village-restore="appraiser"]').click();
+  check('Task115: on the classic screen the panel button restores too', win.state.village.stage.appraiser === 1 && win.state.gold === 400);
 })();
