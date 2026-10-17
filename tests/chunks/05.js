@@ -158,7 +158,7 @@ function tdKey(win, target, key) {
   const doc = win.document, body = doc.body;
   check('Task106: the top-down view is the default — world canvas, HUD, minimap, dock', body.classList.contains('view-topdown') &&
     !!doc.getElementById('tdCanvas') && body.firstElementChild.id === 'tdCanvas' && !!doc.getElementById('tdMinimap') && !!doc.querySelector('.tabbar .td-log-btn'));
-  check('Task106: the five tabs stay in the dock with their content', doc.querySelectorAll('.tabbar .tab-btn').length === 5 && !!doc.querySelector('#tab-research #researchList'));
+  check('Task106: the five tabs stay in the dock with their content (Task 114 adds 마을 as a sixth)', ['mining', 'dev', 'workers', 'research', 'delivery'].every((t) => !!doc.querySelector('.tabbar .tab-btn[data-tab="' + t + '"]')) && doc.querySelectorAll('.tabbar .tab-btn').length === 6 && !!doc.querySelector('.tabbar .tab-btn[data-tab="village"]') && !!doc.querySelector('#tab-research #researchList'));
   check('Task106: no panel is open at the start (the world is the screen)', !body.classList.contains('td-panel-open') && !body.classList.contains('td-log-open'));
   const devBtn = doc.querySelector('.tab-btn[data-tab="dev"]');
   devBtn.click();
@@ -195,12 +195,18 @@ function tdKey(win, target, key) {
   // a spot at least 2 units from every vein and building (the starter veins are random, so search for one)
   let farSpot = null;
   for (let y = -9; y <= 9 && !farSpot; y += 0.5) for (let x = -3; x <= 9 && !farSpot; x += 0.5) {
-    const clear = s.world.mines.every((m) => Math.hypot(m.x - x, m.y - y) > 2) && Math.hypot(s.world.base.x - x, s.world.base.y - y) > 2;
+    const doors = ['appraiser', 'museum'].map((k) => s.village && s.village.sites[k]).filter(Boolean); // Task 114: village doors are targets too
+    const clear = s.world.mines.every((m) => Math.hypot(m.x - x, m.y - y) > 2) && Math.hypot(s.world.base.x - x, s.world.base.y - y) > 2 && doors.every((d) => Math.hypot(d.x - x, d.y - y) > 2);
     if (clear && win.playerCanStand(x, y)) farSpot = [x, y];
   }
   stand(farSpot[0], farSpot[1]);
   check('Task106: far from everything there is nothing to act on', win.tdInteractTarget(p.x, p.y) === null);
-  stand(iron.x + 1.1, iron.y);
+  // 1.1 from the vein on a side where nothing else to act on is near: the workshop door, another vein or
+  // (Task 114) a village door would be the nearer target (the starter veins are random)
+  const others = [s.world.base].concat(s.world.mines.filter((m) => m.id !== iron.id), ['appraiser', 'museum'].map((k) => s.village.sites[k]).filter(Boolean));
+  const side = [[1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]].find(([dx, dy]) => win.playerCanStand(iron.x + dx, iron.y + dy) &&
+    others.every((o) => Math.hypot(o.x - iron.x - dx, o.y - iron.y - dy) > 1.2));
+  stand(iron.x + side[0], iron.y + side[1]);
   check('Task106: within reach (1.1) of an unsecured vein the action is "secure"', win.tdInteractTarget(p.x, p.y).action === 'secure' && win.tdInteractTarget(p.x, p.y).id === iron.id);
   stand(iron.x + 1.3, iron.y);
   const t13 = win.tdInteractTarget(p.x, p.y);
@@ -890,4 +896,398 @@ function t110Arrived(win) {
   check('Task112: broken torch entries are dropped, good ones kept exactly, at most 12', tl.length === 12 && tl[0].x === 1 && tl[0].y === 2 && tl[1].x === 3.25 && tl[1].y === -1.5 && tl.every((t) => Object.keys(t).sort().join() === 'x,y'));
   const st3 = makeMemoryStorage(); bad.run.world.torches = 'lots'; st3.setItem('gachaFactorySave', JSON.stringify(bad));
   check('Task112: a torch field that is not a list means no torches', newDom(st3).window.state.world.torches.length === 0);
+})();
+
+// -----------------------------------------------------------------------------
+// Task 113: the village save skeleton (run.village, additive, saveVersion 1)
+// -----------------------------------------------------------------------------
+(function test_T113_villageState() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, V = win.VILLAGE;
+  check('Task113: two facilities to restore beside the workshop: the appraiser (감정소) and the museum (박물관)',
+    V.ORDER.join() === 'appraiser,museum' && V.FACILITIES.appraiser.name === '감정소' && V.FACILITIES.museum.name === '박물관' && V.FACILITIES.museum.requires === 'appraiser');
+  check('Task113: each is restored in two steps (clearing, then rebuilding), paid in gold and early products only',
+    V.ORDER.every((k) => V.FACILITIES[k].stages.length === 2 && V.FACILITIES[k].stages.every((st) => st.cost.gold > 0 &&
+      Object.keys(st.cost.products || {}).every((p) => win.RECIPES.some((r) => r.key === p) && ['steel', 'coalBrick', 'ironTool'].includes(p)))));
+  check('Task113: a relic codex of 12, each with a name, a rarity and a weight', win.VILLAGE_RELICS.length === 12 &&
+    new Set(win.VILLAGE_RELIC_KEYS).size === 12 && win.VILLAGE_RELICS.every((r) => r.name && ['common', 'uncommon', 'rare'].includes(r.rarity) && r.weight > 0));
+  check('Task113: unidentified relics are their own collectible: the crafting resource 고대 유물 stays as it was',
+    win.RESOURCES.some((r) => r.key === 'relic' && r.name === '고대 유물') && !win.VILLAGE_RELIC_KEYS.includes('relic') &&
+    win.RECIPES.filter((r) => r.need.relic).map((r) => r.key).join() === 'relicPart,relicOrnament');
+  const v = s.village;
+  check('Task113: a new game starts with a ruined village and no relics', v && v.stage.appraiser === 0 && v.stage.museum === 0 &&
+    v.unidentified === 0 && v.digProgress === 0 && v.appraised === 0 && Object.keys(v.owned).length === 0 && v.codex.length === 0 && v.donated.length === 0);
+  // a save from before the village loads with a ruined village, everything else unchanged
+  const st = makeMemoryStorage(); st.setItem('gachaFactorySave', T103_FIXTURE_RAW);
+  const old = newDom(st).window;
+  check('Task113: a save without a village (the fixture) loads with a ruined village', !('village' in T103_FIXTURE.run) &&
+    old.state.village.stage.appraiser === 0 && old.state.village.unidentified === 0 && old.state.gold >= T103_FIXTURE.run.gold && old.state.world.mines.length === 26);
+  // bad values are cleaned up, good ones kept exactly
+  const bad = JSON.parse(T103_FIXTURE_RAW);
+  bad.run.village = { sites: { appraiser: { x: 3.5, y: 2 }, museum: { x: 'a', y: 1 } }, stage: { appraiser: 2, museum: 7 },
+    unidentified: 3, digProgress: -1, appraised: 4.5, owned: { bell: 2, nope: 1, tile: 0 }, codex: ['tile', 'tile', 'zzz'], donated: ['potsherd', 5] };
+  const st2 = makeMemoryStorage(); st2.setItem('gachaFactorySave', JSON.stringify(bad));
+  const w2 = newDom(st2).window, v2 = w2.state.village;
+  check('Task113: broken village values are dropped or reset, good ones kept exactly',
+    v2.sites.appraiser.x === 3.5 && v2.sites.appraiser.y === 2 && v2.stage.appraiser === 2 && v2.stage.museum === 0 && v2.unidentified === 3 &&
+    v2.digProgress === 0 && v2.appraised === 0 && JSON.stringify(v2.owned) === '{"bell":2}' && JSON.stringify(v2.donated) === '["potsherd"]' &&
+    v2.codex.slice().sort().join() === 'bell,potsherd,tile');
+  check('Task113: a museum site that is not a point is not kept', v2.sites.museum === null || (typeof v2.sites.museum.x === 'number' && v2.sites.museum.x !== 'a'));
+  const st3 = makeMemoryStorage(); bad.run.village = 'ruins'; st3.setItem('gachaFactorySave', JSON.stringify(bad));
+  check('Task113: a village field that is not an object means a fresh ruined village', newDom(st3).window.state.village.stage.museum === 0);
+  win.saveGame();
+  const sv = JSON.parse(storage.getItem('gachaFactorySave'));
+  check('Task113: the village is saved in run.village with saveVersion 1', sv.saveVersion === 1 && sv.run.village &&
+    Object.keys(sv.run.village).sort().join() === 'appraised,codex,digProgress,donated,owned,sites,stage,unidentified');
+  check('Task113: village.js loads after player.js and before ui.js (index.html, tests and the simulator agree)',
+    win.document.querySelectorAll('script[src="js/village.js"]').length === 1 &&
+    Array.from(win.document.querySelectorAll('script[src]')).map((e) => e.getAttribute('src')).join().includes('js/player.js,js/village.js,js/ui.js'));
+})();
+
+// -----------------------------------------------------------------------------
+// Task 114: village sites, ruins, collision and door access
+// -----------------------------------------------------------------------------
+// The flood fill used for reachability (foot positions on a 0.1 grid, from the workshop door).
+function t114Reach(win) {
+  const b = win.BALANCE.world, st = 0.1, n = Math.round((b.BOUNDS_MAX_X - b.BOUNDS_MIN_X) / st) + 1;
+  const P = (i) => b.BOUNDS_MIN_X + i * st, idx = (i, j) => j * n + i;
+  const can = new Uint8Array(n * n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) can[idx(i, j)] = win.playerCanStand(P(i), P(j)) ? 1 : 0;
+  const base = win.state.world.base, seen = new Uint8Array(n * n);
+  const at = (x, y) => idx(Math.round((x - b.BOUNDS_MIN_X) / st), Math.round((y - b.BOUNDS_MIN_Y) / st));
+  const q = [at(base.x, base.y + 0.05)]; seen[q[0]] = 1;
+  while (q.length) { const c = q.pop(), i = c % n; [i > 0 ? c - 1 : -1, i < n - 1 ? c + 1 : -1, c - n, c + n].forEach((d) => { if (d < 0 || d >= n * n || seen[d] || !can[d]) return; seen[d] = 1; q.push(d); }); }
+  let pockets = 0; for (let k = 0; k < n * n; k++) if (can[k] && !seen[k]) pockets++;
+  const near = (x, y, r) => { for (let j = Math.round((y - r - b.BOUNDS_MIN_Y) / st); j <= Math.round((y + r - b.BOUNDS_MIN_Y) / st); j++) for (let i = Math.round((x - r - b.BOUNDS_MIN_X) / st); i <= Math.round((x + r - b.BOUNDS_MIN_X) / st); i++) { if (i < 0 || j < 0 || i >= n || j >= n) continue; if (seen[idx(i, j)] && Math.hypot(P(i) - x, P(j) - y) <= r) return true; } return false; };
+  const v = win.state.village;
+  return { pockets, minesOk: win.state.world.mines.every((m) => near(m.x, m.y, win.TOPDOWN.INTERACT_RANGE - 0.15)),
+    doorsOk: win.VILLAGE.ORDER.every((k) => v.sites[k] && near(v.sites[k].x, v.sites[k].y + 0.1, 0.12)) };
+}
+function t114Rules(win) {
+  const v = win.state.village, S = win.VILLAGE.SITE, w = win.state.world;
+  return win.VILLAGE.ORDER.every((k) => { const p = v.sites[k]; return p &&
+    w.mines.every((m) => Math.hypot(m.x - p.x, m.y - p.y) >= S.MINE_CLEAR) && w.workshops.every((h) => Math.hypot(h.x - p.x, h.y - p.y) >= S.WORKSHOP_CLEAR - 1e-9) &&
+    win.worldGenExpansionSeedCells(w.base).every((c) => Math.hypot(c.x - p.x, c.y - p.y) >= S.MINE_CLEAR) && Math.hypot(p.x - w.base.x, p.y - w.base.y) >= S.RMIN &&
+    win.terrainRegionAt(p.x, p.y) === 'open'; }) && Math.hypot(v.sites.appraiser.x - v.sites.museum.x, v.sites.appraiser.y - v.sites.museum.y) >= S.GAP;
+}
+
+(function test_T114_sites() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, v = s.village, b = s.world.base;
+  check('Task114: a new game gives both facilities a site near the workshop when it starts', !!v.sites.appraiser && !!v.sites.museum &&
+    win.VILLAGE.ORDER.every((k) => Math.hypot(v.sites[k].x - b.x, v.sites[k].y - b.y) <= 7));
+  check('Task114: the sites keep clear of mines, later expansion mines, craft huts, the workshop yard and each other', t114Rules(win));
+  const r = t114Reach(win);
+  check('Task114: both doors can be walked to from the workshop door, every vein is still reachable and nothing is cut off', r.doorsOk && r.minesOk && r.pockets === 0);
+  // walls block, the door step stays free
+  const obs = win.worldObstacles().filter((o) => o.kind === 'village');
+  check('Task114: each facility\'s walls are an obstacle, ruined or not (ids appraiser, museum)', obs.length === 2 && obs.map((o) => o.id).sort().join() === 'appraiser,museum');
+  check('Task114: the door step is free to stand on', win.VILLAGE.ORDER.every((k) => win.playerCanStand(v.sites[k].x, v.sites[k].y + 0.02)));
+  const p = s.world.player, a = v.sites.appraiser, F = win.PLAYER_FOOT, box = win.VILLAGE.FACILITIES.appraiser.box;
+  p.x = a.x; p.y = a.y + 0.6; t107Hold(win, ['up'], 10);
+  check('Task114: walking up to the appraiser stops at its wall (at the door), never inside', Math.abs(p.y - (a.y + box.maxY + F.HALF_H)) < 1e-3 && !win.worldObstacles(p.x, p.y, 1).some((o) => win.playerFootOverlaps(o, p.x, p.y)));
+  // proximity: the facility is a target at its door and opens the village panel
+  const t = win.tdInteractTarget(a.x, a.y + 0.2);
+  check('Task114: at the door the facility is the interaction target, named (Task 115: with its next step)', t && t.type === 'village' && t.id === 'appraiser' && /감정소/.test(t.label));
+  const res = win.tdInteract(t);
+  check('Task114: acting on it goes through the village rules (no gold yet: nothing happens, the reason is given)', res.ok === false && /골드/.test(res.text) && s.village.stage.appraiser === 0);
+  win.tdOpenTab('village');
+  check('Task114: the 마을 panel opens from the dock in the top-down screen', win.document.querySelector('.tab-btn.active').dataset.tab === 'village' && win.document.getElementById('tab-village').classList.contains('active'));
+  check('Task114: the panel lists the workshop and both facilities with their state', win.document.querySelectorAll('#villagePanel .village-card').length === 3 &&
+    win.document.querySelector('[data-village-stage="museum"]').textContent === '폐허');
+  // drawn: in the draw list, behind/in front by their wall front
+  const items = win.tdDrawList(null).filter((it) => it.kind === 'village');
+  check('Task114: both facilities are in the draw list as ruins, sorted by the front of their walls', items.length === 2 && items.every((it) => it.stage === 0 && Math.abs(it.sortY - (it.y + win.VILLAGE.FACILITIES[it.id].box.maxY)) < 1e-9));
+  const sp = [0, 1, 2].map((st) => [win.tdVillageSprite('appraiser', st, 0), win.tdVillageSprite('museum', st, 3)]);
+  const inside = (x) => x.rects.length > 10 && x.rects.every(([rx, ry, rw, rh]) => rx >= 0 && ry >= 0 && rx + rw <= x.w && ry + rh <= x.h);
+  check('Task114: each facility has its own picture for ruin, cleared and open (inside 44x40 / 60x48)', sp.every(([ap, mu]) => ap.w === 44 && ap.h === 40 && mu.w === 60 && mu.h === 48 && inside(ap) && inside(mu)) &&
+    new Set(sp.map(([ap]) => JSON.stringify(ap.rects))).size === 3 && new Set(sp.map(([, mu]) => JSON.stringify(mu.rects))).size === 3);
+  // new craft huts keep clear of the sites
+  s.research.workshopBuild = true; s.research.workshopExpansion = true; s.gold = 1e12; Object.keys(s.products).forEach((k) => { s.products[k] = 1e6; });
+  for (let i = 0; i < 8; i++) win.buildWorkshop();
+  check('Task114: craft huts built afterwards keep clear of the sites (8 built)', s.world.workshops.length === 8 &&
+    s.world.workshops.every((h) => win.VILLAGE.ORDER.every((k) => Math.hypot(h.x - v.sites[k].x, h.y - v.sites[k].y) >= win.VILLAGE.SITE.WORKSHOP_CLEAR)));
+  // the sites are saved and come back exactly
+  const kept = JSON.stringify(v.sites);
+  win.saveGame();
+  const w2 = newDom(storage).window;
+  check('Task114: the sites are saved and come back exactly (never moved)', JSON.stringify(w2.state.village.sites) === kept && JSON.stringify(JSON.parse(storage.getItem('gachaFactorySave')).run.village.sites) === kept);
+})();
+
+(function test_T114_oldSaveAndManyWorlds() {
+  // the fixture: sites are chosen round its 26 mines and 2 huts, which stay exactly where they were
+  const st = makeMemoryStorage(); st.setItem('gachaFactorySave', T103_FIXTURE_RAW);
+  const fx = newDom(st).window;
+  check('Task114: an older save gets sites when it loads; its mines and huts are not moved or removed',
+    !!fx.state.village.sites.appraiser && !!fx.state.village.sites.museum && t103Canon(fx.state.world.mines) === t103Canon(T103_FIXTURE.run.world.mines) &&
+    t103Canon(fx.state.world.workshops) === t103Canon(T103_FIXTURE.run.world.workshops));
+  const rf = t114Reach(fx);
+  check('Task114: in the fixture both doors and every vein can be reached, nothing is cut off', t114Rules(fx) && rf.doorsOk && rf.minesOk && rf.pockets === 0);
+  // generated worlds, with 8 huts built first (old saves) or after (new games), the tunnel open and all sites unlocked
+  const win = newDom(makeMemoryStorage(), { fullWorld: true }).window;
+  let bad = 0, worlds = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const rnd = t103Random(seed * 6151);
+    const fresh = win.freshRunState(), s = win.state;
+    Object.keys(fresh).forEach((k) => { s[k] = fresh[k]; });
+    s.world.hiddenMineIds = [];
+    s.world.mines = win.generateInitialWorldMines(s.world.base, { random: rnd });
+    s.research.workshopBuild = true; s.research.workshopExpansion = true; s.gold = 1e12;
+    Object.keys(s.products).forEach((k) => { s.products[k] = 1e6; });
+    const hutsFirst = seed % 2 === 0;
+    if (hutsFirst) for (let i = 0; i < 8; i++) win.buildWorkshop();
+    const ok = win.villageEnsureSites();
+    if (!hutsFirst) for (let i = 0; i < 8; i++) win.buildWorkshop();
+    ['manaVein', 'ruins', 'spaceStation'].forEach((k) => { s.unlockedSites[k] = true; win.seedWorldMinesForSite(k); });
+    win.unlockTunnel({ random: rnd }); win.surveyMines({ random: rnd });
+    const r = t114Reach(win);
+    worlds++;
+    if (!ok || !t114Rules(win) || !r.doorsOk || !r.minesOk || r.pockets || s.world.workshops.length !== 8) bad++;
+  }
+  check('Task114: in 12 generated worlds (8 huts before or after, expansions, tunnel, survey) the sites follow the rules and everything stays reachable', worlds === 12 && bad === 0);
+})();
+
+(function test_T114_classic() {
+  const win = tdDomAt('https://example.test/?view=classic', makeMemoryStorage());
+  check('Task114: the classic screen keeps working and has the village panel too', !win.document.body.classList.contains('view-topdown') &&
+    !!win.document.querySelector('.tab-btn[data-tab="village"]') && win.document.querySelectorAll('#villagePanel .village-card').length === 3);
+})();
+
+// -----------------------------------------------------------------------------
+// Task 115: staged restoration (clear, then rebuild; the museum after the appraiser)
+// -----------------------------------------------------------------------------
+(function test_T115_restore() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, v = s.village, F = win.VILLAGE.FACILITIES, doc = win.document;
+  const a = v.sites.appraiser, m = v.sites.museum, p = s.world.player;
+  // nothing can be paid for yet
+  check('Task115: with no gold the first step is blocked and says why', /골드/.test(win.villageRestoreBlocker('appraiser')) && !win.villageRestore('appraiser') && v.stage.appraiser === 0);
+  check('Task115: the museum waits for the appraiser', /감정소를 먼저/.test(win.villageRestoreBlocker('museum')));
+  p.x = m.x; p.y = m.y + 0.2;
+  const tm = win.tdInteractTarget(p.x, p.y);
+  check('Task115: at the museum door before that, the target is locked and says so', tm && tm.id === 'museum' && tm.action === 'locked' && /감정소 먼저 복구/.test(tm.label));
+  // the first step by walking up and pressing E (the same as the action button)
+  s.gold = 1000;
+  p.x = a.x; p.y = a.y + 0.2;
+  const ta = win.tdInteractTarget(p.x, p.y);
+  check('Task115: at the appraiser door the target offers the next step with its cost', ta && ta.action === 'restore' && /잔해 치우기/.test(ta.label) && /100G/.test(ta.label));
+  win.TD.target = ta; win.tdUpdateActionButton();
+  check('Task115: the phone action button reads 복구', doc.getElementById('tdAction').textContent === '복구');
+  win.tdInteractNow();
+  check('Task115: E clears the rubble: stage 1, exactly 100G paid', v.stage.appraiser === 1 && s.gold === 900);
+  // the second step needs products
+  const t2 = win.tdInteractTarget(p.x, p.y);
+  check('Task115: the next step is the rebuild, paid in gold and products', t2.action === 'restore' && /건물 복구/.test(t2.label) && /강철 8/.test(t2.label) && /석탄 벽돌 4/.test(t2.label));
+  const floats = win.TD.floats.length;
+  win.tdInteractNow();
+  check('Task115: without the products nothing is paid and the reason floats up', v.stage.appraiser === 1 && s.gold === 900 && win.TD.floats.length === floats + 1 && /강철/.test(win.TD.floats[win.TD.floats.length - 1].text));
+  s.products.steel = 10; s.products.coalBrick = 5;
+  win.tdInteractNow();
+  check('Task115: with them, the appraiser opens: 400G, 8 steel and 4 coal bricks paid once', v.stage.appraiser === 2 && win.villageIsOpen('appraiser') && s.gold === 500 && s.products.steel === 2 && s.products.coalBrick === 1);
+  check('Task115: an open facility takes no more payments', !win.villageRestore('appraiser') && s.gold === 500 && /이미 운영/.test(win.villageRestoreBlocker('appraiser')));
+  // the museum, through the 마을 panel buttons
+  win.renderVillage();
+  let btn = doc.querySelector('[data-village-restore="museum"]');
+  win.updateNumbers();
+  check('Task115: the panel shows the museum step with its cost, disabled while short, with the reason', !!btn && /1,200G/.test(btn.textContent) && btn.disabled &&
+    /골드/.test(doc.querySelector('[data-village-why="museum"]').textContent));
+  s.gold = 10000; s.products.steel = 25; s.products.ironTool = 6;
+  win.updateNumbers();
+  check('Task115: ...and enabled once affordable', !btn.disabled && doc.querySelector('[data-village-why="museum"]').textContent === '');
+  btn.click();
+  btn = doc.querySelector('[data-village-restore="museum"]');
+  check('Task115: the panel button clears the museum rubble (1,200G)', v.stage.museum === 1 && s.gold === 8800 && !!btn && /건물 복구/.test(btn.textContent));
+  btn.click();
+  check('Task115: ...and rebuilds it (3,000G, 20 steel, 5 iron tools); the card then shows it open', v.stage.museum === 2 && s.gold === 5800 && s.products.steel === 5 && s.products.ironTool === 1 &&
+    !doc.querySelector('[data-village-restore="museum"]') && doc.querySelector('[data-village-stage="museum"]').textContent === '운영 중');
+  check('Task115: each step wrote a log line', Array.from(doc.querySelectorAll('#log > *')).filter((e) => /감정소|박물관/.test(e.textContent)).length >= 4);
+  // drawn by stage, lit when open
+  const items = win.tdDrawList(null).filter((it) => it.kind === 'village');
+  check('Task115: both are drawn as open buildings now', items.every((it) => it.stage === 2));
+  check('Task115: open facilities light their windows', win.tdVillageLights(0).length === 2);
+  check('Task115: the walls still block and the door step stays free once rebuilt', win.worldObstacles().filter((o) => o.kind === 'village').length === 2 && win.playerCanStand(a.x, a.y + 0.02));
+  // saved and loaded back
+  win.saveGame();
+  const w2 = newDom(storage).window;
+  check('Task115: restoration is saved and comes back', w2.state.village.stage.appraiser === 2 && w2.state.village.stage.museum === 2 && JSON.stringify(w2.state.village.sites) === JSON.stringify(v.sites));
+  check('Task115: the workshop is listed first as the village\'s production centre', doc.querySelector('#villagePanel .village-card').dataset.village === 'workshop');
+})();
+
+(function test_T115_classicRestore() {
+  // the classic screen restores through the same panel buttons
+  const win = tdDomAt('https://example.test/?view=classic', makeMemoryStorage());
+  win.state.gold = 500;
+  win.renderVillage(); win.updateNumbers();
+  win.document.querySelector('[data-village-restore="appraiser"]').click();
+  check('Task115: on the classic screen the panel button restores too', win.state.village.stage.appraiser === 1 && win.state.gold === 400);
+})();
+
+// -----------------------------------------------------------------------------
+// Task 116: unidentified relics (found by hand mining) and the appraiser (appraisal, codex)
+// -----------------------------------------------------------------------------
+function t116OpenVillage(win, which) {
+  const s = win.state; s.gold += 1e6; s.products.steel += 100; s.products.coalBrick += 100; s.products.ironTool += 100;
+  (which || ['appraiser', 'museum']).forEach((k) => { while (!win.villageIsOpen(k)) if (!win.villageRestore(k)) break; });
+}
+
+(function test_T116_relics() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, v = s.village, R = win.VILLAGE.RELIC, doc = win.document;
+  win.secureMine('mine_start_iron');
+  const iron = win.mineById('mine_start_iron');
+  const rates = JSON.stringify(win.RESOURCES.map((r) => win.autoRate(r.key)));
+  // mining by hand: the resource gain is exactly as before, relics come on top
+  let ironGot = 0, found = 0;
+  for (let i = 0; i < R.EVERY * 3; i++) { const before = s.resources.iron; win.mineMine(iron.id); ironGot += s.resources.iron - before; }
+  check('Task116: hand mining still gives exactly its usual amount (no change to resources)', Math.abs(ironGot - R.EVERY * 3 * iron.miningPower * win.mult()) < 1e-9);
+  check('Task116: every 8 hand minings of an ordinary vein turn up one unidentified relic', v.unidentified === 3 && v.digProgress === 0);
+  check('Task116: the crafting resource 고대 유물 is not touched', s.resources.relic === 0);
+  check('Task116: worker output (autoRate) is unchanged', JSON.stringify(win.RESOURCES.map((r) => win.autoRate(r.key))) === rates);
+  check('Task116: finding one writes a log line', Array.from(doc.querySelectorAll('#log > *')).some((e) => /미감정 유물을 찾았어요/.test(e.textContent)));
+  // automatic income never finds relics
+  const before = v.unidentified;
+  for (let i = 0; i < 50; i++) win.tickMining();
+  check('Task116: automatic mining (the tick) finds none', v.unidentified === before);
+  // more beyond the mountain and on relic veins
+  const relicVein = win.addMine({ id: 'mine_t116_relic', x: s.world.base.x + 3, y: s.world.base.y + 3, resource: 'relic', grade: 3, miningPower: 1, developmentState: 'secured' });
+  v.digProgress = 0; win.mineMine(relicVein.id);
+  check('Task116: a 고대 유물 vein counts 3, and still gives its resource', v.digProgress === 3 && s.resources.relic === 1 * win.mult());
+  s.world.tunnelUnlocked = true;
+  const far = win.addMine({ id: 'mine_t116_far', x: -8, y: 4, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'secured' });
+  v.digProgress = 0; win.mineMine(far.id);
+  check('Task116: a vein beyond the mountain counts 2', v.digProgress === 2);
+  // the cap
+  v.unidentified = R.MAX_UNIDENTIFIED; v.digProgress = 5;
+  for (let i = 0; i < 20; i++) win.mineMine(iron.id);
+  check('Task116: at most 20 are held; while full, mining finds none and adds no progress', v.unidentified === R.MAX_UNIDENTIFIED && v.digProgress === 5);
+  v.unidentified = 3; v.digProgress = 0;
+  // E at a vein says so when one turns up
+  s.world.player.x = iron.x + 0.4; s.world.player.y = iron.y;
+  v.digProgress = R.EVERY - 1;
+  const r = win.tdInteract(win.tdInteractTarget(s.world.player.x, s.world.player.y));
+  check('Task116: mining with E shows "미감정 유물!" when one turns up', r.ok && /미감정 유물!/.test(r.text) && v.unidentified === 4);
+  // appraisal needs the appraiser open
+  check('Task116: no appraisal before the appraiser is open', /감정소/.test(win.villageAppraiseBlocker()) && win.villageAppraise() === null && v.unidentified === 4);
+  t116OpenVillage(win, ['appraiser']);
+  const a = v.sites.appraiser;
+  const t = win.tdInteractTarget(a.x, a.y + 0.2);
+  win.TD.target = t; win.tdUpdateActionButton();
+  check('Task116: at the open appraiser the target offers appraisal with the count; the button reads 감정', t.action === 'appraise' && /미감정 4/.test(t.label) && doc.getElementById('tdAction').textContent === '감정');
+  s.world.player.x = a.x; s.world.player.y = a.y + 0.2;
+  const expected = win.villageNextRelic();
+  win.tdInteractNow();
+  check('Task116: E appraises one: it becomes a known relic, registered in the codex', v.unidentified === 3 && v.appraised === 1 && v.owned[expected.key] === 1 && v.codex.includes(expected.key) &&
+    win.TD.floats.some((f) => f.text.includes(expected.name)));
+  // the panel: codex and the appraisal button (the same function)
+  win.renderVillage();
+  const cards = doc.querySelectorAll('[data-village-relic]');
+  check('Task116: the codex shows all 12, unknown ones as ???', cards.length === 12 && doc.querySelectorAll('.village-relic.is-unknown').length === 11 &&
+    doc.querySelector('[data-village-relic="' + expected.key + '"]').textContent.includes(expected.name) && doc.querySelector('[data-village-codex-count]').textContent === '1');
+  doc.querySelector('[data-village-appraise]').click();
+  check('Task116: the panel button appraises too', v.appraised === 2 && v.unidentified === 2);
+  // all relics turn up over time, deterministically
+  v.unidentified = 60;
+  const seq = [];
+  for (let i = 0; i < 60; i++) seq.push(win.villageAppraise().relic.key);
+  check('Task116: appraising 60 registers the whole codex (new ones are likelier), every relic owned at least once', v.codex.length === 12 &&
+    win.VILLAGE_RELIC_KEYS.every((k) => (v.owned[k] || 0) >= 1) && Object.values(v.owned).reduce((x, y) => x + y, 0) === v.appraised);
+  const counts = {}; seq.forEach((k) => { counts[k] = (counts[k] || 0) + 1; });
+  check('Task116: rare relics stay rarer than common ones', win.VILLAGE_RELICS.filter((r) => r.rarity === 'rare').every((r) => (counts[r.key] || 0) <= Math.max(...win.VILLAGE_RELICS.filter((x) => x.rarity === 'common').map((x) => counts[x.key] || 0))));
+  win.updateNumbers();
+  check('Task116: with nothing left, the button is disabled and the door target just opens the panel', doc.querySelector('[data-village-appraise]').disabled && win.villageAppraise() === null &&
+    win.tdInteractTarget(a.x, a.y + 0.2).action === 'open');
+  // saved and loaded back
+  const kept = JSON.stringify({ u: v.unidentified, d: v.digProgress, n: v.appraised, o: v.owned, c: v.codex });
+  win.saveGame();
+  const w2 = newDom(storage).window, v2 = w2.state.village;
+  check('Task116: relics, the codex and progress are saved and come back exactly', JSON.stringify({ u: v2.unidentified, d: v2.digProgress, n: v2.appraised, o: v2.owned, c: v2.codex }) === kept);
+  check('Task116: the same appraisal count gives the same next relic after loading (no randomness)', w2.villageNextRelic().key === win.villageNextRelic().key);
+})();
+
+(function test_T116_classic() {
+  const win = tdDomAt('https://example.test/?view=classic', makeMemoryStorage());
+  t116OpenVillage(win, ['appraiser']);
+  win.state.village.unidentified = 2;
+  win.renderVillage(); win.updateNumbers();
+  win.document.querySelector('[data-village-appraise]').click();
+  check('Task116: on the classic screen the panel appraises too', win.state.village.appraised === 1 && win.state.village.codex.length === 1);
+  win.secureMine('mine_start_iron'); win.buildMines();
+  for (let i = 0; i < 8; i++) win.document.querySelector('[data-mine-mine="mine_start_iron"]').click();
+  check('Task116: the classic mine button finds relics too (the same mineMine)', win.state.village.unidentified === 2);
+})();
+
+// -----------------------------------------------------------------------------
+// Task 117: the museum (donation and display)
+// -----------------------------------------------------------------------------
+(function test_T117_museum() {
+  const storage = makeMemoryStorage();
+  const win = newDom(storage).window;
+  const s = win.state, v = s.village, doc = win.document;
+  t116OpenVillage(win, ['appraiser']);
+  v.unidentified = 8;
+  for (let i = 0; i < 8; i++) win.villageAppraise();
+  const owned0 = JSON.stringify(v.owned), kinds = Object.keys(v.owned).length;
+  check('Task117: no donations before the museum is open', /박물관/.test(win.villageDonateBlocker()) && win.villageDonateAll() === 0 && v.donated.length === 0 && JSON.stringify(v.owned) === owned0);
+  t116OpenVillage(win, ['museum']);
+  const m = v.sites.museum, gold = s.gold;
+  const t = win.tdInteractTarget(m.x, m.y + 0.2);
+  win.TD.target = t; win.tdUpdateActionButton();
+  check('Task117: at the open museum the target offers to donate the new relics; the button reads 기증', t.action === 'donate' && new RegExp('\\(' + kinds + '점\\)').test(t.label) && doc.getElementById('tdAction').textContent === '기증');
+  s.world.player.x = m.x; s.world.player.y = m.y + 0.2;
+  win.tdInteractNow();
+  check('Task117: E donates one of each kind owned: they go on display and leave the owned relics (duplicates stay)', v.donated.length === kinds &&
+    v.donated.every((k) => win.VILLAGE_RELIC_KEYS.includes(k)) && Object.keys(v.owned).every((k) => v.donated.includes(k)) &&
+    Object.values(v.owned).reduce((a, b) => a + b, 0) === 8 - kinds);
+  check('Task117: donating gives no gold (no rewards yet)', s.gold === gold);
+  check('Task117: a kind already on display cannot be donated again', /이미 전시/.test(win.villageDonateBlocker(v.donated[0])) && !win.villageDonate(v.donated[0]));
+  check('Task117: with nothing new the door shows the display count', win.tdInteractTarget(m.x, m.y + 0.2).action === 'open' && new RegExp('전시 ' + kinds + '/12').test(win.tdInteractTarget(m.x, m.y + 0.2).label));
+  // the display: niches on the building, cases in the panel
+  const item = win.tdDrawList(null).find((it) => it.kind === 'village' && it.id === 'museum');
+  check('Task117: the museum lights one display niche per two relics on show', item.exhibits === Math.ceil(kinds / 2));
+  const lit = (n) => JSON.stringify(win.tdVillageSprite('museum', 2, n).rects);
+  check('Task117: its picture changes as niches light up', lit(0) !== lit(1) && lit(1) !== lit(6) && lit(6) === lit(9));
+  win.renderVillage();
+  check('Task117: the panel shows the display room: cases for what is on show, empty cases for the rest', doc.querySelectorAll('[data-village-exhibit]').length === 12 &&
+    doc.querySelectorAll('[data-village-exhibit]:not(.is-unknown)').length === kinds && doc.querySelector('[data-village-exhibits]').textContent === String(kinds));
+  // donate a new one through the panel button
+  const fresh = win.VILLAGE_RELIC_KEYS.find((k) => !v.donated.includes(k));
+  v.owned[fresh] = 1; if (!v.codex.includes(fresh)) v.codex.push(fresh);
+  win.renderVillage();
+  check('Task117: a new relic is listed for donation', !!doc.querySelector('[data-village-donatable="' + fresh + '"]') && !doc.querySelector('[data-village-donate-all]').disabled);
+  doc.querySelector('[data-village-donate="' + fresh + '"]').click();
+  check('Task117: its 기증 button donates it', v.donated.includes(fresh) && !v.owned[fresh] && doc.querySelector('[data-village-donate-all]').disabled);
+  // the whole collection
+  win.VILLAGE_RELIC_KEYS.forEach((k) => { if (!v.donated.includes(k)) v.owned[k] = 1; });
+  check('Task117: the whole collection can be put on show (12/12)', win.villageDonateAll() === 12 - kinds - 1 && v.donated.length === 12 && win.tdDrawList(null).find((it) => it.id === 'museum').exhibits === 6);
+  // saved and loaded back
+  win.saveGame();
+  const w2 = newDom(storage).window;
+  check('Task117: the display is saved and comes back', w2.state.village.donated.length === 12 && JSON.stringify(w2.state.village.donated) === JSON.stringify(v.donated));
+  check('Task117: the crafting resource 고대 유물 was never used', s.resources.relic === 0);
+})();
+
+(function test_T117_classicAndOldSave() {
+  const win = tdDomAt('https://example.test/?view=classic', makeMemoryStorage());
+  t116OpenVillage(win);
+  win.state.village.owned = { bell: 1 }; win.state.village.codex = ['bell'];
+  win.renderVillage();
+  win.document.querySelector('[data-village-donate-all]').click();
+  check('Task117: on the classic screen the panel donates too', win.state.village.donated.join() === 'bell');
+  // an older save goes through the whole village from scratch, with its own world kept
+  const st = makeMemoryStorage(); st.setItem('gachaFactorySave', T103_FIXTURE_RAW);
+  const fx = newDom(st).window, s = fx.state;
+  const mines = t103Canon(s.world.mines), huts = t103Canon(s.world.workshops), res = t103Canon(s.resources);
+  t116OpenVillage(fx);
+  s.village.unidentified = 3;
+  for (let i = 0; i < 3; i++) fx.villageAppraise();
+  fx.villageDonateAll();
+  fx.saveGame();
+  const back = JSON.parse(st.getItem('gachaFactorySave'));
+  check('Task117: an older save restores, appraises and donates; its mines, huts and resources are untouched (saveVersion 1)',
+    back.saveVersion === 1 && back.run.village.stage.museum === 2 && back.run.village.donated.length >= 1 && t103Canon(back.run.world.mines) === mines &&
+    t103Canon(back.run.world.workshops) === huts && t103Canon(back.run.resources) === res);
 })();

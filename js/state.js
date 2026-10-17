@@ -80,7 +80,61 @@ function freshRunState(){
     craftFacility:1, // gold-funded run-scoped timed-craft speed level (1 = current craft times)
     autoLineLogged:false, // Task 6: has the one-time "both iron+coal automated" log fired this run?
     world: freshWorldState(), // Task 27+: base, world mines, workshops
+    village: freshVillageState(), // Task 113: the starting village (sites, restoration, relics)
   };
+}
+
+// ---------------------------------------------------------------------------
+// Task 113: the starting village beside the workshop (blueprint 24.8). Run
+// progress, saved in run.village (additive field, saveVersion 1).
+//   sites        where each facility stands ({x, y} world units, its door step),
+//                chosen once among free ground and then kept (null = not yet chosen)
+//   stage        restoration per facility: 0 ruin, 1 cleared, 2 open
+//   unidentified relics picked up while mining, waiting for the appraiser
+//   digProgress  manual mining progress toward the next unidentified relic
+//   appraised    how many relics have been appraised (drives which relic comes out)
+//   owned        appraised relics in hand: relic key -> count
+//   codex        relic keys registered in the codex (appraised at least once)
+//   donated      relic keys donated to the museum (one of each, on display)
+// The facility and relic lists are in js/village.js; this only checks shapes,
+// so it can run before that file is loaded.
+// ---------------------------------------------------------------------------
+const VILLAGE_FACILITY_KEYS = ['appraiser', 'museum'];
+
+function freshVillageState(){
+  return { sites: { appraiser: null, museum: null }, stage: { appraiser: 0, museum: 0 },
+    unidentified: 0, digProgress: 0, appraised: 0, owned: {}, codex: [], donated: [] };
+}
+
+function sanitizeVillageSite(raw){
+  if(!isPlainObject(raw) || !isFiniteNumber(raw.x) || !isFiniteNumber(raw.y) || !terrainInBounds(raw.x, raw.y)) return null;
+  return { x: raw.x, y: raw.y };
+}
+
+// Missing or invalid (any older save) -> a ruined village with no relics.
+// Relic keys must be on the relic list (VILLAGE_RELIC_KEYS, js/village.js) when it is loaded.
+function sanitizeVillageState(raw){
+  const fresh = freshVillageState();
+  if(!isPlainObject(raw)) return fresh;
+  const known = (k) => typeof k === 'string' && (typeof VILLAGE_RELIC_KEYS === 'undefined' || VILLAGE_RELIC_KEYS.includes(k));
+  const sites = isPlainObject(raw.sites) ? raw.sites : {}, stage = isPlainObject(raw.stage) ? raw.stage : {};
+  const owned = {};
+  if(isPlainObject(raw.owned)) Object.keys(raw.owned).forEach(k => { if(known(k) && isNonNegativeInt(raw.owned[k]) && raw.owned[k] > 0) owned[k] = raw.owned[k]; });
+  const keyList = (list) => Array.isArray(list) ? [...new Set(list.filter(known))] : [];
+  const out = {
+    sites: {}, stage: {},
+    unidentified: isNonNegativeInt(raw.unidentified) ? raw.unidentified : 0,
+    digProgress: isNonNegativeInt(raw.digProgress) ? raw.digProgress : 0,
+    appraised: isNonNegativeInt(raw.appraised) ? raw.appraised : 0,
+    owned, codex: keyList(raw.codex), donated: keyList(raw.donated),
+  };
+  VILLAGE_FACILITY_KEYS.forEach(k => {
+    out.sites[k] = sanitizeVillageSite(sites[k]);
+    out.stage[k] = isNonNegativeInt(stage[k]) && stage[k] <= 2 ? stage[k] : 0;
+  });
+  // what was donated or is owned has been appraised, so it is in the codex
+  Object.keys(owned).concat(out.donated).forEach(k => { if(!out.codex.includes(k)) out.codex.push(k); });
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +391,7 @@ function sanitizeRunState(raw){
     craftFacility: (isNonNegativeInt(raw.craftFacility) && raw.craftFacility >= 1) ? raw.craftFacility : 1, // Task 16: additive field, missing/invalid → default 1 (preserves current craft times)
     autoLineLogged: typeof raw.autoLineLogged === 'boolean' ? raw.autoLineLogged : false, // Task 6: additive field, no saveVersion bump needed
     world, // Task 27: additive field; missing (legacy save) -> fresh world state
+    village: sanitizeVillageState(raw.village), // Task 113: additive field; missing -> ruined village, no relics
   };
 }
 // Task 72: per-company delivery progress. Lives in `permanent` because

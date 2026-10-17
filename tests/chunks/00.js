@@ -26,7 +26,7 @@ const html = fs.readFileSync(HTML_PATH, 'utf8');
 // in the exact same order the browser loads them — this is not a reimplementation,
 // it is the literal file content index.html points at.
 const JS_DIR = path.join(__dirname, '..', 'js');
-const MODULE_FILES = ['data.js', 'balance.js', 'terrain.js', 'worldgen.js', 'state.js', 'systems.js', 'factory.js', 'research.js', 'delivery.js', 'player.js', 'ui.js', 'main.js',
+const MODULE_FILES = ['data.js', 'balance.js', 'terrain.js', 'worldgen.js', 'state.js', 'systems.js', 'factory.js', 'research.js', 'delivery.js', 'player.js', 'village.js', 'ui.js', 'main.js',
   // Task 104-106: the top-down world (loaded after main.js, as in index.html)
   'topdown/view.js', 'topdown/tiles.js', 'topdown/sprites.js', 'topdown/interact.js', 'topdown/light.js', 'topdown/workers.js', 'topdown/render.js', 'topdown/app.js'];
 const moduleSource = MODULE_FILES.map((f) => fs.readFileSync(path.join(JS_DIR, f), 'utf8')).join('\n');
@@ -111,6 +111,7 @@ function newDom(storage, opts) {
   TD_RES_COLORS: () => TD_RES_COLORS, TD_PLAYER_COLORS: () => TD_PLAYER_COLORS,
   // Task 107: obstacle boxes and the player's feet
   WORLD_OBSTACLE_BOXES: () => WORLD_OBSTACLE_BOXES, PLAYER_FOOT: () => PLAYER_FOOT, SCENERY_BLOCK_BOXES: () => SCENERY_BLOCK_BOXES, TORCH: () => TORCH,
+  VILLAGE: () => VILLAGE, VILLAGE_RELICS: () => VILLAGE_RELICS, VILLAGE_RELIC_KEYS: () => VILLAGE_RELIC_KEYS, // Task 113
   TD_LIGHT: () => TD_LIGHT, // Task 108
   TD_WORKER: () => TD_WORKER, // Task 109
 };
@@ -146,6 +147,9 @@ function newDom(storage, opts) {
     WORLD_OBSTACLE_BOXES: { get: () => win.__expose.WORLD_OBSTACLE_BOXES(), configurable: true },
     SCENERY_BLOCK_BOXES: { get: () => win.__expose.SCENERY_BLOCK_BOXES(), configurable: true },
     TORCH: { get: () => win.__expose.TORCH(), configurable: true },
+    VILLAGE: { get: () => win.__expose.VILLAGE(), configurable: true },
+    VILLAGE_RELICS: { get: () => win.__expose.VILLAGE_RELICS(), configurable: true },
+    VILLAGE_RELIC_KEYS: { get: () => win.__expose.VILLAGE_RELIC_KEYS(), configurable: true },
     PLAYER_FOOT: { get: () => win.__expose.PLAYER_FOOT(), configurable: true },
     TD_LIGHT: { get: () => win.__expose.TD_LIGHT(), configurable: true },
     TD_WORKER: { get: () => win.__expose.TD_WORKER(), configurable: true },

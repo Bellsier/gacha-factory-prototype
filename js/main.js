@@ -31,6 +31,8 @@ function boot(){
   // announced here — they aren't errors, and 'unavailable' will surface
   // naturally as '저장 안 됨' the moment an actual save attempt is made.
 
+  // Task 114: the village facilities get their sites (once; a save keeps them)
+  if(typeof villageEnsureSites === 'function') villageEnsureSites();
   renderAll();
   log(loaded.ok ? '이전 진행 상황을 불러왔습니다.' : '공방 가동을 시작합니다. 채굴장을 눌러 자원을 모으세요.');
 

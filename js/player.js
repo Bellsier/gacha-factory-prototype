@@ -151,6 +151,11 @@ function worldObstacles(nearX, nearY, radius){
   w.mines.forEach(m => { if(m) add('mine', m.id, m.x, m.y); });
   if(w.base) add('base', 'base', w.base.x, w.base.y);
   w.workshops.forEach(ws => { if(ws) add('workshop', ws.id, ws.x, ws.y); });
+  // Task 114: the village facilities' walls (every stage: ruins block too; the door step stays free)
+  if(typeof villageObstacleBoxes === 'function') villageObstacleBoxes().forEach(o => {
+    if(radius !== undefined && Math.hypot((o.minX + o.maxX) / 2 - nearX, (o.minY + o.maxY) / 2 - nearY) > radius + 1) return;
+    out.push(o);
+  });
   // Task 111: solid scenery beyond the mountain (only reachable, and drawn, with the tunnel open)
   if(terrainTunnelOpen()){
     const sc = worldScenery();

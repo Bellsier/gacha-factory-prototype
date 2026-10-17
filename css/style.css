@@ -450,3 +450,15 @@
     .td-close{top:auto; bottom:calc(72dvh - 44px);}
     body.view-topdown:not(.td-touch) .td-torch{bottom:70px;} /* Task 112: above the full-width dock */
   }
+
+/* Task 114~117: the village panel (마을 탭) */
+.village-list{display:flex; flex-direction:column; gap:8px;}
+.village-card{border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--panel-2);}
+.village-head{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;}
+.village-stage{font-size:0.75rem; padding:2px 8px; border-radius:10px; background:rgba(255,255,255,0.08);}
+.village-card .village-actions{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.village-card .village-actions button{width:auto;}
+.village-codex{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:6px; margin-top:8px;}
+.village-relic{border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:0.8rem; background:rgba(0,0,0,0.15);}
+.village-relic.is-unknown{opacity:0.5;}
+.village-relic .rarity{font-size:0.7rem; opacity:0.75;}

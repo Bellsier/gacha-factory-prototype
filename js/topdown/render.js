@@ -25,6 +25,15 @@ function tdDrawList(player){
   list.push({ kind: 'base', x: base.x, y: base.y, sortY: base.y + front('base') });
   list.push({ kind: 'prop', prop: 'lamp', x: base.x + 0.62, y: base.y + 0.02, sortY: base.y + 0.02, light: true });
   state.world.workshops.forEach(w => { if(w) list.push({ kind: 'workshop', id: w.id, tier: workshopTier(w.level), x: w.x, y: w.y, sortY: w.y + front('workshop') }); });
+  // Task 114: the village facilities (sorted by the front of their walls, like the huts)
+  if(typeof VILLAGE !== 'undefined' && state.village && state.village.sites){
+    VILLAGE.ORDER.forEach(k => {
+      const site = state.village.sites[k];
+      if(!site) return;
+      list.push({ kind: 'village', id: k, stage: Math.min(2, state.village.stage[k] || 0), exhibits: Math.ceil((state.village.donated || []).length / 2),
+        x: site.x, y: site.y, sortY: site.y + VILLAGE.FACILITIES[k].box.maxY });
+    });
+  }
   state.world.mines.forEach(m => {
     if(!m) return;
     const look = !isMineDiscovered(m) ? 'undiscovered' : m.developmentState === 'secured' ? 'secured' : 'unsecured';
@@ -47,10 +56,33 @@ function tdDrawList(player){
   return list.sort((a, b) => a.sortY - b.sortY);
 }
 
+// Task 115: an open facility's windows glow warm (the museum's display niches too).
+function tdVillageLights(now){
+  const out = [], v = state.village;
+  if(typeof VILLAGE === 'undefined' || !v || !v.sites) return out;
+  VILLAGE.ORDER.forEach((k, i) => {
+    const site = v.sites[k];
+    if(!site || (v.stage[k] || 0) < 2) return;
+    if(k === 'appraiser') out.push({ kind: 'village', x: site.x - 0.2, y: site.y - 0.2, r: 0.6, rgb: [255, 210, 130], strength: 0.5 * tdFlicker(now, 20 + i) });
+    else out.push({ kind: 'village', x: site.x, y: site.y - 0.25, r: 0.9, rgb: [255, 220, 150], strength: 0.4 + 0.04 * Math.min(6, Math.ceil((v.donated || []).length / 2)) });
+  });
+  return out;
+}
+
+// Task 114: baked village facility images, cached by facility, stage and lit niches.
+function tdVillageImage(key, stage, exhibits){
+  TD.villageImages = TD.villageImages || {};
+  const id = key + '|' + stage + '|' + (key === 'museum' && stage >= 2 ? exhibits : 0);
+  if(!(id in TD.villageImages)) TD.villageImages[id] = tdSpriteImage(tdVillageSprite(key, stage, exhibits));
+  return TD.villageImages[id];
+}
+
 // Task 108: a sprinkle of grass tufts on the open land that sway in the wind
 // (fixed pattern; kept clear of veins, huts and the workshop yard). Cached.
 function tdOpenLandTufts(){
-  const w = state.world, key = w.base.x + ',' + w.base.y + '|' + w.mines.length + '|' + w.workshops.length;
+  const w = state.world, vs = (state.village && state.village.sites) || {};
+  const sites = ['appraiser', 'museum'].map(k => vs[k]).filter(Boolean); // Task 114: none on a village site
+  const key = w.base.x + ',' + w.base.y + '|' + w.mines.length + '|' + w.workshops.length + '|' + sites.map(p => p.x + ',' + p.y).join(';');
   if(TD.tuftKey === key && TD.tufts) return TD.tufts;
   const out = [], b = BALANCE.world;
   for(let y = b.BOUNDS_MIN_Y + 0.25; y <= b.BOUNDS_MAX_Y; y += 0.5){
@@ -62,6 +94,7 @@ function tdOpenLandTufts(){
       if(Math.hypot(jx - w.base.x, jy - w.base.y) < 1.5) continue;
       if(w.mines.some(m => m && Math.hypot(m.x - jx, m.y - jy) < 0.6)) continue;
       if(w.workshops.some(ws => ws && Math.hypot(ws.x - jx, ws.y - jy) < 0.8)) continue;
+      if(sites.some(p => Math.hypot(p.x - jx, p.y - jy) < 1.0)) continue;
       out.push({ x: jx, y: jy });
     }
   }
@@ -118,8 +151,18 @@ function tdDrawSprite(g, img, sx, sy, zoom, anchorY){
   g.drawImage(img, Math.round(sx - w / 2), Math.round(sy - h + (anchorY || 0) * zoom), w, h);
 }
 
-function tdAddFloat(text, wx, wy, color){
-  TD.floats.push({ text, x: wx, y: wy, t0: performance.now(), color: color || '#fff3b0' });
+function tdAddFloat(text, wx, wy, color, lift){
+  // Task 117: floats still rising from the same point stack above each other
+  const now = performance.now(), stack = TD.floats.filter(f => f.x === wx && f.y === wy && now - f.t0 < 1200).length;
+  TD.floats.push({ text, x: wx, y: wy, t0: now, color: color || '#fff3b0', lift: lift || 34, stack });
+}
+
+// How high (sprite pixels) the interaction bubble sits above a target's point: above its picture.
+function tdBubbleLift(target){
+  if(!target) return 34;
+  if(target.type === 'base') return 64;
+  if(target.type === 'village') return target.id === 'museum' ? 54 : 46;
+  return 34;
 }
 
 function tdFrame(now){
@@ -174,6 +217,7 @@ function tdRender(now){
       if(swaying && TD.quality < 2) tdDrawSway(g, sheet.prop[it.prop], sp.x, sp.y, zoom, 2, tdSway(now, it.x, it.y, it.kind === 'decor' ? 'tuft' : it.prop));
       else tdDrawSprite(g, sheet.prop[it.prop], sp.x, sp.y, zoom, 2);
     }
+    else if(it.kind === 'village') tdDrawSprite(g, tdVillageImage(it.id, it.stage, it.exhibits), sp.x, sp.y, zoom, 3);
     else if(it.kind === 'torch') tdDrawSprite(g, sheet.torch && sheet.torch[Math.floor(now / 130 + it.seed) % 3], sp.x, sp.y, zoom, 2);
     else if(it.kind === 'gate'){
       const t = terrainTunnel(), top = topdownToScreen(it.x, t.y - t.halfWidth, cam, w, h, zoom);
@@ -198,28 +242,32 @@ function tdRender(now){
   if(TD.quality < 2) tdRenderClouds(g, cam, w, h, zoom, now);
   const darkness = typeof TD.forceDarkness === 'number' ? TD.forceDarkness : tdAmbientDarkness(Date.now());
   TD.darkness = darkness;
-  const extraLights = typeof tdWorkerLights === 'function' ? tdWorkerLights(now) : [];
+  const extraLights = (typeof tdWorkerLights === 'function' ? tdWorkerLights(now) : []).concat(tdVillageLights(now));
   tdRenderLighting(g, tdLightList({ x: pos.x, y: pos.y, dir: p.facing }, now, extraLights), darkness, cam, w, h, zoom, TD.quality, now);
   const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.4, w / 2, h / 2, Math.max(w, h) * 0.78);
   vg.addColorStop(0, 'rgba(10,14,12,0)'); vg.addColorStop(1, 'rgba(10,14,12,0.32)');
   g.fillStyle = vg; g.fillRect(0, 0, w, h);
-  // interaction bubble over the target
+  // interaction bubble over the target (Task 115: kept on screen; a label too wide splits after its name)
   TD.target = typeof tdInteractTarget === 'function' ? tdInteractTarget(p.x, p.y) : null;
   if(TD.target){
     const sp = topdownToScreen(TD.target.x, TD.target.y, cam, w, h, zoom);
     const label = (TD.touch ? '' : '[E] ') + TD.target.label;
     g.font = 'bold ' + (12 + zoom) + 'px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
-    const tw = g.measureText(label).width + 14, bx = Math.round(sp.x - tw / 2), by = Math.round(sp.y - (TD.target.type === 'base' ? 64 : 34) * zoom);
+    let lines = [label];
+    if(g.measureText(label).width + 14 > w - 12 && label.includes(' · ')){ const cut = label.indexOf(' · '); lines = [label.slice(0, cut), label.slice(cut + 3)]; }
+    const tw = Math.min(w - 12, Math.max(...lines.map(l => g.measureText(l).width)) + 14), bh = 22 * lines.length;
+    const bx = Math.round(Math.max(6, Math.min(w - tw - 6, sp.x - tw / 2))), by = Math.round(sp.y - tdBubbleLift(TD.target) * zoom) - (lines.length - 1) * 22;
     g.fillStyle = TD.target.action === 'locked' ? 'rgba(40,36,34,0.88)' : 'rgba(22,28,32,0.9)';
-    g.fillRect(bx, by, tw, 22); g.fillStyle = TD.target.action === 'locked' ? '#8b98a1' : '#ffd27a';
-    g.fillRect(bx, by + 21, tw, 2);
-    g.fillStyle = TD.target.action === 'locked' ? '#b8c0c6' : '#fff6dc'; g.textBaseline = 'middle'; g.fillText(label, bx + 7, by + 11);
+    g.fillRect(bx, by, tw, bh); g.fillStyle = TD.target.action === 'locked' ? '#8b98a1' : '#ffd27a';
+    g.fillRect(bx, by + bh - 1, tw, 2);
+    g.fillStyle = TD.target.action === 'locked' ? '#b8c0c6' : '#fff6dc'; g.textBaseline = 'middle';
+    lines.forEach((l, i) => g.fillText(l, bx + 7, by + 11 + i * 22, tw - 14));
   }
   // floating texts (+1 철광석 ...)
   TD.floats = TD.floats.filter(f => now - f.t0 < 1200);
   TD.floats.forEach(f => {
     const k = (now - f.t0) / 1200, sp = topdownToScreen(f.x, f.y, cam, w, h, zoom);
-    const fy = sp.y - 34 * zoom - 26 - k * 34; // starts above the interaction bubble and rises
+    const fy = sp.y - (f.lift || 34) * zoom - 26 - (f.stack || 0) * 22 - k * 34; // starts above the interaction bubble and rises
     g.globalAlpha = 1 - k * k; g.font = 'bold ' + (13 + zoom) + 'px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = '#000'; g.fillText(f.text, sp.x + 1, fy + 1);
@@ -248,6 +296,13 @@ function tdRenderMinimap(cam){
     if(m.developmentState === 'secured'){ g.fillStyle = '#3fc9b0'; g.fillRect(Math.round(x) - 2, Math.round(y) + 2, 4, 1); }
   });
   (state.world.torches || []).forEach(t => { const [x, y] = at(t.x, t.y); g.fillStyle = '#ffb04a'; g.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 2); });
+  // Task 114: village facilities: grey while ruined, coloured once open
+  if(typeof VILLAGE !== 'undefined' && state.village && state.village.sites) VILLAGE.ORDER.forEach(k => {
+    const site = state.village.sites[k];
+    if(!site) return;
+    const [x, y] = at(site.x, site.y), open = (state.village.stage[k] || 0) >= 2;
+    g.fillStyle = open ? (k === 'museum' ? '#e6e1d8' : '#5fa0d8') : '#7a746c'; g.fillRect(Math.round(x) - 2, Math.round(y) - 3, 5, 4);
+  });
   const [bx, by] = at(state.world.base.x, state.world.base.y);
   g.fillStyle = '#d68b3d'; g.fillRect(Math.round(bx) - 3, Math.round(by) - 3, 6, 6);
   const p = state.world.player, [px, py] = at(p.x, p.y);

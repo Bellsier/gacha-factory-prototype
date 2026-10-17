@@ -15,7 +15,7 @@ const hours = Number(process.argv[2]) || 10;
 const seed = Number(process.argv[3]) || 1;
 const quiet = process.argv.includes('--quiet');
 const root = path.join(__dirname, '..');
-const MODULES = ['data.js', 'balance.js', 'terrain.js', 'worldgen.js', 'state.js', 'systems.js', 'factory.js', 'research.js', 'delivery.js', 'player.js', 'ui.js', 'main.js'];
+const MODULES = ['data.js', 'balance.js', 'terrain.js', 'worldgen.js', 'state.js', 'systems.js', 'factory.js', 'research.js', 'delivery.js', 'player.js', 'village.js', 'ui.js', 'main.js'];
 const source = MODULES.map(f => fs.readFileSync(path.join(root, 'js', f), 'utf8')).join('\n');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 

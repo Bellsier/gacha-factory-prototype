@@ -17,9 +17,13 @@ function t103Shape(v) {
   if (v && typeof v === 'object') { const o = {}; Object.keys(v).sort().forEach((k) => { o[k] = t103Shape(v[k]); }); return o; }
   return v === null ? 'null' : typeof v;
 }
-// Task 112: the one field added to the save since the fixture was made
-// (additive, saveVersion 1): the world's torches, [] for a save without any.
-function t103ShapeNow() { const f = JSON.parse(JSON.stringify(T103_FIXTURE)); f.run.world.torches = []; return t103Shape(f); }
+// The fields added to the save since the fixture was made (all additive,
+// saveVersion 1): Task 112 the world's torches ([] for a save without any) and
+// Task 113 the village (a ruined village with no relics for a save without one).
+// (Task 114: the facility sites are chosen when the game starts, so a loaded save has them.)
+function t103VillageNow(sites) { return { sites: sites || { appraiser: { x: 0, y: 0 }, museum: { x: 0, y: 0 } }, stage: { appraiser: 0, museum: 0 }, unidentified: 0, digProgress: 0, appraised: 0, owned: {}, codex: [], donated: [] }; }
+function t103RunNow(run, sites) { const r = JSON.parse(JSON.stringify(run)); r.world.torches = []; r.village = t103VillageNow(sites); return r; }
+function t103ShapeNow() { const f = JSON.parse(JSON.stringify(T103_FIXTURE)); f.run = t103RunNow(f.run); return t103Shape(f); }
 // JSON with object keys sorted, so two values compare by content, not key order
 // (loading rebuilds objects field by field, e.g. a worker's id moves to the end).
 function t103Canon(v) {
@@ -86,8 +90,8 @@ function t103Random(seed) {
   // load -> save gives the same file (savedAt aside)
   win.saveGame();
   const again = JSON.parse(storage.getItem('gachaFactorySave'));
-  check('Task103: fixture — load then save writes the same run and permanent data (plus the empty torch list, Task 112)', again.saveVersion === 1 &&
-    t103Canon(again.run) === t103Canon(Object.assign({}, r, { world: Object.assign({}, r.world, { torches: [] }) })) && t103Canon(again.permanent) === t103Canon(p));
+  check('Task103: fixture — load then save writes the same run and permanent data (plus the empty torch list and ruined village, Task 112/113)', again.saveVersion === 1 &&
+    t103Canon(again.run) === t103Canon(t103RunNow(r, again.run.village && again.run.village.sites)) && t103Canon(again.permanent) === t103Canon(p));
   check('Task103: fixture — the save structure is unchanged at every level (plus the empty torch list, Task 112)', t103Canon(t103Shape(again)) === t103Canon(t103ShapeNow()));
   // the game goes on from it
   const iron0 = s.resources.iron, gold0 = s.gold;

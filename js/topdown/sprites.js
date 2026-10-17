@@ -147,6 +147,64 @@ function tdPropSprite(kind){
   return P.done(false);
 }
 
+// --- Task 114/115/117: the village facilities, by restoration stage.
+//   stage 0 ruin (broken walls, rubble, weeds), 1 cleared (foundation and scaffolding), 2 open.
+//   The appraiser (감정소) is 44 x 40, the museum (박물관) 60 x 48; the door is at the bottom centre.
+//   `exhibits` (museum only) lights that many of its six display niches (one per two relics on show).
+function tdVillageSprite(key, stage, exhibits){
+  const museum = key === 'museum';
+  const W = museum ? 60 : 44, H = museum ? 48 : 40, P = tdPainter(W, H);
+  const cx = W / 2, groundY = H - 3;
+  const stone = museum ? '#a9a39a' : '#9a7446', stoneDark = museum ? '#7f7a72' : '#7a5a36', stoneLight = museum ? '#c6c0b6' : '#b8915c';
+  P(2, H - 3, W - 4, 3, 'rgba(0,0,0,0.22)'); // shadow
+  const fw = museum ? 50 : 36, fx = Math.round(cx - fw / 2);
+  if(stage <= 0){
+    // ruin: a broken wall stump, fallen stones and a beam, weeds
+    P(fx, groundY - 8, fw, 8, '#6e6458'); P(fx, groundY - 8, fw, 1, '#8a8072');
+    [[0, 14], [6, 9], [fw - 10, 12], [fw - 4, 7]].forEach(([dx, h]) => { P(fx + dx, groundY - 8 - h, 4, h, stoneDark); P(fx + dx, groundY - 8 - h, 4, 1, stoneLight); });
+    P(fx + 10, groundY - 6, 12, 2, '#5a3b28'); P(fx + 11, groundY - 7, 10, 1, '#7a5a36'); // a fallen beam
+    [[4, -3], [16, -2], [24, -4], [fw - 14, -2]].forEach(([dx, dy]) => { P(fx + dx, groundY + dy, 3, 2, stone); P(fx + dx, groundY + dy, 3, 1, stoneLight); });
+    [[2, -1], [13, 0], [fw - 6, -1], [20, -9]].forEach(([dx, dy]) => { P(fx + dx, groundY + dy - 2, 1, 3, '#5b8a4a'); P(fx + dx + 1, groundY + dy - 3, 1, 3, '#6b9b55'); });
+    return P.done(false);
+  }
+  if(stage === 1){
+    // cleared: a clean foundation, a scaffold and a stack of materials
+    P(fx, groundY - 6, fw, 6, '#8a8072'); P(fx, groundY - 6, fw, 1, '#a39a8c'); P(fx + 1, groundY - 3, fw - 2, 1, 'rgba(0,0,0,0.15)');
+    [fx + 2, fx + fw - 4, Math.round(cx) - 1].forEach(x => P(x, groundY - 26, 2, 20, '#8a6440'));
+    P(fx + 2, groundY - 20, fw - 4, 2, '#a07a50'); P(fx + 2, groundY - 12, fw - 4, 2, '#a07a50');
+    P(fx + 4, groundY - 26, fw - 8, 2, '#a07a50');
+    P(fx + fw - 12, groundY - 10, 8, 4, '#b8915c'); P(fx + fw - 12, groundY - 10, 8, 1, '#d0ab76'); // planks
+    P(fx + 5, groundY - 9, 6, 3, '#77706a'); P(fx + 5, groundY - 9, 6, 1, '#958d85'); // cut stones
+    P(Math.round(cx) - 5, groundY - 30, 10, 3, '#e2b23c'); P(Math.round(cx) - 4, groundY - 29, 8, 1, '#3a2a1e'); // a little sign
+    return P.done(false);
+  }
+  if(!museum){
+    // the appraiser: a cottage with a blue roof, a lens on its sign and a lit window
+    P(fx, groundY - 18, fw, 18, stone); for(let y = groundY - 14; y < groundY; y += 4) P(fx, y, fw, 1, 'rgba(0,0,0,0.12)');
+    for(let k = 0; k < 12; k++){ const o = Math.floor(k * 5 / 11); P(fx + 3 - o, groundY - 31 + k, fw - 6 + 2 * o, 1, k % 4 === 3 ? '#2f5f86' : '#3f7aa8'); }
+    P(fx - 2, groundY - 20, fw + 4, 2, '#2f5f86'); P(fx + 3, groundY - 31, fw - 6, 1, 'rgba(255,255,255,0.2)');
+    P(Math.round(cx) - 4, groundY - 11, 8, 11, '#4a3626'); P(Math.round(cx) - 3, groundY - 10, 6, 10, '#6a4a30'); // door
+    P(fx + 3, groundY - 14, 7, 6, '#3a2a1e'); P(fx + 4, groundY - 13, 5, 4, '#ffd27a'); // window
+    P(fx + fw - 10, groundY - 15, 8, 8, '#e8dcc0'); P(fx + fw - 10, groundY - 15, 8, 1, '#5a3b28'); // the sign
+    P.disc(fx + fw - 7, groundY - 12, 2, '#3f7aa8'); P(fx + fw - 6, groundY - 12, 1, 1, '#bfe3ff'); P(fx + fw - 5, groundY - 10, 2, 2, '#5a3b28'); // a lens
+    return P.done(false);
+  }
+  // the museum: a stone hall with a pediment, columns and six display niches
+  P(fx, groundY - 22, fw, 22, stone); P(fx, groundY - 3, fw, 3, stoneDark);
+  for(let k = 0; k < 10; k++){ const o = Math.floor(k * 25 / 9); P(Math.round(cx) - o, groundY - 34 + k, 2 * o, 1, k === 9 ? stoneDark : stoneLight); }
+  P(fx - 1, groundY - 24, fw + 2, 2, stoneDark);
+  [fx + 2, fx + 10, fx + fw - 12, fx + fw - 4].forEach(x => { P(x, groundY - 22, 2, 19, '#e6e1d8'); P(x + 2, groundY - 22, 1, 19, stoneDark); });
+  P(Math.round(cx) - 4, groundY - 13, 8, 13, '#4a3626'); P(Math.round(cx) - 3, groundY - 12, 6, 12, '#6a4a30');
+  const lit = Math.max(0, Math.min(6, exhibits || 0));
+  for(let k = 0; k < 6; k++){
+    const nx = k < 3 ? fx + 14 + (k % 3) * 4 + Math.floor(k % 3) : fx + fw - 26 + (k % 3) * 4 + Math.floor(k % 3), ny = groundY - 17;
+    P(nx, ny, 3, 6, '#3a2a1e'); P(nx, ny + 1, 3, 4, k < lit ? '#ffd27a' : '#55504a');
+    if(k < lit) P(nx + 1, ny + 2, 1, 2, ['#c98a4a', '#9ab8c8', '#d8c070', '#b07ac8', '#7fd7ec', '#e6e1d8'][k]);
+  }
+  P(Math.round(cx) - 7, groundY - 31, 14, 4, '#e2b23c'); P(Math.round(cx) - 6, groundY - 30, 12, 2, '#5a3b28'); // the name board
+  return P.done(false);
+}
+
 // --- Task 112: a torch the player sets down, 10 x 22, with a 3-frame flame.
 function tdTorchSprite(frame){
   const P = tdPainter(10, 22);

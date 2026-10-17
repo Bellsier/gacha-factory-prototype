@@ -885,9 +885,107 @@ function updateNumbers(){
   craftFacilityBtn.textContent = craftFacilityAtMax() ? '제작 시설 강화 — 최대' : `제작 시설 강화 — ${craftFacilityCost()}G`;
   craftFacilityBtn.disabled = craftFacilityAtMax() || state.gold < craftFacilityCost();
   renderCurrencies();
+  refreshVillageButtons(); // Task 115
 }
 
 // Structural rebuild after state changes. Render helpers only read `state`.
+// Task 114~117: the village panel (마을 탭). The workshop (the village's
+// production centre) and each facility with its state and next step; the
+// actions call the same functions as walking up to the door (js/village.js).
+// Rebuilt by renderAll and after a village action; the tick only refreshes
+// which buttons can be pressed (refreshVillageButtons).
+function renderVillage(){
+  const wrap = document.getElementById('villagePanel');
+  if(!wrap || typeof VILLAGE === 'undefined') return;
+  const v = villageState();
+  let html = '<div class="village-list">' +
+    '<div class="village-card" data-village="workshop"><div class="village-head"><b>공방</b> <span class="village-stage">운영 중</span></div>' +
+    '<div class="rate">마을의 중심 생산 시설. 제작과 판매는 개발 탭에서 합니다.</div></div>';
+  VILLAGE.ORDER.forEach(k => {
+    const f = VILLAGE.FACILITIES[k], stage = villageStage(k), site = v.sites[k], step = villageNextStep(k);
+    html += '<div class="village-card" data-village="' + k + '">' +
+      '<div class="village-head"><b>' + f.name + '</b> <span class="village-stage" data-village-stage="' + k + '">' + VILLAGE.STAGE_NAMES[Math.min(stage, 2)] + '</span></div>' +
+      '<div class="rate">' + (site ? '공방 근처 (' + site.x.toFixed(1) + ', ' + site.y.toFixed(1) + ')' : '자리를 찾는 중') + '</div>';
+    if(step){
+      html += '<div class="village-actions"><button data-village-restore="' + k + '">' + step.name + ' (' + villageCostText(step.cost) + ')</button></div>' +
+        '<div class="rate" data-village-why="' + k + '"></div>';
+      if(k === 'appraiser') html += villageRelicLine(v) + '<div class="rate">감정소를 복구하면 감정할 수 있어요.</div>'; // Task 116
+    } else html += villageOpenSection(k);
+    html += '</div>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-village-restore]').forEach(btn => { btn.onclick = () => { if(villageRestore(btn.dataset.villageRestore)){ renderVillage(); renderCurrencies(); updateNumbers(); } }; });
+  bindVillageOpenSections(wrap);
+  refreshVillageButtons();
+}
+
+// Task 116: unidentified relics held, and how much hand mining until the next one.
+function villageRelicLine(v){
+  return '<div class="rate">미감정 유물 <b data-village-unidentified>' + v.unidentified + '</b>개 · 다음 유물까지 채굴 <b data-village-progress>' +
+    (VILLAGE.RELIC.EVERY - v.digProgress) + '</b>점</div>';
+}
+
+// What an open facility's card shows (Task 116 appraiser, Task 117 museum).
+function villageOpenSection(k){
+  const v = villageState();
+  if(k === 'appraiser'){
+    let html = villageRelicLine(v) +
+      '<div class="village-actions"><button data-village-appraise>유물 감정</button></div>' +
+      '<div class="rate">도감 <b data-village-codex-count>' + v.codex.length + '</b> / ' + VILLAGE_RELICS.length + '</div><div class="village-codex">';
+    VILLAGE_RELICS.forEach(r => {
+      const known = v.codex.includes(r.key);
+      html += '<div class="village-relic' + (known ? '' : ' is-unknown') + '" data-village-relic="' + r.key + '">' +
+        (known ? '<b>' + r.name + '</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span><br>' + r.desc + '<br><span class="rarity">보유 ' + (v.owned[r.key] || 0) + '</span>'
+          : '<b>???</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span>') + '</div>';
+    });
+    return html + '</div>';
+  }
+  if(k === 'museum'){
+    // Task 117: what is on display, and what can be donated
+    const can = villageDonatable();
+    let html = '<div class="rate">전시 <b data-village-exhibits>' + v.donated.length + '</b> / ' + VILLAGE_RELICS.length + ' · 감정한 유물을 종류마다 하나씩 기증해 전시해요.</div>' +
+      '<div class="village-actions"><button data-village-donate-all' + (can.length ? '' : ' disabled') + '>모두 기증 (' + can.length + '점)</button></div>';
+    if(can.length){
+      html += '<div class="village-codex">';
+      can.forEach(key => { const r = villageRelicByKey(key); html += '<div class="village-relic" data-village-donatable="' + key + '"><b>' + r.name + '</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span><br><button data-village-donate="' + key + '">기증</button></div>'; });
+      html += '</div>';
+    }
+    html += '<div class="rate" style="margin-top:8px;">전시실</div><div class="village-codex">';
+    VILLAGE_RELICS.forEach(r => {
+      const on = v.donated.includes(r.key);
+      html += '<div class="village-relic' + (on ? '' : ' is-unknown') + '" data-village-exhibit="' + r.key + '">' +
+        (on ? '<b>' + r.name + '</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span><br>' + r.desc : '<b>빈 진열장</b>') + '</div>';
+    });
+    return html + '</div>';
+  }
+  return '<div class="rate">운영 중</div>';
+}
+function bindVillageOpenSections(wrap){
+  const ap = wrap.querySelector('[data-village-appraise]');
+  if(ap) ap.onclick = () => { if(villageAppraise()){ renderVillage(); updateNumbers(); } };
+  const all = wrap.querySelector('[data-village-donate-all]');
+  if(all) all.onclick = () => { if(villageDonateAll()){ renderVillage(); updateNumbers(); } };
+  wrap.querySelectorAll('[data-village-donate]').forEach(btn => { btn.onclick = () => { if(villageDonate(btn.dataset.villageDonate)){ renderVillage(); updateNumbers(); } }; });
+}
+
+// Per tick: which village buttons can be pressed now, and why not.
+function refreshVillageButtons(){
+  const wrap = document.getElementById('villagePanel');
+  if(!wrap || typeof VILLAGE === 'undefined') return;
+  const ap = wrap.querySelector('[data-village-appraise]');
+  if(ap) ap.disabled = !!villageAppraiseBlocker();
+  const un = wrap.querySelector('[data-village-unidentified]'), pr = wrap.querySelector('[data-village-progress]'), vs = villageState();
+  if(un && un.textContent !== String(vs.unidentified)) un.textContent = String(vs.unidentified);
+  if(pr && pr.textContent !== String(VILLAGE.RELIC.EVERY - vs.digProgress)) pr.textContent = String(VILLAGE.RELIC.EVERY - vs.digProgress);
+  wrap.querySelectorAll('[data-village-restore]').forEach(btn => {
+    const why = villageRestoreBlocker(btn.dataset.villageRestore);
+    btn.disabled = !!why;
+    const note = wrap.querySelector('[data-village-why="' + btn.dataset.villageRestore + '"]');
+    if(note && note.textContent !== (why || '')) note.textContent = why || '';
+  });
+}
+
 function renderAll(){
   renderCurrencies();
   renderBaseInfo();
@@ -902,6 +1000,7 @@ function renderAll(){
   renderWorkshopBuild();
   renderDelivery();
   renderReputation();
+  renderVillage();
   renderLastPull();
   updateNumbers();
   renderWorldGround();

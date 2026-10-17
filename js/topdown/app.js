@@ -45,7 +45,7 @@ function tdInteractNow(){
   if(!target) return false;
   const r = tdInteract(target);
   if(r.open){ tdOpenTab(r.open); return true; }
-  if(r.text) tdAddFloat(r.text, target.x, target.y, r.ok ? '#fff3b0' : '#b8c0c6');
+  if(r.text) tdAddFloat(r.text, target.x, target.y, r.ok ? '#fff3b0' : '#b8c0c6', tdBubbleLift(target));
   return r.ok;
 }
 
@@ -68,7 +68,8 @@ function tdUpdateActionButton(){
   const btn = document.getElementById('tdAction');
   if(!btn) return;
   const t = TD.target;
-  const label = !t ? '·' : t.action === 'mine' ? '캐기' : t.action === 'secure' ? '확보' : t.action === 'open' ? '열기' : '잠김';
+  const label = !t ? '·' : t.action === 'mine' ? '캐기' : t.action === 'secure' ? '확보' : t.action === 'open' ? '열기'
+    : t.action === 'restore' ? '복구' : t.action === 'appraise' ? '감정' : t.action === 'donate' ? '기증' : '잠김'; // Task 115~117: village actions
   if(btn.textContent !== label) btn.textContent = label;
   btn.classList.toggle('is-idle', !t || t.action === 'locked');
 }
