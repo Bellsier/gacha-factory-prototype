@@ -1,0 +1,254 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#182b27"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E⚒%3C/text%3E%3C/svg%3E"><title>채굴 공방 · 작은 세계의 첫걸음</title><style>:root{color-scheme:dark;font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;color:#e6ecdb;background:#172923;font-synthesis:none}*{box-sizing:border-box}body{margin:0;overflow:hidden}button{font:inherit;color:inherit;border:1px solid #61756577;border-radius:6px;background:#31483e;padding:8px 13px;cursor:pointer}button:hover{background:#48604c;border-color:#c5d3aa}button:focus-visible,canvas:focus-visible{outline:2px solid #eed59b;outline-offset:-2px}button:disabled{opacity:.42;cursor:not-allowed}header{height:62px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;background:#172b25;border-bottom:1px solid #6c846136}.brand{display:flex;align-items:center;gap:13px}.brand strong{font-size:20px;letter-spacing:2px}.brand-icon{color:#e2bd7c;font-size:29px}.edition{font-size:11px;border:1px solid #68816666;padding:4px 7px;border-radius:4px;color:#aebca5}.header-right{display:flex;align-items:center;gap:10px;font-size:12px}#save-status{color:#9caf9c}#help-button{border-radius:50%;padding:5px 11px}#stage{position:relative;width:100vw;height:calc(100dvh - 120px);min-height:220px;overflow:hidden}#world{width:100%;height:100%;display:block;image-rendering:pixelated;outline:none}.region-card{position:absolute;left:24px;top:22px;padding:17px 20px;min-width:218px;background:linear-gradient(115deg,#172b25ed,#172b25c9);border:1px solid #b2c19a34;border-radius:8px;pointer-events:none;box-shadow:0 5px 22px #102a2926}.eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;color:#c2cbaa}.region-card h1{font-size:24px;margin:7px 0 5px;letter-spacing:-1px}.region-card p{font-size:12px;color:#bcc8ac;margin:0 0 14px}.health{display:flex;align-items:center;gap:8px;color:#e3a28d;font-size:12px}.health>div{width:125px;height:6px;border-radius:4px;background:#57735b66;overflow:hidden}.health i{display:block;height:100%;background:#d48f7a;width:100%;transition:width .2s}.health b{font-size:10px;color:#e5dfc6}.equipment{font-size:11px;color:#b2c4a5;margin-top:10px}.quest-card{position:absolute;left:24px;bottom:26px;width:265px;padding:14px 17px;border-left:2px solid #e2c386;background:#192e26da;border-radius:0 6px 6px 0;pointer-events:none}.quest-card p{font-size:13px;line-height:1.6;margin:7px 0}#quest-progress{font-size:11px;color:#a9bd9f}#minimap-wrap{position:absolute;right:24px;top:22px;border:1px solid #bec8a761;border-radius:7px;padding:6px;background:#182b29e8;text-align:center;pointer-events:none}#minimap{display:block;width:144px;height:108px;image-rendering:pixelated}#minimap-wrap span{display:block;font-size:10px;margin-top:4px;color:#bac8ae}kbd{font:600 10px system-ui;border:1px solid #8c9b7e66;border-bottom-width:2px;padding:2px 5px;border-radius:3px;background:#223b32;color:#e7e5cf;white-space:nowrap}#toast{position:absolute;top:20px;left:50%;transform:translateX(-50%);max-width:44%;padding:10px 17px;border-radius:6px;background:#22362eeb;color:#f1dfb8;font-size:12px;text-align:center;pointer-events:none}#prompt{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);padding:10px 16px;border:1px solid #d7c49580;background:#152a25ed;border-radius:7px;font-size:13px;pointer-events:none;white-space:nowrap}#prompt:empty,#toast:empty{display:none}footer{height:58px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;background:#172b25;border-top:1px solid #78896742;font-size:11px}.keys{display:flex;gap:18px;color:#bac6ab}.keys span{display:flex;gap:6px;align-items:center}nav{display:flex;gap:8px}nav button{background:transparent;font-size:12px;padding:7px 10px}#panel-backdrop{position:absolute;inset:0;background:#0a191980;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}#panel-backdrop[hidden]{display:none}#panel{width:590px;max-width:92vw;max-height:88%;overflow:auto;border:1px solid #a1ad7d88;border-radius:11px;background:#1d322c;box-shadow:0 15px 60px #0008;padding:22px}.panel-heading{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #72896355;margin-bottom:17px;padding-bottom:12px}.panel-heading h2{font-size:20px;margin:0}.panel-heading button{font-size:23px;line-height:20px;padding:4px 9px;background:transparent}#panel-content p{font-size:13px;line-height:1.9;color:#c6d0b8}.row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;gap:12px;border-bottom:1px solid #7f95632e}.row strong{font-size:13px}.row small{display:block;font-size:11px;color:#a3b49e;margin-top:4px;line-height:1.5}.row button{font-size:12px;min-width:75px}.section-label{font-size:11px;letter-spacing:1px;color:#e2c28a;margin:22px 0 5px}.inventory-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.resource{padding:14px 8px;text-align:center;background:#2b4438;border-radius:6px;border:1px solid #8da47c33}.resource b{display:block;font-size:20px;margin-bottom:5px}.resource span{font-size:11px;color:#c3cfb4}.action-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.action-line button{font-size:12px}.hint{color:#d7bc89!important}#fatal{position:absolute;inset:25%;background:#362b29;padding:30px;z-index:9}input[type=file]{max-width:100%;font-size:12px}.region-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}.region-list>div{padding:11px;background:#30473b;border-radius:4px;font-size:12px}.region-list small{display:block;color:#adbfa8;margin-top:5px;font-size:10px}@media(max-width:800px){header{padding:0 14px}.region-card{left:12px;top:12px;min-width:180px;padding:12px}.region-card h1{font-size:20px}.quest-card{left:12px;bottom:15px;width:210px}#minimap-wrap{right:12px;top:12px}#minimap{width:110px;height:82px}#toast{top:auto;bottom:95px;max-width:70%;width:max-content}footer{padding:0 12px}.keys{gap:8px}.keys span:nth-child(n+4){display:none}.edition{display:none}#prompt{bottom:20px;left:auto;right:12px;transform:none;font-size:11px}#save-status{display:none}}
+</style></head><body>
+<header><div class="brand"><span class="brand-icon">⚒</span><strong>채굴 공방</strong><span class="edition">실험판 v0.1</span></div><div class="header-right"><span id="save-status">독립 저장</span><button id="save-button">저장</button><button id="help-button" aria-label="조작 안내">?</button></div></header>
+<main id="stage"><canvas id="world" tabindex="0" aria-label="채굴 공방 게임 월드. WASD 이동, E 상호작용"></canvas>
+<div class="region-card"><span class="eyebrow" id="region-tag">SURFACE / 01</span><h1 id="region-name">푸른 초원</h1><p id="region-sub">집으로 이어지는 길</p><div class="health"><span>♥</span><div><i id="health-fill"></i></div><b id="health-value">100</b></div><div class="equipment" id="equipment">곡괭이 I · 채굴 Lv.1</div></div>
+<div class="quest-card"><span class="eyebrow">작은 발걸음</span><p id="quest">구리 광맥에서 첫 광물을 캐 보세요.</p><div id="quest-progress">기록 0 / 11</div></div>
+<div id="minimap-wrap"><canvas id="minimap" width="168" height="126" aria-label="현재 지역 미니맵"></canvas><span>탐험 지도 <kbd>M</kbd></span></div><div id="toast" role="status"></div><div id="prompt"></div>
+<div id="panel-backdrop" hidden><section id="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title"><div class="panel-heading"><h2 id="panel-title"></h2><button id="close-panel" aria-label="닫기">×</button></div><div id="panel-content"></div></section></div><div id="fatal" hidden></div></main>
+<footer><div class="keys"><span><kbd>WASD</kbd> 이동</span><span><kbd>E</kbd> 행동</span><span><kbd>Space</kbd> 검</span><span><kbd>F</kbd> 원거리</span><span><kbd>B</kbd> 자전거</span></div><nav><button id="inventory-button">창고 <kbd>I</kbd></button><button id="map-button">지도·기록 <kbd>M</kbd></button></nav></footer>
+<script>(function(G){
+'use strict';
+G.SAVE_KEY='chaegulGongbang.experimental.v01';G.VERSION=1;G.W=1200;G.H=900;G.SPEED=210;
+G.resources={stone:{name:'돌',color:'#c3c8be',grade:1},copper:{name:'구리',color:'#eaa275',grade:1},wood:{name:'목재',color:'#d7b57c',grade:1},iron:{name:'철',color:'#b9d1e1',grade:2},crystal:{name:'수정',color:'#bf9bfa',grade:3},ember:{name:'불씨석',color:'#ff925d',grade:3},crop:{name:'순무',color:'#d8df9c',grade:1},relic:{name:'유적 조각',color:'#8fe2d5',grade:1}};
+G.regions=[
+{id:'meadow',name:'푸른 초원',sub:'집으로 이어지는 길',ground:'#526c46',light:'#91a76a',dark:'#344b39',accent:'#e3c58a',note:'초원의 기록: 끊어진 길을 다시 잇는 작은 일부터 시작한다.',action:'공방에서 곡괭이 강화 · 마을 복구'},
+{id:'forest',name:'이끼숲',sub:'옛 장인들이 남긴 흔적',ground:'#334f42',light:'#69876a',dark:'#21392f',accent:'#b8d18c',note:'장인의 기록: 첫 번째 봉인을 위한 특수 금속 상자가 이 숲에서 만들어졌다.',action:'장인 기록 조사 · 목재 채집'},
+{id:'frost',name:'서리 고원',sub:'침묵하는 사원의 불빛',ground:'#879fa6',light:'#d2ddd5',dark:'#566b7f',accent:'#cfedf1',note:'사원 기록: 이곳은 두 번째 봉인과 관련되어 있다. 그 결과는 아직 알려져 있지 않다.',action:'사원 등불 순서 복구 · 철 채굴'},
+{id:'marsh',name:'안개 늪지',sub:'물길 건너 들려오는 이야기',ground:'#506966',light:'#80988b',dark:'#304a50',accent:'#c7dcaa',note:'늪지 기록: 불완전한 목격담만으로 누군가를 범인으로 정할 수는 없다.',action:'수로 복구 · 이주민과 대화'},
+{id:'crystal',name:'별빛 수정 지대',sub:'기억을 품은 결정',ground:'#565771',light:'#9290af',dark:'#353a53',accent:'#c5a7f5',note:'연구 기록: 과학자는 결정화의 확산을 막았다. 사고와 침식 유물의 인과는 확인되지 않았다.',action:'수정 채굴 · 연구 시설 조사'},
+{id:'ridge',name:'붉은 바위 산맥',sub:'다시 열리는 광산길',ground:'#89634f',light:'#c18d62',dark:'#5f4640',accent:'#efb581',note:'광산 기록: 이 산맥과 화산의 광석은 인공 수정 연구에 쓰였다.',action:'광산 터널 개방 · 철 광맥'},
+{id:'volcano',name:'잿불 화산 지대',sub:'대지 아래의 따뜻한 숨',ground:'#50494b',light:'#847064',dark:'#302d36',accent:'#ffae70',note:'지열 시설 기록: 오래된 제련 장치에 대지의 열기가 남아 있다.',action:'지열 시설 복구 · 불씨석 채굴'},
+{id:'b1',name:'B1 · 고대 도시 입구',sub:'멈춰 선 역',ground:'#3e494f',light:'#67797a',dark:'#263238',accent:'#d4bc89',note:'역의 기록: 이곳의 철도는 이미 존재했다. 필요한 것은 새 부설이 아니라 복구다.',action:'기존 레일 복구 · 수레 탑승'},
+{id:'b2',name:'B2 · 오래된 시설',sub:'잠든 도시에 전력을',ground:'#3e4b5e',light:'#6b8494',dark:'#263342',accent:'#9bd4d9',note:'시설 기록: 사람들은 극심한 추위와 질병을 피해 지하 도시로 내려왔다.',action:'전력 장치 순서 복구'},
+{id:'b3',name:'B3 · 얼어붙은 구조물',sub:'얼음 아래 남은 온기',ground:'#526981',light:'#92b9cb',dark:'#33465e',accent:'#c4edfa',note:'난방 기록: 얼음 속에는 과거의 생활 공간이 그대로 남아 있다.',action:'난방 장치 순서 복구'},
+{id:'b4',name:'B4 · 마지막 연구실',sub:'나선의 가장 깊은 곳',ground:'#3b4159',light:'#727992',dark:'#252b3e',accent:'#dfc5f3',note:'연구실 기록: 의식 이전과 오염된 물질에 대한 단편이다. 재앙의 상세 연표는 아직 확정할 수 없다.',action:'연구실 기록 복원 · 탐험 완료'}];
+G.recipes={pick2:{name:'구리 곡괭이',desc:'채굴 등급 2 · 철 광맥 채굴',cost:{copper:6,stone:4},research:'mining'},pick3:{name:'강철 곡괭이',desc:'채굴 등급 3 · 수정과 불씨석',cost:{iron:6,copper:4},research:'craft'},sword:{name:'강화 검',desc:'근접 피해 18 → 30',cost:{copper:4,stone:2},research:'craft'},bike:{name:'자전거',desc:'지상에서 B · 이동 속도 1.7배',cost:{copper:4,wood:2},research:'transport'},lantern:{name:'정원 등불',desc:'G로 앞에 배치 · 최대 8개',cost:{copper:2,stone:2},research:null}};
+G.researches={mining:{name:'채굴 기술',desc:'구리 곡괭이 제작 해금',cost:{copper:2}},craft:{name:'제작 기술',desc:'강철 곡괭이·강화 검 해금',cost:{copper:2,stone:2}},transport:{name:'운송 기술',desc:'자전거 제작 해금',cost:{wood:2}},ancient:{name:'고대 기술',desc:'방문한 텔레포터 활성화',cost:{copper:2,stone:2}}};
+G.clamp=(x,a,b)=>Math.max(a,Math.min(b,x));G.distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+})(globalThis.CG=globalThis.CG||{});
+</script><script>(function(G){
+'use strict';
+G.makeWorld=function(id){
+ const index=G.regions.findIndex(r=>r.id===id);if(index<0)throw Error('Unknown region');
+ const region=G.regions[index],objects=[],enemies=[];
+ const add=(kind,x,y,props={})=>{const o={id:`${id}-${objects.length}`,kind,x,y,w:30,h:22,solid:false,...props};objects.push(o);return o;};
+ const ore=(x,y,resource)=>add('ore',x,y,{name:G.resources[resource].name+' 광맥',resource,solid:true,w:42,h:28});
+ const gate=(x,y,target,label)=>add('gate',x,y,{name:label,target});const underground=index>=7;
+ for(let y=92;y<850;y+=94)for(let x=70;x<1180;x+=103){
+  if(Math.abs(y-520)<92||Math.abs(x-600)<75||Math.abs(y-740)<60||y>780)continue;
+  if(id==='meadow'&&x>220&&y>280&&y<780)continue;
+  if(id==='b1'&&x>=250&&x<=1060&&y>=575&&y<=725)continue;
+  if(x>360&&x<920&&y>220&&y<440)continue;
+  const n=(x*7+y*13+index*41)%11;
+  if(n<6)add(underground?'pillar':(index===4?'crystal':index>=5?'rock':'tree'),x,y,{solid:true,w:28,h:22});
+ }
+ if(!underground){gate(70,520,G.regions[(index+6)%7].id,'← '+G.regions[(index+6)%7].name);gate(1130,520,G.regions[(index+1)%7].id,G.regions[(index+1)%7].name+' →');}
+ else{gate(70,520,index===7?'meadow':G.regions[index-1].id,index===7?'地上 · 푸른 초원':'↑ '+G.regions[index-1].name);if(index<10)gate(1130,520,G.regions[index+1].id,'↓ '+G.regions[index+1].name);}
+ add('teleport',1030,740,{name:'텔레포터'});add('record',880,300,{name:'지역 기록',text:region.note});
+ if(id==='meadow'){
+  add('house',310,360,{name:'나의 집',solid:true,w:130,h:105,ay:430});add('workshop',600,360,{name:'채굴 공방',solid:true,w:150,h:105,ay:430});add('warehouse',1000,360,{name:'공용 창고',solid:true,w:120,h:100,ay:428});
+  add('npc',720,620,{name:'마을 안내인',text:'광맥 앞에서 E를 눌러 보세요. 광물은 곧바로 창고로 들어갑니다. 구리 2개로 채굴 기술을 연구하고, 구리 6개와 돌 4개로 곡괭이를 만드세요. 집에서 쉬면 체력이 회복됩니다.'});
+  ore(800,430,'copper');ore(910,620,'copper');ore(800,650,'stone');ore(1070,620,'stone');
+  add('tree',470,650,{solid:true,w:30,h:24});add('rock',550,650,{solid:true,w:34,h:26});add('log',350,600,{name:'쓰러진 가지',resource:'wood'});add('farm',300,740,{name:'작은 텃밭',w:112,h:64});add('repair',650,740,{name:'마을 우물',cost:{stone:4},flag:'well',w:42,h:32,solid:true});gate(850,800,'b1','↓ 고대 도시 B1');
+ }else if(!underground){
+  const resource=index===1?'copper':index===2||index===3||index===5?'iron':index===4?'crystal':'ember';ore(760,430,resource);ore(920,650,resource);ore(800,650,'stone');add('log',350,650,{name:'쓰러진 가지',resource:'wood'});
+  if(index===1)add('landmark',600,330,{name:'장인의 작업대',flag:'artisan',cost:{wood:2},w:90,h:45,solid:true,ay:375});
+  if(index===2)for(let i=0;i<3;i++)add('switch',480+i*120,330,{name:`사원 등불 ${i+1}`,puzzle:'temple',order:i,sequence:[0,1,2]});
+  if(index===3){add('landmark',600,330,{name:'수로 수문',flag:'sluice',cost:{stone:2},w:90,h:45,solid:true,ay:375});add('npc',400,620,{name:'늪지의 주민',text:'안개 속에서 본 옷차림만으로는 누구인지 알 수 없어요. 숲의 기록도 함께 읽어 주세요.'});}
+  if(index===4)add('landmark',600,330,{name:'연구 관측기',flag:'observatory',cost:{iron:2},w:70,h:45,solid:true,ay:375});
+  if(index===5)add('landmark',600,330,{name:'무너진 광산 통로',flag:'tunnel',cost:{stone:4},w:130,h:60,solid:true,ay:378});
+  if(index===6)add('landmark',600,330,{name:'지열 제련 장치',flag:'geothermal',cost:{iron:2},w:100,h:55,solid:true,ay:375});
+  enemies.push({id:id+'-enemy-0',x:540,y:540,homeX:540,homeY:540,hp:48,maxHp:48,kind:index===6?'ember':'slime',cooldown:0,hit:0});enemies.push({id:id+'-enemy-1',x:960,y:240,homeX:960,homeY:240,hp:48,maxHp:48,kind:'slime',cooldown:0,hit:0});
+ }else{
+  add('ore',800,710,{name:'오래된 돌더미',resource:'stone',solid:true,w:42,h:28});
+  if(index===7){add('repair',430,330,{name:'옛 철도 분기기',flag:'rail',cost:{stone:2},w:42,h:32});add('cart',310,650,{name:'레일 수레'});}
+  else if(index<10){const puzzle=index===8?'power':'heat';for(let i=0;i<3;i++)add('switch',480+i*120,330,{name:`${index===8?'전력':'난방'} 장치 ${i+1}`,puzzle,order:i,sequence:index===8?[1,0,2]:[2,1,0]});add('sign',600,430,{name:'장치 사용 기록',text:index===8?'복구 순서: 가운데 → 왼쪽 → 오른쪽. 틀리면 처음부터 다시 시작합니다.':'난방 순서: 오른쪽 → 가운데 → 왼쪽. 틀리면 처음부터 다시 시작합니다.'});}
+  else add('lab',600,330,{name:'마지막 연구실',solid:true,w:120,h:54,ay:375});
+ }
+ return {id,region,objects,enemies,underground,width:G.W,height:G.H};
+};
+G.collides=function(world,x,y,r=12){if(x<r||y<r||x>G.W-r||y>G.H-r)return true;return world.objects.some(o=>o.solid&&Math.abs(x-o.x)<o.w/2+r&&Math.abs(y-o.y)<o.h/2+r);};
+})(globalThis.CG=globalThis.CG||{});
+</script><script>(function(G){'use strict';
+class Game{
+ constructor(){
+  this.state={version:1,region:'meadow',player:{x:420,y:520,hp:100,facing:{x:0,y:1},moving:false},inventory:Object.fromEntries(Object.keys(G.resources).map(k=>[k,0])),xp:{mining:0,melee:0,ranged:0},pick:1,sword:1,research:{},equipment:{},visited:['meadow'],records:[],flags:{},puzzles:{},teleports:[],ore:{},farm:{stage:0,readyAt:0},decorations:[],lanterns:0,clock:0,kills:0};
+  this.world=G.makeWorld('meadow');this.effects=[];this.projectiles=[];this.panel=null;this.notice='공방에 오신 것을 환영합니다. 오른쪽 구리 광맥에서 E로 채굴하세요.';this.noticeTime=7;this.cooldown=0;this.attackTime=0;this.bike=false;this.riding=false;this.invulnerable=0;
+ }
+ say(text){this.notice=text;this.noticeTime=5;return false;}
+ burst(x,y,color,text){this.effects.push({x,y,color,text,life:.7});}
+ nearest(){const p=this.state.player;let best=null,dist=65;for(const o of this.world.objects){if(!o.name)continue;const d=Math.hypot(p.x-o.x,p.y-(o.ay??o.y));if(d<dist){best=o;dist=d;}}return best;}
+ move(dx,dy,dt,speed=G.SPEED,actor=this.state.player){const len=Math.hypot(dx,dy);if(!len)return;dx/=len;dy/=len;const steps=Math.max(1,Math.ceil(speed*dt/6)),sx=dx*speed*dt/steps,sy=dy*speed*dt/steps;for(let i=0;i<steps;i++){if(!G.collides(this.world,actor.x+sx,actor.y))actor.x+=sx;if(!G.collides(this.world,actor.x,actor.y+sy))actor.y+=sy;}}
+ step(dt,input={}){
+  dt=G.clamp(Number(dt)||0,0,.1);if(this.panel)return;this.state.clock+=dt;this.cooldown=Math.max(0,this.cooldown-dt);this.attackTime=Math.max(0,this.attackTime-dt);this.noticeTime=Math.max(0,this.noticeTime-dt);
+  const p=this.state.player,dx=(input.right?1:0)-(input.left?1:0),dy=(input.down?1:0)-(input.up?1:0),ox=p.x,oy=p.y;
+  if(this.riding){p.x=G.clamp(p.x+dx*G.SPEED*2*dt,300,1000);p.y=650;}else this.move(dx,dy,dt,G.SPEED*(this.bike?1.7:1));
+  p.moving=p.x!==ox||p.y!==oy;if(dx||dy){const d=Math.hypot(dx,dy);p.facing={x:dx/d,y:dy/d};}
+  this.invulnerable=Math.max(0,this.invulnerable-dt);
+  for(const e of this.world.enemies){if(e.hp<=0)continue;e.cooldown=Math.max(0,e.cooldown-dt);e.hit=Math.max(0,e.hit-dt);const dist=G.distance(p,e);if(dist<260&&dist>28)this.move(p.x-e.x,p.y-e.y,dt,65,e);if(dist<35&&e.cooldown===0){e.cooldown=1;if(this.damage(8))return;}}
+  for(const shot of this.projectiles){shot.life-=dt;const steps=Math.ceil(shot.speed*dt/6);for(let i=0;i<steps&&shot.life>0;i++){shot.x+=shot.dx*shot.speed*dt/steps;shot.y+=shot.dy*shot.speed*dt/steps;if(G.collides(this.world,shot.x,shot.y,3)){shot.life=0;break;}const e=this.world.enemies.find(e=>e.hp>0&&G.distance(e,shot)<24);if(e){this.hitEnemy(e,16,true);shot.life=0;}}}
+  this.projectiles=this.projectiles.filter(s=>s.life>0);this.effects.forEach(e=>e.life-=dt);this.effects=this.effects.filter(e=>e.life>0);
+ }
+ interact(){
+  if(this.panel||this.cooldown>0)return false;
+  if(this.riding){const p=this.state.player,exit=[[p.x,695],[p.x,605],[p.x-45,695],[p.x+45,695]].find(([x,y])=>!G.collides(this.world,x,y));if(!exit)return this.say('내릴 공간이 없습니다. 수레를 조금 움직여 주세요.');const cart=this.world.objects.find(o=>o.kind==='cart');if(cart)cart.x=p.x;this.riding=false;[p.x,p.y]=exit;this.cooldown=.3;this.say('수레에서 내렸습니다.');return true;}
+  const o=this.nearest();if(!o)return this.say('조금 더 가까이 다가가세요.');
+  if(o.kind==='ore'){
+   const r=G.resources[o.resource];if(this.state.pick<r.grade)return this.say(`등급 ${r.grade} 곡괭이가 필요합니다. 공방에서 강화하세요.`);const n=this.state.ore[o.id]||{hits:0,readyAt:0};if(n.readyAt>this.state.clock)return this.say(`광맥 회복 중 · ${Math.ceil(n.readyAt-this.state.clock)}초`);if(n.hits>=4)n.hits=0;n.hits++;if(n.hits>=4)n.readyAt=this.state.clock+24;this.state.ore[o.id]=n;this.state.inventory[o.resource]+=2;this.state.xp.mining++;this.cooldown=.3;this.attackTime=.2;this.burst(o.x,o.y,r.color,r.name+' +2');this.say(`${r.name} +2 → 공용 저장소`);return true;
+  }
+  if(o.kind==='gate'){this.enter(o.target);return true;}
+  if(o.kind==='house'){this.state.player.hp=100;return this.say('집에서 잠시 쉬었습니다. 체력이 모두 회복됐습니다.');}
+  if(o.kind==='warehouse'){this.panel={type:'inventory',title:'공용 저장소'};return true;}
+  if(o.kind==='workshop'){this.panel={type:'workshop',title:'채굴 공방 · 제작과 연구'};return true;}
+  if(o.kind==='record'){if(this.state.region==='b4'&&!this.state.flags.lab)return this.say('연구실의 전력과 난방을 복구해야 기록을 읽을 수 있습니다.');this.state.records=[...new Set([...this.state.records,this.state.region])];this.panel={type:'message',title:o.name,text:o.text};return true;}
+  if(o.kind==='log'){const n=this.state.ore[o.id]||{hits:0,readyAt:0};if(n.readyAt>this.state.clock)return this.say('가지를 모았습니다. 잠시 뒤 다시 찾아보세요.');n.hits=1;n.readyAt=this.state.clock+12;this.state.ore[o.id]=n;this.state.inventory.wood+=4;this.cooldown=.3;this.burst(o.x,o.y,'#d5b276','목재 +4');return this.say('목재 +4 → 공용 저장소');}
+  if(o.kind==='repair'||o.kind==='landmark'){if(this.state.flags[o.flag])return this.say(o.name+' · 복구 완료');if(!this.pay(o.cost))return false;this.state.flags[o.flag]=true;this.syncWorld();this.cooldown=.3;this.burst(o.x,o.y,'#d6db9f','복구 완료');this.say(o.name+' 복구 완료');return true;}
+  if(o.kind==='switch'){const n=this.state.puzzles[o.puzzle]||0;if(n===3)return this.say('이미 장치를 모두 복구했습니다.');this.state.puzzles[o.puzzle]=o.sequence[n]===o.order?n+1:0;this.cooldown=.25;this.say(this.state.puzzles[o.puzzle]===3?'복구 완료! 오래된 장치에 다시 빛이 돌아왔습니다.':this.state.puzzles[o.puzzle]===0?'순서가 맞지 않습니다. 장치 기록을 확인하세요.':`장치 연결 ${this.state.puzzles[o.puzzle]} / 3`);return true;}
+  if(o.kind==='lab'){if(this.state.puzzles.power!==3||this.state.puzzles.heat!==3)return this.say('B2 전력 장치와 B3 난방 장치를 먼저 복구하세요.');this.state.flags.lab=true;this.state.records=[...new Set([...this.state.records,'b4'])];this.panel={type:'message',title:'탐험 완료 · 마지막 연구실',text:'전력과 온기가 돌아오자 남겨진 기록이 읽히기 시작합니다. 의식 이전과 오염된 물질에 대한 단편입니다. 아직 밝혀지지 않은 이야기를 남겨 두고, 마을로 돌아갑니다. B4 탐험 목표를 완료했습니다.'};return true;}
+  if(o.kind==='cart'){if(!this.state.flags.rail)return this.say('북쪽의 옛 철도 분기기를 돌 2개로 복구하세요.');this.riding=true;this.state.player.x=o.x;this.state.player.y=650;this.cooldown=.3;this.say('레일 수레 탑승 · A/D 이동 · E 내리기');return true;}
+  if(o.kind==='teleport'){if(!this.state.research.ancient)return this.say('공방에서 고대 기술을 연구하면 활성화할 수 있습니다.');this.state.teleports=[...new Set([...this.state.teleports,this.state.region])];this.panel={type:'teleport',title:'활성화한 텔레포터'};return true;}
+  if(o.kind==='farm'){const f=this.state.farm;this.cooldown=.3;if(f.stage===0){f.stage=1;this.say('순무 씨앗을 심었습니다. E로 물을 주세요.');}else if(f.stage===1){f.stage=2;f.readyAt=this.state.clock+30;this.say('물을 주었습니다. 플레이 시간 30초 후 자랍니다.');}else if(this.state.clock<f.readyAt)this.say(`순무가 자라는 중 · ${Math.ceil(f.readyAt-this.state.clock)}초`);else{f.stage=0;this.state.inventory.crop+=3;this.burst(o.x,o.y,'#decca4','순무 +3');this.say('순무 +3 · Q로 먹으면 체력 30 회복');}return true;}
+  this.panel={type:'message',title:o.name,text:o.text||'이곳의 장치를 살펴보았습니다.'};return true;
+ }
+ enter(id){const previous=this.state.region,from=G.regions.findIndex(r=>r.id===previous),to=G.regions.findIndex(r=>r.id===id);if(to<0)return false;this.state.region=id;this.world=G.makeWorld(id);this.syncWorld();this.bike=false;this.riding=false;this.panel=null;this.state.player.x=(from<7&&to===(from+6)%7)||(from>=8&&to===from-1)?1030:170;this.state.player.y=520;this.state.player.moving=false;if(id==='meadow'&&previous==='b1'){this.state.player.x=850;this.state.player.y=740;}this.state.visited=[...new Set([...this.state.visited,id])];this.projectiles=[];this.effects=[];this.cooldown=.4;this.say(G.regions[to].name+'에 도착했습니다.');return true;}
+ attack(ranged=false){if(this.panel||this.cooldown>0||this.riding)return false;this.cooldown=ranged?.45:.32;this.attackTime=.22;const p=this.state.player,f=p.facing;if(ranged)this.projectiles.push({x:p.x,y:p.y,dx:f.x,dy:f.y,speed:420,life:1.3});else for(const e of this.world.enemies){const d=G.distance(e,p),dot=(e.x-p.x)*f.x+(e.y-p.y)*f.y;if(e.hp>0&&d<72&&(dot>0||d<30))this.hitEnemy(e,this.state.sword===2?30:18,false);}return true;}
+ hitEnemy(e,n,ranged){e.hp=Math.max(0,e.hp-n);e.hit=.2;this.burst(e.x,e.y,'#f0d7a5',String(n));if(e.hp===0){this.state.kills++;this.state.xp[ranged?'ranged':'melee']+=5;this.state.inventory.relic++;this.state.inventory.stone+=2;this.say('처치 · 유적 조각 +1 · 돌 +2');}}
+ damage(n){if(this.invulnerable>0)return false;this.state.player.hp=Math.max(0,this.state.player.hp-n);this.invulnerable=.8;if(this.state.player.hp===0){this.enter('meadow');this.state.player.x=420;this.state.player.y=520;this.state.player.hp=100;this.say('기운을 잃어 집 앞으로 돌아왔습니다. 자원은 보존됩니다.');return true;}return false;}
+ toggleBike(){if(this.panel||this.world.underground||!this.state.equipment.bike)return this.say('자전거는 공방에서 제작한 뒤 지상에서 사용할 수 있습니다.');this.bike=!this.bike;this.say(this.bike?'자전거 탑승 · 이동 속도 증가':'자전거에서 내렸습니다.');return true;}
+ travel(id){if(this.nearest()?.kind!=='teleport'||!this.state.teleports.includes(id)||!this.state.teleports.includes(this.state.region)||id===this.state.region)return false;this.enter(id);this.state.player.x=1030;this.state.player.y=690;this.say('텔레포터로 이동했습니다.');return true;}
+ eat(){if(this.state.inventory.crop<1||this.state.player.hp>=100)return this.say('순무가 없거나 체력이 이미 가득합니다.');this.state.inventory.crop--;this.state.player.hp=Math.min(100,this.state.player.hp+30);this.say('순무를 먹었습니다. 체력 +30');return true;}
+ decorate(){const p=this.state.player,x=p.x+p.facing.x*42,y=p.y+p.facing.y*42;if(this.panel||this.state.lanterns<1)return this.say('공방에서 정원 등불을 먼저 만드세요.');if(this.state.decorations.length>=8||G.collides(this.world,x,y)||this.world.objects.some(o=>o.name&&Math.hypot(x-o.x,y-(o.ay??o.y))<45)||this.state.decorations.some(d=>d.region===this.state.region&&Math.hypot(d.x-x,d.y-y)<30))return this.say('이곳에는 등불을 놓을 수 없습니다. 빈 땅을 찾으세요.');this.state.decorations.push({region:this.state.region,x,y});this.state.lanterns--;this.say('정원 등불을 배치했습니다.');return true;}
+ atWorkshop(){return this.nearest()?.kind==='workshop';}
+ syncWorld(){for(const o of this.world.objects)if(o.flag==='tunnel')o.solid=!this.state.flags.tunnel;}
+ pay(cost){if(Object.entries(cost).some(([k,n])=>this.state.inventory[k]<n))return this.say('재료가 부족합니다. 창고 재고를 확인하세요.');for(const [k,n]of Object.entries(cost))this.state.inventory[k]-=n;return true;}
+ research(id){const r=G.researches[id];if(!r||!this.atWorkshop()||this.state.research[id])return false;if(!this.pay(r.cost))return false;this.state.research[id]=true;this.say(r.name+' 연구 완료');return true;}
+ craft(id){const r=G.recipes[id];if(!r||!this.atWorkshop())return false;if(r.research&&!this.state.research[r.research])return this.say('먼저 해당 기술을 연구하세요.');if(id!=='lantern'&&this.state.equipment[id])return this.say('이미 제작한 장비입니다.');if(id==='pick3'&&this.state.pick<2)return this.say('구리 곡괭이를 먼저 만드세요.');if(!this.pay(r.cost))return false;if(id==='pick2')this.state.pick=2;if(id==='pick3')this.state.pick=3;if(id==='sword')this.state.sword=2;if(id==='lantern')this.state.lanterns++;else this.state.equipment[id]=true;this.say(r.name+' 제작 완료'+(id.startsWith('pick')?' · 자동 장착':''));return true;}
+ serialize(){return JSON.stringify(this.state);}
+ static fromSave(json){
+  const raw=JSON.parse(json),g=new Game(),s=g.state;if(!raw||raw.version!==1||!G.regions.some(r=>r.id===raw.region)||!raw.player||!raw.inventory)throw Error('지원하지 않는 실험판 저장 형식입니다.');const num=(v,a,b)=>{if(typeof v!=='number'||!Number.isFinite(v))throw Error('저장 데이터에 올바르지 않은 숫자가 있습니다.');return G.clamp(v,a,b);};
+  s.region=raw.region;g.world=G.makeWorld(s.region);s.player.x=num(raw.player.x,12,G.W-12);s.player.y=num(raw.player.y,12,G.H-12);s.player.hp=num(raw.player.hp,1,100);
+  for(const k of Object.keys(G.resources))s.inventory[k]=Math.floor(num(raw.inventory[k],0,1e6));for(const k of ['mining','melee','ranged'])s.xp[k]=Math.floor(num(raw.xp?.[k]??0,0,1e6));s.pick=Math.floor(num(raw.pick??1,1,3));s.sword=Math.floor(num(raw.sword??1,1,2));s.clock=num(raw.clock??0,0,1e10);s.kills=Math.floor(num(raw.kills??0,0,1e6));s.lanterns=Math.floor(num(raw.lanterns??0,0,100));
+  for(const k of Object.keys(G.researches))if(raw.research?.[k]===true)s.research[k]=true;for(const k of Object.keys(G.recipes))if(raw.equipment?.[k]===true)s.equipment[k]=true;for(const k of ['visited','records','teleports'])s[k]=[...new Set((Array.isArray(raw[k])?raw[k]:[]).filter(x=>G.regions.some(r=>r.id===x)))];if(!s.visited.includes(s.region))s.visited.push(s.region);
+  for(const k of ['well','rail','artisan','sluice','observatory','tunnel','geothermal','lab'])if(raw.flags?.[k]===true)s.flags[k]=true;for(const k of ['temple','power','heat'])s.puzzles[k]=Math.floor(num(raw.puzzles?.[k]??0,0,3));
+  for(const r of G.regions)for(const o of G.makeWorld(r.id).objects){const n=raw.ore?.[o.id];if(n&&['ore','log'].includes(o.kind))s.ore[o.id]={hits:Math.floor(num(n.hits,0,4)),readyAt:num(n.readyAt,0,s.clock+60)};}s.farm={stage:Math.floor(num(raw.farm?.stage??0,0,2)),readyAt:num(raw.farm?.readyAt??0,0,s.clock+120)};
+  g.syncWorld();if(G.collides(g.world,s.player.x,s.player.y)){s.player.x=170;s.player.y=520;}
+  s.decorations=(Array.isArray(raw.decorations)?raw.decorations:[]).slice(0,8).filter(d=>d&&G.regions.some(r=>r.id===d.region)&&Number.isFinite(d.x)&&Number.isFinite(d.y)&&!G.collides(G.makeWorld(d.region),d.x,d.y)).map(d=>({region:d.region,x:d.x,y:d.y}));return g;
+ }
+ snapshot(){return JSON.parse(JSON.stringify({state:this.state,world:this.world,panel:this.panel,bike:this.bike,riding:this.riding,notice:this.notice,camera:this.camera}));}
+}
+G.Game=Game;
+})(globalThis.CG=globalThis.CG||{});
+</script><script>(function(G){
+'use strict';
+const hash=(x,y)=>{let n=Math.sin(x*127.1+y*311.7)*43758.5453;return n-Math.floor(n);};
+const rect=(c,x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(Math.round(x),Math.round(y),w,h);};
+const ellipse=(c,x,y,rx,ry,color)=>{c.fillStyle=color;c.beginPath();c.ellipse(x,y,rx,ry,0,0,Math.PI*2);c.fill();};
+const polygon=(c,pts,color)=>{c.fillStyle=color;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(...p):c.moveTo(...p));c.closePath();c.fill();};
+function label(c,text,x,y,color='#e6e5cb'){c.font='11px system-ui';c.textAlign='center';c.fillStyle='#162824c9';const w=c.measureText(text).width+12;c.fillRect(x-w/2,y-12,w,18);c.fillStyle=color;c.fillText(text,x,y);}
+function building(c,o,t){
+ const workshop=o.kind==='workshop',warehouse=o.kind==='warehouse',w=o.w;
+ ellipse(c,o.x+8,o.y+45,w*.63,23,'#15261e55');rect(c,o.x-w/2,o.y-40,w,88,warehouse?'#737b64':'#b4a47d');rect(c,o.x-w/2,o.y+34,w,14,'#746952');
+ for(let y=o.y-30;y<o.y+33;y+=16)rect(c,o.x-w/2,y,w,2,'#867d6255');
+ polygon(c,[[o.x-w/2-12,o.y-30],[o.x-w/2-12,o.y-58],[o.x,o.y-105],[o.x+w/2+12,o.y-58],[o.x+w/2+12,o.y-30]],workshop?'#72534b':warehouse?'#526c64':'#826251');
+ polygon(c,[[o.x-w/2-12,o.y-58],[o.x,o.y-105],[o.x,o.y-92],[o.x-w/2-12,o.y-45]],'#b6956b');
+ for(let x=o.x-w/2;x<o.x+w/2;x+=18)rect(c,x,o.y-43,13,3,'#452e3133');
+ rect(c,o.x-15,o.y+7,30,42,'#263e33');rect(c,o.x-11,o.y+10,22,35,'#4b5040');rect(c,o.x+5,o.y+28,3,3,'#e8c17e');
+ for(const side of [-1,1]){rect(c,o.x+side*(w/2-25)-10,o.y-14,20,23,'#4b5343');rect(c,o.x+side*(w/2-25)-7,o.y-11,14,16,'#e7bb73');rect(c,o.x+side*(w/2-25)-1,o.y-11,2,16,'#99835b');}
+ if(workshop){rect(c,o.x+35,o.y-111,18,45,'#7e7766');rect(c,o.x+32,o.y-111,24,6,'#afa18a');for(let i=0;i<3;i++)ellipse(c,o.x+43+Math.sin(t+i)*6,o.y-125-(t*12+i*15)%48,7+i*3,5+i*2,'#d0d1b325');}label(c,o.name,o.x,o.y+65);
+}
+function person(c,p,t,npc=false){
+ const walk=p.moving?Math.sin(t*13)*4:0;ellipse(c,p.x,p.y+4,14,6,'#15221e66');rect(c,p.x-8,p.y-5+walk,6,11,'#323e3b');rect(c,p.x+2,p.y-5-walk,6,11,'#323e3b');
+ rect(c,p.x-12,p.y-23,24,22,npc?'#b18862':'#89a4a0');rect(c,p.x-11,p.y-14,22,5,npc?'#936a50':'#536c66');rect(c,p.x-9,p.y-37,18,16,'#e1bb91');rect(c,p.x-12,p.y-39,24,8,npc?'#6b5743':'#d2b469');rect(c,p.x-8,p.y-44,16,7,npc?'#6b5743':'#d2b469');
+ if(!npc){rect(c,p.x-3,p.y-40,6,5,'#fff0ba');rect(c,p.x-15,p.y-19,5,14,'#bc9a72');rect(c,p.x+10,p.y-19,5,14,'#bc9a72');}
+ const facing=p.facing||{x:0,y:1};if(facing.y>=0){rect(c,p.x-5+facing.x*2,p.y-30,2,3,'#38483c');rect(c,p.x+3+facing.x*2,p.y-30,2,3,'#38483c');}
+}
+function object(c,o,g,t){
+ const done=g.state.flags[o.flag];if(['house','workshop','warehouse'].includes(o.kind))return building(c,o,t);
+ if(o.kind==='tree'){
+  ellipse(c,o.x+8,o.y+8,34,12,'#17292044');rect(c,o.x-7,o.y-25,14,35,'#715b40');rect(c,o.x-2,o.y-21,4,30,'#9f8053');const sway=Math.sin(t*1.3+o.x)*1.7;
+  polygon(c,[[o.x-38+sway,o.y-22],[o.x-33+sway,o.y-55],[o.x-18+sway,o.y-80],[o.x+6+sway,o.y-87],[o.x+31+sway,o.y-61],[o.x+39+sway,o.y-28]],g.world.id==='frost'?'#b6cec4':'#294d38');
+  polygon(c,[[o.x-30+sway,o.y-48],[o.x-13+sway,o.y-78],[o.x+5+sway,o.y-79],[o.x+26+sway,o.y-57],[o.x+16+sway,o.y-34],[o.x-12+sway,o.y-34]],g.world.id==='frost'?'#deebe0':'#49744a');rect(c,o.x-15,o.y-64,17,4,g.world.id==='frost'?'#f2f2dd':'#74904f');return;
+ }
+ if(o.kind==='rock'||o.kind==='ore'){
+  const n=g.state.ore[o.id],empty=n&&n.readyAt>g.state.clock;
+  ellipse(c,o.x+3,o.y+8,28,9,'#182b2944');polygon(c,[[o.x-24,o.y+7],[o.x-27,o.y-10],[o.x-13,o.y-25],[o.x+8,o.y-29],[o.x+24,o.y-12],[o.x+25,o.y+6]],empty?'#586456':'#7c8a7b');polygon(c,[[o.x-27,o.y-10],[o.x-13,o.y-25],[o.x+8,o.y-29],[o.x+6,o.y-9],[o.x-11,o.y]],'#a3ad90');
+  if(o.kind==='ore'&&!empty){const color=G.resources[o.resource].color;for(let i=0;i<4;i++){const x=o.x-15+(i%2)*19,y=o.y-17+Math.floor(i/2)*15;polygon(c,[[x-5,y],[x,y-7],[x+7,y-3],[x+4,y+4]],color);}ellipse(c,o.x+6,o.y-15,2+Math.sin(t*3)*.8,2,'#fff2cf');}return;
+ }
+ if(o.kind==='pillar'){rect(c,o.x-17,o.y-54,34,65,'#596c73');rect(c,o.x-22,o.y-58,44,10,'#8a9da0');rect(c,o.x-11,o.y-43,5,40,'#8ea5a5');rect(c,o.x-23,o.y+7,46,8,'#809397');return;}
+ if(o.kind==='crystal'){for(let i=0;i<3;i++){const x=o.x+(i-1)*13;polygon(c,[[x-8,o.y],[x-8,o.y-28-i*8],[x,o.y-42-i*8],[x+8,o.y-28-i*8],[x+8,o.y]],i===1?'#bba4de':'#8578ad');}return;}
+ if(o.kind==='gate'){rect(c,o.x-4,o.y-18,8,32,'#9b7d52');rect(c,o.x-29,o.y-36,58,24,'#c1ad78');rect(c,o.x-26,o.y-33,52,17,'#80704b');label(c,o.name,o.x,o.y-48,'#f2e2b1');return;}
+ if(o.kind==='npc'){person(c,{...o,moving:false},t,true);label(c,o.name,o.x,o.y-52);return;}
+ if(o.kind==='teleport'){ellipse(c,o.x,o.y,32,15,'#879a9855');ellipse(c,o.x,o.y,24,11,'#668781');const active=g.state.teleports.includes(g.state.region);c.strokeStyle=active?'#a7f6db':'#acb1a3';c.lineWidth=3;c.beginPath();c.ellipse(o.x,o.y-22,18,30,0,0,Math.PI*2);c.stroke();rect(c,o.x-5,o.y-18,10,8,active?'#d0ffe3':'#75847c');if(active)ellipse(c,o.x,o.y-22,12,21,'#9eebcc22');return;}
+ if(o.kind==='record'||o.kind==='sign'){rect(c,o.x-16,o.y-25,32,37,'#b2b7a1');rect(c,o.x-11,o.y-20,22,25,'#677871');for(let i=0;i<3;i++)rect(c,o.x-7,o.y-16+i*7,14-i*3,2,'#ccdbbd');if(!g.state.records.includes(g.state.region)&&o.kind==='record')label(c,'✦',o.x,o.y-37,'#f6daa0');return;}
+ if(o.kind==='log'){rect(c,o.x-22,o.y-4,44,13,'#99754b');ellipse(c,o.x-22,o.y+2,7,8,'#d4b47b');rect(c,o.x-15,o.y-3,30,3,'#bd975d');return;}
+ if(o.kind==='farm'){
+  rect(c,o.x-56,o.y-30,112,64,'#4e4833');for(let i=0;i<4;i++)rect(c,o.x-49,o.y-22+i*16,98,4,'#8f7951');const f=g.state.farm;
+  if(f.stage)for(let i=0;i<8;i++){const x=o.x-40+(i%4)*27,y=o.y-17+Math.floor(i/4)*29;rect(c,x-2,y-6,4,13,'#8cba6b');polygon(c,[[x,y-3],[x-9,y-9],[x-9,y-1],[x,y+3],[x+9,y-5],[x+9,y-11]],'#91ae58');if(f.stage===2&&g.state.clock>=f.readyAt)ellipse(c,x,y+5,6,5,'#e8c7b3');}return;
+ }
+ if(o.kind==='switch'){const progress=g.state.puzzles[o.puzzle]||0,lit=progress>o.sequence.indexOf(o.order);rect(c,o.x-14,o.y-6,28,20,'#819595');rect(c,o.x-6,o.y-38,12,33,'#4e686d');ellipse(c,o.x,o.y-42,10,12,lit?'#f4d395':'#708d96');if(lit)ellipse(c,o.x,o.y-42,22,25,'#f3ce7522');label(c,String(o.order+1),o.x,o.y+30);return;}
+ if(o.kind==='cart'){const x=g.riding?g.state.player.x:o.x;rect(c,x-23,o.y-18,46,28,'#9b7957');rect(c,x-26,o.y-22,52,7,'#cfb278');ellipse(c,x-15,o.y+11,7,7,'#29393b');ellipse(c,x+15,o.y+11,7,7,'#29393b');return;}
+ if(o.kind==='repair'||o.kind==='landmark'||o.kind==='lab'){
+  const w=o.w||60;ellipse(c,o.x+7,o.y+16,w*.65,18,'#192b3344');
+  if(o.flag==='tunnel'&&done){rect(c,o.x-w/2,o.y-39,22,53,'#9ba68c');rect(c,o.x+w/2-22,o.y-39,22,53,'#9ba68c');rect(c,o.x-w/2-4,o.y-47,w+8,13,'#a6ad97');rect(c,o.x-w/2+22,o.y-34,w-44,48,'#253b36');label(c,'열린 광산 통로',o.x,o.y+38);return;}
+  rect(c,o.x-w/2,o.y-39,w,53,done?'#9ba68c':'#747f76');rect(c,o.x-w/2-4,o.y-47,w+8,13,'#a6ad97');rect(c,o.x-15,o.y-25,30,34,done?'#a8d7bb':'#394e4c');if(o.kind==='lab'){rect(c,o.x-44,o.y-64,88,20,'#8298a4');ellipse(c,o.x,o.y-67,14,17,g.state.flags.lab?'#e7c6f5':'#8593b3');}label(c,o.name,o.x,o.y+38);return;
+ }
+}
+G.render=function(canvas,g,t){
+ const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height,zoom=Math.max(w/G.W,h/G.H,.65,Math.min(1.25,w/900,h/570)),vw=Math.min(G.W,w/zoom),vh=Math.min(G.H,h/zoom),p=g.state.player,cam={x:G.clamp(p.x-vw/2,0,G.W-vw),y:G.clamp(p.y-vh/2,0,G.H-vh),zoom};
+ g.camera=cam;c.imageSmoothingEnabled=false;c.clearRect(0,0,w,h);c.save();c.scale(zoom,zoom);c.translate((w/zoom-vw)/2-cam.x,(h/zoom-vh)/2-cam.y);const r=g.world.region;rect(c,0,0,G.W,G.H,r.ground);
+ for(let y=Math.floor(cam.y/32)*32;y<cam.y+vh+32;y+=32)for(let x=Math.floor(cam.x/32)*32;x<cam.x+vw+32;x+=32){const n=hash(x,y);rect(c,x,y,32,32,n>.52?r.light:r.dark);c.globalAlpha=.83;rect(c,x,y,32,32,r.ground);c.globalAlpha=1;if(n>.65){rect(c,x+8,y+14,2,5,r.light);rect(c,x+12,y+16,2,3,r.light);}}
+ const road=g.world.underground?'#737b7970':'#b9a77a66';rect(c,0,492,G.W,56,road);rect(c,577,310,46,505,road);
+ if(g.world.id==='meadow'){rect(c,285,428,735,30,road);rect(c,285,430,30,110,road);rect(c,784,430,30,115,road);rect(c,275,712,790,50,road);rect(c,830,740,40,75,road);}
+ if(g.world.id==='marsh'){for(const y of [155,825]){rect(c,0,y,G.W,40,'#365c69');for(let x=0;x<G.W;x+=50)rect(c,x+Math.sin(t+x)*4,y+12,24,2,'#7caaa577');}rect(c,570,155,60,40,'#ac976f');}
+ if(g.world.id==='volcano'){for(const y of [145,825]){rect(c,0,y,G.W,32,'#ac593f');for(let x=0;x<G.W;x+=33)rect(c,x,y+8+Math.sin(t+x)*5,19,4,'#f0b365');}}
+ if(g.world.id==='b1'){for(let x=300;x<1000;x+=24)rect(c,x,633,8,34,'#967e64');rect(c,290,638,720,3,'#a7aca0');rect(c,290,662,720,3,'#a7aca0');if(!g.state.flags.rail){rect(c,650,633,35,34,r.ground);rect(c,647,644,40,4,'#7c6a59');}}
+ const entities=[...g.world.objects.map(o=>({y:o.y,draw:()=>object(c,o,g,t)})),{y:p.y,draw:()=>{if(g.bike){ellipse(c,p.x-15,p.y+3,10,10,'#293d36');ellipse(c,p.x+15,p.y+3,10,10,'#293d36');rect(c,p.x-17,p.y-3,34,3,'#d4b47a');}person(c,p,t);if(g.attackTime>0){const a=Math.atan2(p.facing.y,p.facing.x);c.strokeStyle='#ffe4a3';c.lineWidth=5;c.beginPath();c.arc(p.x,p.y-13,37,a-.8,a+.8);c.stroke();}}}];
+ for(const e of g.world.enemies)if(e.hp>0)entities.push({y:e.y,draw:()=>{const bob=Math.sin(t*4+e.x)*3;ellipse(c,e.x,e.y+4,20,8,'#1d302d66');ellipse(c,e.x,e.y-8+bob,21,17,e.hit>0?'#fff1b8':e.kind==='ember'?'#d58e58':'#92a77c');rect(c,e.x-8,e.y-12+bob,4,5,'#344b3a');rect(c,e.x+5,e.y-12+bob,4,5,'#344b3a');if(e.hp<e.maxHp){rect(c,e.x-20,e.y-37,40,4,'#263c2d');rect(c,e.x-20,e.y-37,40*e.hp/e.maxHp,4,'#d78f79');}}});
+ entities.sort((a,b)=>a.y-b.y).forEach(e=>e.draw());
+ for(const d of g.state.decorations.filter(d=>d.region===g.state.region)){rect(c,d.x-3,d.y-26,6,30,'#65583e');ellipse(c,d.x,d.y-29,7,10,'#f6d18b');ellipse(c,d.x,d.y-29,30,30,'#efc56b13');}
+ for(const shot of g.projectiles)ellipse(c,shot.x,shot.y-12,5,4,'#fff0bd');
+ for(const e of g.effects){c.globalAlpha=e.life/.7;for(let i=0;i<6;i++)rect(c,e.x+Math.cos(i)*((.7-e.life)*50),e.y-12+Math.sin(i)*((.7-e.life)*40),4,4,e.color);label(c,e.text,e.x,e.y-38-(.7-e.life)*30,e.color);c.globalAlpha=1;}
+ const near=g.nearest();if(near){c.strokeStyle='#f8e3a4';c.lineWidth=2;c.setLineDash([5,4]);c.beginPath();c.ellipse(near.x,near.ay??near.y,30,15,0,0,Math.PI*2);c.stroke();c.setLineDash([]);}c.restore();
+ if(g.world.underground){const grad=c.createRadialGradient(w/2,h/2,100,w/2,h/2,Math.max(w,h)*.65);grad.addColorStop(0,'#18263b00');grad.addColorStop(1,'#0c152b88');c.fillStyle=grad;c.fillRect(0,0,w,h);}
+ for(let i=0;i<18;i++){const x=(hash(i,2)*w+t*(g.world.id==='frost'?6:2))%w,y=(hash(i,4)*h+t*(g.world.id==='frost'?12:-2)+h)%h;ellipse(c,x,y,1.4,1.4,g.world.underground?'#a4d3f325':'#f0e9b548');}
+ const mini=document.getElementById('minimap');if(mini){const m=mini.getContext('2d');m.fillStyle=r.dark;m.fillRect(0,0,168,126);m.fillStyle=r.ground;m.fillRect(3,3,162,120);rect(m,0,69,168,8,'#a9a18466');for(const o of g.world.objects){const color=o.kind==='gate'?'#edd9a6':o.kind==='ore'?'#d9b47e':o.kind==='teleport'?'#91d4cc':o.name?'#b7c4a1':'#314e3f';rect(m,o.x/G.W*168-2,o.y/G.H*126-2,4,4,color);}m.strokeStyle='#dce4c866';m.strokeRect(cam.x/G.W*168,cam.y/G.H*126,vw/G.W*168,vh/G.H*126);ellipse(m,p.x/G.W*168,p.y/G.H*126,3,3,'#fff5c7');}
+};
+})(globalThis.CG=globalThis.CG||{});
+</script><script>(function(G){'use strict';
+let game=new G.Game(),saveBlocked=false,blockedRaw=null;
+const canvas=document.getElementById('world'),held={},byId=id=>document.getElementById(id);let last=performance.now(),panelKey='',hudTime=0,saveTime=0;
+function status(text){byId('save-status').textContent=text;}
+try{const raw=localStorage.getItem(G.SAVE_KEY);if(raw){try{game=G.Game.fromSave(raw);game.say('실험판 저장을 불러왔습니다.');status('저장 복원');}catch(e){saveBlocked=true;blockedRaw=raw;status('저장 보호 중');game.say('저장 형식을 읽지 못했습니다. 원본은 보존됩니다. 창고에서 내보내기 할 수 있습니다.');}}}catch(e){saveBlocked=true;status('저장 접근 불가');game.say('저장소를 사용할 수 없습니다. 창고의 JSON 내보내기를 이용하세요.');}
+function resize(){canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight;}
+function clear(){for(const k of Object.keys(held))delete held[k];}
+function close(){game.panel=null;clear();canvas.focus();}
+function open(type,title,text){clear();game.panel={type,title,text};panelKey='';hud();}
+function save(manual=false){if(saveBlocked){if(manual)game.say('기존 저장을 보호 중입니다. 창고에서 현재 진행을 JSON으로 내보내세요.');return false;}try{localStorage.setItem(G.SAVE_KEY,game.serialize());status('저장됨');if(manual)game.say('실험판 진행을 저장했습니다.');return true;}catch(e){status('저장 실패 · JSON 내보내기');if(manual)game.say('저장 공간 또는 권한이 부족합니다. 창고에서 JSON으로 내보내세요.');return false;}}
+function download(text,name){const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function el(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
+function button(text,fn,id){const b=el('button',text);if(id)b.id=id;b.onclick=()=>{fn();panelKey='';hud();};return b;}
+function costs(cost){return Object.entries(cost).map(([k,n])=>`${G.resources[k].name} ${n} (${game.state.inventory[k]})`).join(' · ');}
+function section(parent,text){parent.append(el('h3',text,'section-label'));}
+function row(parent,name,desc,action){const r=el('div',undefined,'row'),info=el('div');info.append(el('strong',name),el('small',desc));r.append(info);if(action)r.append(action);parent.append(r);}
+function panel(){
+ const p=game.panel,s=game.state,key=JSON.stringify([p,s.inventory,s.research,s.equipment,s.records,s.teleports,s.lanterns,game.notice]);if(key===panelKey)return;panelKey=key;byId('panel-backdrop').hidden=!p;if(!p)return;byId('panel-title').textContent=p.title;const content=byId('panel-content');content.replaceChildren();
+ if(p.type==='inventory'){
+  const grid=el('div',undefined,'inventory-grid');for(const [id,r]of Object.entries(G.resources)){const item=el('div',undefined,'resource'),num=el('b',s.inventory[id]);num.style.color=r.color;item.append(num,el('span',r.name));grid.append(item);}content.append(grid);content.append(el('p',`채굴 경험 ${s.xp.mining} · 근접 ${s.xp.melee} · 원거리 ${s.xp.ranged} · 등불 ${s.lanterns}개 · 배치 ${s.decorations.length}/8`));
+  const actions=el('div',undefined,'action-line');actions.append(button('순무 먹기 · HP +30',()=>game.eat(),'eat-button'),button('현재 진행 JSON 내보내기',()=>download(game.serialize(),'chaegul-lab-save.json'),'export-save'));if(blockedRaw)actions.append(button('읽지 못한 원본 내보내기',()=>download(blockedRaw,'chaegul-lab-original.json')));content.append(actions);section(content,'이 실험판의 저장 가져오기');
+  const file=el('input');file.type='file';file.accept='.json,application/json';file.id='import-save';file.onchange=async()=>{try{if(!file.files[0]||file.files[0].size>1000000)throw Error('1MB 이하 JSON 파일을 선택하세요.');const imported=G.Game.fromSave(await file.files[0].text());if(!confirm(saveBlocked?'보호 중인 원본 저장과 현재 진행을 선택한 파일로 덮어씁니다. 원본을 먼저 내보냈는지 확인하세요. 계속할까요?':'현재 실험판 진행을 선택한 저장으로 바꿀까요?'))return;game=imported;saveBlocked=false;blockedRaw=null;save();close();game.say('실험판 진행을 가져왔습니다.');}catch(e){game.say('불러오기 실패: '+e.message);panelKey='';hud();}};content.append(file);content.append(el('p','기존 게임 저장은 사용하지 않습니다. 이 실험판의 JSON만 가져올 수 있습니다.','hint'));
+ }else if(p.type==='workshop'){
+  content.append(el('p','가까운 광맥에서 재료를 모아 공방을 성장시키세요. 장비는 제작 즉시 장착됩니다. 괄호 안 숫자는 현재 재고입니다.'));section(content,'01 / 기술 연구');for(const [id,r]of Object.entries(G.researches)){const b=button(s.research[id]?'연구 완료':'연구',()=>game.research(id),'research-'+id);b.disabled=!!s.research[id];row(content,r.name,r.desc+' · '+costs(r.cost),b);}section(content,'02 / 장비와 소품 제작');for(const [id,r]of Object.entries(G.recipes)){const done=id!=='lantern'&&s.equipment[id],b=button(done?'제작 완료':'제작',()=>game.craft(id),'craft-'+id);b.disabled=!!done;row(content,r.name,r.desc+' · '+costs(r.cost),b);}content.append(el('p',game.notice,'hint'));
+ }else if(p.type==='map'){
+  content.append(el('p',s.flags.lab?'B4 연구실 복원 완료. 남은 지역의 기록과 생활을 즐겨 보세요.':'목표: B2 전력과 B3 난방을 복구하고 B4 연구실 기록을 읽으세요. 초원 남쪽에 지하 입구가 있습니다.'));const grid=el('div',undefined,'region-list');for(const r of G.regions){const n=el('div',(s.visited.includes(r.id)?'● ':'○ ')+r.name);n.append(el('small',r.action));if(s.records.includes(r.id))n.append(el('small','기록 발견 ✓'));grid.append(n);}content.append(grid);section(content,'발견한 기록');for(const id of s.records)content.append(el('p',G.regions.find(r=>r.id===id).note));content.append(el('p','지상: 초원 ↔ 이끼숲 ↔ 서리 고원 ↔ 늪지 ↔ 수정 지대 ↔ 산맥 ↔ 화산 ↔ 초원. 길 끝 표지판에서 E로 이동하세요.','hint'));
+ }else if(p.type==='teleport'){content.append(el('p','직접 방문해 활성화한 장치 사이에서만 이동합니다.'));for(const id of s.teleports){const b=button(id===s.region?'현재 위치':'이동',()=>{game.travel(id);clear();},'travel-'+id);b.disabled=id===s.region;row(content,G.regions.find(r=>r.id===id).name,'활성화됨',b);}}
+ else{content.append(el('p',p.text||'WASD / 방향키: 이동 · E: 상호작용 · Space: 근접 공격 · F: 원거리 공격 · B: 자전거 · Q: 순무 먹기 · G: 등불 배치 · I: 창고 · M: 지도/기록 · P: 저장 · Esc: 닫기'));if(p.type==='help'){content.append(el('p','구리 8개와 돌 4개를 캐고 공방에서 채굴 기술 → 구리 곡괭이를 만드세요. 철을 캐면 강철 곡괭이로 성장할 수 있습니다. 사원 등불은 왼쪽 → 가운데 → 오른쪽. B2/B3의 장치 순서는 해당 층 안내석에 적혀 있습니다.'));content.append(el('p','기운을 잃으면 재료를 보존한 채 집 앞에서 회복합니다. 광맥은 24초 후 재생합니다. 패널을 연 동안 세계는 멈춥니다.'));content.append(el('p','독립 실험판입니다. 지리·수치·마을 배치는 임시이며 기존 게임 기능과 저장 호환성을 검증한 버전이 아닙니다.','hint'));}}
+}
+function hud(){const r=game.world.region,s=game.state;byId('region-name').textContent=r.name;byId('region-sub').textContent=r.sub;byId('region-tag').textContent=(game.world.underground?'UNDERGROUND':'SURFACE')+' / '+String(G.regions.indexOf(r)+1).padStart(2,'0');byId('health-fill').style.width=s.player.hp+'%';byId('health-value').textContent=Math.ceil(s.player.hp);byId('equipment').textContent=`곡괭이 ${'I'.repeat(s.pick)} · 채굴 Lv.${1+Math.floor(s.xp.mining/10)}${game.bike?' · 자전거':''}`;byId('quest').textContent=s.flags.lab?'연구실 복원 완료! 마을과 남은 기록을 탐험하세요.':s.xp.mining===0?'구리 광맥에서 첫 광물을 캐 보세요.':s.pick===1?'구리 8 · 돌 4 → 공방에서 곡괭이 강화':r.action;byId('quest-progress').textContent=`기록 ${s.records.length} / 11 · 방문 ${s.visited.length} / 11`;byId('toast').textContent=game.noticeTime>0?game.notice:'';const o=game.nearest();byId('prompt').textContent=game.riding?'[A/D] 수레 이동 · [E] 내리기':o?'[E] '+o.name:'';panel();}
+const directions={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right'};
+window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement)return;if(directions[e.code]||['Space','KeyE'].includes(e.code))e.preventDefault();if(e.code==='Escape'){close();return;}if(game.panel)return;if(directions[e.code])held[directions[e.code]]=true;if(e.repeat)return;if(e.code==='KeyE'){game.interact();if(game.panel)clear();}if(e.code==='Space')game.attack(false);if(e.code==='KeyF')game.attack(true);if(e.code==='KeyB')game.toggleBike();if(e.code==='KeyQ')game.eat();if(e.code==='KeyG')game.decorate();if(e.code==='KeyI')open('inventory','공용 저장소');if(e.code==='KeyM')open('map','지도와 탐험 기록');if(e.code==='KeyP')save(true);});
+window.addEventListener('keyup',e=>{if(directions[e.code])held[directions[e.code]]=false;});window.addEventListener('blur',clear);document.addEventListener('visibilitychange',()=>{clear();last=performance.now();});byId('close-panel').onclick=close;byId('inventory-button').onclick=()=>open('inventory','공용 저장소');byId('map-button').onclick=()=>open('map','지도와 탐험 기록');byId('help-button').onclick=()=>open('help','작은 세계의 첫걸음');byId('save-button').onclick=()=>save(true);window.addEventListener('resize',resize);window.addEventListener('pagehide',()=>save());resize();canvas.focus();
+function frame(now){try{const dt=Math.min(.05,(now-last)/1000);last=now;game.step(dt,held);G.render(canvas,game,now/1000);hudTime+=dt;saveTime+=dt;if(hudTime>.08){hud();hudTime=0;}if(saveTime>10){save();saveTime=0;}requestAnimationFrame(frame);}catch(error){byId('fatal').hidden=false;byId('fatal').textContent='게임 실행 오류: '+error.message;console.error(error);}}
+Object.defineProperty(window,'chaegul',{value:Object.freeze({snapshot:()=>game.snapshot(),version:G.VERSION})});requestAnimationFrame(frame);
+})(globalThis.CG);
+</script></body></html>

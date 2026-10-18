@@ -1,0 +1,8 @@
+{
+  "checks": [
+    "Real F-key ranged projectile kills enemy and grants ranged XP",
+    "Enemy attacks exhaust HP and safely return player home"
+  ],
+  "errors": [],
+  "passed": true
+}
