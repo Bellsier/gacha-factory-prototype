@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>채굴 공방 — 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>채굴 공방</h1>
+      <div class="sub">작은 광산과 공방을 천천히 키우는 2D 힐링 경영 게임</div>
+    </div>
+    <div class="sub"><span id="saveStatus"></span></div>
+  </header>
+
+  <div class="currencies">
+    <div class="cur"><div class="label">골드</div><div class="value" id="goldVal">0</div></div>
+    <div class="cur ticket"><div class="label">가챠권</div><div class="value" id="ticketVal">0</div></div>
+    <div class="cur prestige"><div class="label">명성</div><div class="value" id="prestigeVal">0</div></div>
+  </div>
+
+  <div class="next-hint" id="nextHint">채굴 탭에서 광석을 캔 뒤, 개발 탭에서 강철을 만들어 파세요. 골드 50이 되면 첫 가챠권을 받습니다.</div>
+
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="mining">채굴</button>
+    <button class="tab-btn" data-tab="dev">개발</button>
+    <button class="tab-btn" data-tab="workers">인부</button>
+    <button class="tab-btn" data-tab="research">연구</button>
+    <button class="tab-btn" data-tab="delivery">납품</button>
+    <button class="tab-btn" data-tab="village">마을</button>
+  </div>
+
+  <div id="tab-mining" class="tab-panel active">
+    <section>
+      <h2>거점</h2>
+      <div id="baseInfo"></div>
+    </section>
+    <section>
+      <h2>공방 풍경</h2>
+      <div class="line ambience">
+        <div class="res-name">🌿 오늘도 조용히 공방이 돌아갑니다.</div>
+        <div class="rate">광맥을 캐고, 불을 피우고, 만든 물건을 팔며 거점을 조금씩 키워보세요.</div>
+      </div>
+    </section>
+    <section>
+      <h2>탐색</h2>
+      <div id="worldStage" class="world-stage" aria-label="플레이어 캐릭터">
+        <div class="world-ground"></div>
+        <div id="worldTerrainLayer" class="world-terrain-layer"></div>
+        <div class="world-base-marker" data-world-base title="거점"></div>
+        <div id="worldMineLayer" class="world-mine-layer"></div>
+        <div id="worldWorkshopLayer" class="world-workshop-layer"></div>
+        <div id="worldMap" class="world-map" aria-label="탐험 지도"></div>
+        <div id="worldInfo" class="world-info" aria-live="polite" hidden></div>
+        <div id="playerChar" class="player-char pose-idle facing-down" data-player-pose="idle" data-player-facing="down"></div>
+      </div>
+      <p class="rate" style="margin:8px 0 0;">WASD 또는 방향키로 거점 주변을 걸어 보세요.</p>
+    </section>
+    <section>
+      <h2>월드 광맥</h2>
+      <div id="worldMines"></div>
+    </section>
+    <section>
+      <h2>공용 저장소</h2>
+      <div id="sharedStorage"></div>
+    </section>
+    <section>
+      <h2>채굴장</h2>
+      <p class="rate" style="margin:0 0 10px;">캔 광석은 골드가 아닙니다. 위쪽 <b>개발</b> 탭에서 제작·판매해야 골드가 됩니다.</p>
+      <div id="lines"></div>
+    </section>
+  </div>
+
+  <div id="tab-dev" class="tab-panel">
+    <section>
+      <h2>제작소</h2>
+      <div id="workshopBuild"></div>
+      <div id="bottleneck" class="line"></div>
+      <div id="workshops"></div>
+    </section>
+    <section>
+      <h2>제작</h2>
+      <div class="line" style="margin-bottom:10px;">
+        <div class="facility">
+          <span>제작 시설 Lv.<span id="craftFacilityVal">1</span></span>
+          <button id="craftFacilityBtn" class="ghost"></button>
+        </div>
+      </div>
+      <div class="recipes" id="recipes"></div>
+    </section>
+    <section>
+      <h2>본사 투자</h2>
+      <div class="prestige-box" style="border-color:var(--amber);">
+        <div>현재 투자 배율 <span class="mult" id="hqMultVal" style="color:var(--amber);">×1.00</span></div>
+        <p>골드를 투자해서 모든 채굴·판매 수익에 곱연산 보너스를 붙입니다. 레벨이 오를수록 비용이 크게 늘어납니다.</p>
+        <button id="hqBtn"></button>
+      </div>
+    </section>
+  </div>
+
+  <div id="tab-workers" class="tab-panel">
+    <section>
+      <h2>뽑기</h2>
+      <div class="gacha-box">
+        <div>일꾼을 뽑아 채굴장에 배치하세요</div>
+        <div class="rates" id="firstGachaHint"></div>
+        <div class="gacha-actions">
+          <button id="gachaTicketBtn">가챠권으로 뽑기 (1장)</button>
+          <button id="gachaGoldBtn" class="ghost">골드로 뽑기 (50G)</button>
+        </div>
+        <div class="roster" id="lastPull"></div>
+      </div>
+    </section>
+    <section>
+      <h2>인부 강화</h2>
+      <div class="workers" id="workers"></div>
+    </section>
+  </div>
+
+  <div id="tab-delivery" class="tab-panel">
+    <section>
+      <h2>납품</h2>
+      <div class="prestige-box" style="margin-bottom:10px;">
+        <div>명성 <span class="mult" id="reputationVal">0</span> · 현재 배율 <span class="mult" id="multVal">×1.00</span></div>
+        <p>명성은 수주를 완수하면 오르고, 줄어들지 않아요. 명성이 오를수록 아래 효과가 열리고 더 강해집니다.</p>
+        <div id="reputationEffects"></div>
+      </div>
+      <p class="rate" style="margin:0 0 10px;">회사에 제품을 보내면 점수가 쌓이고, 점수가 기준을 넘으면 정기 거래가 시작됩니다. 수주를 완수하면 명성을 얻어요. 보낸 제품과 배송비는 사라집니다.</p>
+      <div id="deliveryList"></div>
+    </section>
+  </div>
+
+  <div id="tab-research" class="tab-panel">
+    <section>
+      <h2>연구</h2>
+      <p class="rate" style="margin:0 0 10px;">연구는 새로운 가능성을 엽니다. 한 번 연구하면 계속 유지됩니다.</p>
+      <div id="researchList"></div>
+      <div id="tunnelContract"></div>
+    </section>
+  </div>
+
+  <div id="tab-village" class="tab-panel">
+    <section>
+      <h2>마을</h2>
+      <p class="rate" style="margin:0 0 10px;">공방이 있는 푸른 초원의 시작 마을입니다. 무너진 시설을 하나씩 복구하고, 채굴하다 찾은 유물을 감정소에서 감정해 박물관에 전시하세요.</p>
+      <div id="villagePanel"></div>
+    </section>
+  </div>
+
+  <section id="logSection">
+    <h2>기록</h2>
+    <div id="log"></div>
+  </section>
+
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/balance.js"></script>
+<script src="js/terrain.js"></script>
+<script src="js/worldgen.js"></script>
+<script src="js/state.js"></script>
+<script src="js/systems.js"></script>
+<script src="js/factory.js"></script>
+<script src="js/research.js"></script>
+<script src="js/delivery.js"></script>
+<script src="js/player.js"></script>
+<script src="js/village.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+<script src="js/topdown/view.js"></script>
+<script src="js/topdown/tiles.js"></script>
+<script src="js/topdown/sprites.js"></script>
+<script src="js/topdown/interact.js"></script>
+<script src="js/topdown/light.js"></script>
+<script src="js/topdown/workers.js"></script>
+<script src="js/topdown/render.js"></script>
+<script src="js/topdown/app.js"></script>
+</body>
+</html>

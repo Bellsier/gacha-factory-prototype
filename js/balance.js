@@ -1,0 +1,188 @@
+// ---------------------------------------------------------------------------
+// BALANCE — every gameplay-tunable number that lives in a function body
+// (rather than in RESOURCES/RECIPES/RARITY/SITES, which are already
+// content-data and stay untouched). Values are copied verbatim from the
+// prior hardcoded literals; nothing here changes game balance.
+// TICK_MS is kept separate: it's an engine timing constant, not a balance
+// knob (see tickLoop's use of TICKS_PER_SECOND below, which preserves the
+// existing rate/10 and -0.1 relationships bit-for-bit).
+// ---------------------------------------------------------------------------
+const TICK_MS = 100;
+const TICKS_PER_SECOND = 1000/TICK_MS; // exactly 10 — used to derive per-tick fractions bit-identically to the prior /10 and -0.1 literals
+const BALANCE = {
+  // Task 75/76: reputation (permanent, only ever grows). Each reputation
+  // effect in REPUTATION_EFFECTS (data.js) opens at its own reputation and
+  // grows with it; nothing counts reputation beyond MAX.
+  reputation: {
+    // Task 83: MAX = the total reputation of all fixed orders (36), so finishing
+    // every order reaches it exactly. The multiplier is ~x4.0 there, as before:
+    // 18 * 0.12 + 18 * 0.045 = +2.97.
+    MAX: 36,                    // reputation beyond this adds nothing
+    MULT_PER_POINT: 0.12,       // mult(): +12% per point up to MULT_SOFT_AT ...
+    MULT_SOFT_AT: 18,
+    MULT_PER_POINT_SOFT: 0.045, // ... and +4.5% per point above it (Task 76: gentler growth)
+  },
+  // Task 72: delivery and partner companies (Blueprint 15.1).
+  delivery: {
+    SLOT_THRESHOLDS: [0, 5, 15],   // reputation needed for the 1st, 2nd, 3rd company (companySlots)
+    SHIPPING_RATE: 0.1,            // shipping gold = ceil(base value * SHIPPING_RATE * company.distance)
+    FAVORITE_MULT: 1.5,            // score multiplier for a company's favorite products
+    REPEAT_DECAY_UNITS: 200,       // each unit's score weight = max(REPEAT_MIN_WEIGHT, 1 - unitsAlreadySent / this), per product and company
+    REPEAT_MIN_WEIGHT: 0.25,
+    ORDER_VALUE_DIVISOR: 100,      // order reputation = floor(sqrt(order value / this))
+    ORDER_REPUTATION_CAP: 4,       // most reputation one order can give
+    TRADE_INTERVAL_SEC: 60,        // regular trade: one purchase per company every this many seconds (waits for stock)
+    TRADE_QTY: 5,                  // regular trade: units bought per purchase
+    TRADE_PRICE_MULT: 1.3,         // regular trade: price paid = sell price * this * mult()
+    TRADE_RESERVE: 10,             // Task 83: regular trade never sells the last this many units of a product (research / site / upgrade costs)
+  },
+  // Task 83: how orders arrive. Each company starts with its first fixed order
+  // open; after that a new one arrives every arrival interval while the company
+  // has fewer than orderCap() open orders. The interval shrinks linearly with
+  // reputation (START at 0, MIN at reputation MAX). Once a company's fixed
+  // list is done, its orders are random repeat orders: gold only, no reputation.
+  orders: {
+    ARRIVAL_SEC_START: 1500,
+    ARRIVAL_SEC_MIN: 300,
+    SECOND_SLOT_AT: 18,         // reputation at which a company can hold 2 open orders (1 before)
+    REPEAT_PAY_MULT: 1.2,       // repeat order pays qty * sell * this * (1 + tradePrice effect) * mult()
+    REPEAT_VALUE_SHARE: 0.3,    // Task 84: a repeat order's base value = this share of the company's last fixed order
+    REPEAT_LAP_GROWTH: 0.2,     // repeat quantity grows this much per lap (a lap = the company's fixed order count)
+    REPEAT_QTY_CAP_MULT: 2,     // ... but never above this times the base quantity
+    REPEAT_MAX_QTY: 100,        // hard cap on one repeat order's quantity
+  },
+  // Task 93: tunnel construction (Blueprint 3.1.1). The research only unlocks the
+  // commission; the contractor then digs for DURATION_SEC of real time.
+  tunnel: {
+    COMMISSION_GOLD: 5000,
+    COMMISSION_PRODUCTS: { alloy: 5 },
+    DURATION_SEC: 600,
+  },
+  hq: {
+    MULTIPLIER_PER_LEVEL: 0.08, // hqMult(): run-scoped multiplier gained per HQ level
+    COST_BASE: 1000,            // hqCost(): base cost of HQ level 0
+    COST_GROWTH: 1.6,           // hqCost(): cost growth factor per level
+    MAX_LEVEL: 12,              // Task 84
+  },
+  mining: {
+    // Task 87: every secured mine yields miningPower * grade * this per second of its resource (times mult()).
+    MINE_RATE_PER_GRADE: 0.4,
+    WORKFORCE_BONUS_MULTIPLIER: 1.5, // autoRate(): auto-mining bonus per workforce level
+    FACILITY_COST_BASE: 20,          // facilityCost(): base cost of facility level 0
+    FACILITY_COST_GROWTH: 1.5,       // facilityCost(): cost growth factor per level
+    FACILITY_BONUS_PER_LEVEL: 1,     // manual-yield bonus added per facility level purchased
+    // Task 84: growth levers are capped (balance simulation: uncapped they made resource rates reach 100,000/s).
+    FACILITY_MAX_LEVEL: 12,
+    WORKFORCE_MAX_LEVEL: 12,
+    WORKFORCE_COST_BASE: 15,         // workforceCost(): base cost of workforce level 0
+    WORKFORCE_COST_GROWTH: 1.5,      // workforceCost(): cost growth factor per level
+    WORKFORCE_BONUS_PER_LEVEL: 1,    // auto-mining bonus added per workforce level purchased
+  },
+  worker: {
+    EFFECTIVE_DIVISOR: 16,       // workerEffective(): (mining*carry*move) / EFFECTIVE_DIVISOR
+    STAT_COST_BASE: {mining:200, carry:300, move:250}, // workerUpgradeCost(): base cost per stat
+    STAT_COST_GROWTH: 1.35,      // workerUpgradeCost(): cost growth factor per stat level
+    STAT_INCREMENT_PER_UPGRADE: 1, // stat gain per upgrade purchase
+    MIN_REQUIRED: 1,             // minimum workers (early-game guidance)
+    // Task 84: how many workers the base can hold = CAP_BASE + CAP_PER_BASE_LEVEL * (base level - 1).
+    // Without a cap, 50G pulls and the free tickets made income grow without limit.
+    STAT_MAX_LEVEL: 3,           // Task 84: upgrades per worker stat (stats multiply: 3 stats each +3 is already x30-x100)
+    CAP_BASE: 8,
+    CAP_PER_BASE_LEVEL: 4,
+  },
+  selling: {
+    AUTO_SELL_COST_MULTIPLIER: 20, // autoSellCost(): recipe.sell * AUTO_SELL_COST_MULTIPLIER
+  },
+  // Task 71: building a workshop (research 'workshopBuild' opens it). Cost in
+  // gold: BUILD_COST_BASE * BUILD_COST_GROWTH^(workshops already built).
+  workshop: {
+    BUILD_COST_BASE: 500,
+    BUILD_COST_GROWTH: 1.6,
+    MAX_COUNT: 6,
+    // Task 83: the 7th and 8th workshop (after 제작소 증축) also take upper parts, keyed by the workshop's number.
+    BUILD_PRODUCTS: { 7: { steelGear: 2 }, 8: { manaEngine: 1 } },
+    // Task 79: upgrading one workshop (each level = +WORKSHOP_LEVEL_SPEED_PER_LEVEL craft speed).
+    // Gold: round(UPGRADE_COST_BASE * UPGRADE_COST_GROWTH^(level-1)) to go from `level` to level+1.
+    // Products: UPGRADE_PRODUCTS[target level] is paid in addition (only for the high levels).
+    MAX_LEVEL: 8,
+    UPGRADE_COST_BASE: 1500,
+    UPGRADE_COST_GROWTH: 1.7,
+    UPGRADE_PRODUCTS: { 6: { precisionPart: 2 }, 7: { relicPart: 3 }, 8: { quantumCore: 1 } },
+  },
+  crafting: {
+    WORKSHOP_LEVEL_SPEED_PER_LEVEL: 0.25,
+    FACILITY_COST_BASE: 500,          // craftFacilityCost(): base gold cost of the first upgrade (level 1 → 2)
+    FACILITY_COST_GROWTH: 1.5,        // craftFacilityCost(): cost growth factor per facility level
+    FACILITY_SPEED_PER_LEVEL: 0.1,    // craftSpeed(): +10% timed-craft speed per level above 1
+    FACILITY_MAX_LEVEL: 15,           // Task 84
+  },
+  world: {
+    // expandBase/unlockSite spend SITES[key].unlockCost, not a separate world cost.
+    EXPANSION_SITE_ORDER: ['abandonedMine','manaVein','ruins','spaceStation'],
+    PLAYER_SPEED: 3, // world units per second; tickPlayer divides by TICKS_PER_SECOND
+    // Task 62: base-centred world. Coordinates may be negative or positive;
+    // the walkable area is BOUNDS_* (can be widened later without touching
+    // any other code). The base starts slightly east of the world centre.
+    BOUNDS_MIN_X: -10,
+    BOUNDS_MIN_Y: -10,
+    BOUNDS_MAX_X: 10,
+    BOUNDS_MAX_Y: 10,
+    START_BASE_X: 2,
+    START_BASE_Y: 0,
+    // Task 65: a hidden mine is discovered when the player comes this close (world units).
+    DISCOVERY_RADIUS: 2.5,
+  },
+  // Task 80: values late research switches to (js/research.js helpers).
+  research: {
+    DISCOVERY_RADIUS: 4.0,   // 탐사 장비
+    MAX_WORKSHOPS: 8,        // 제작소 증축
+    TRADE_QTY: 10,           // 정기 거래 확대
+    TRADE_INTERVAL_SEC: 40,  // 빠른 거래
+    SURVEY_MINES: 3,         // 지질 조사: hidden mines added in the outer ring
+  },
+  worldGen: {
+    // Task 63: new-game mine layout (js/worldgen.js). Starter iron/coal are
+    // placed at a random cell this far from the base (world units). Max 3
+    // keeps them a ~1 s walk away and clear of the expansion seeds (>= 4 out).
+    STARTER_MIN_DIST: 2,
+    STARTER_MAX_DIST: 3,
+    STARTER_MIN_SPACING: 2, // starter mines are at least this far apart
+    EXTRA_MINES: 0,         // Task 63 extra mines anywhere (unused now that rings set the counts)
+    // Task 64: distance rings around the base, [minDist, maxDist) in world
+    // units. Each ring places `count` mines (the iron/coal starters count
+    // toward the first ring) with resources picked by weight. Farther rings:
+    // fewer mines, rarer resources. With the base at (2,0) in a -10..10 world
+    // the farthest cell is ~15.6 away, so the last ring reaches the edges.
+    MIN_SPACING: 2, // preferred minimum distance between mines (falls back if a ring is full)
+    RINGS: [
+      { key: 'near',  minDist: 2,  maxDist: 4,        count: 5, resources: { iron: 1, coal: 1 } },
+      // Task 65: at most one mid-tier (mana/crystal) mine in the mid ring; the rest iron/coal.
+      { key: 'mid',   minDist: 4,  maxDist: 7,        count: 4, resources: { iron: 2, coal: 2, mana: 1, crystal: 1 },
+        limits: [{ resources: ['mana', 'crystal'], max: 1 }] },
+      { key: 'far',   minDist: 7,  maxDist: 10,       count: 3, resources: { mana: 2, crystal: 2, rareMetal: 1, relic: 1 } },
+      { key: 'outer', minDist: 10, maxDist: Infinity, count: 2, resources: { rareMetal: 2, relic: 2, cosmicShard: 1, plasma: 1 } },
+    ],
+    // Task 69: the land beyond the mountain. It is not a separate generator:
+    // each environment zone (WORLD_TERRAIN.BEYOND.ZONES) borrows the resource
+    // pool of a distance ring above — the whole land is far from the base, the
+    // mine/rare zones are in the outermost ring. Farther from the tunnel exit =
+    // fewer mines. These mines are generated once, when the tunnel is opened
+    // (unlockTunnel), and are saved like any other mine.
+    BEYOND: {
+      MIN_SPACING: 2, // preferred minimum distance between mines (falls back if a zone is full)
+      ZONES: [
+        { zone: 'deepForest',  ring: 'far',   count: 3 },
+        { zone: 'rockyGround', ring: 'far',   count: 2 },
+        { zone: 'halfDugMine', ring: 'outer', count: 2 },
+        { zone: 'rareDeep',    ring: 'outer', count: 1 },
+      ],
+    },
+  },
+  gacha: {
+    FIRST_TICKET_GOLD_THRESHOLD: 50, // one-time gold milestone that grants the first ticket
+    PULL_COST_GOLD: 50,              // gold cost of a direct gold-funded gacha pull
+    PULL_COST_TICKET: 1,             // tickets consumed per ticket-funded gacha pull
+    TICKET_TRICKLE_MS: 45000,        // passive automatic ticket grant interval
+  },
+};
+
