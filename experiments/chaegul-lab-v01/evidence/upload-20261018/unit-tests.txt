@@ -1,0 +1,32 @@
+✔ 11 maps and no underground enemies (4.974126ms)
+✔ diagonal speed normalized (4.029089ms)
+✔ tree and rock collision (3.417009ms)
+✔ mining needs proximity and adds shared stock and XP (1.217376ms)
+✔ boundaries clamp long frame (0.362059ms)
+✔ workshop research and crafting debit once (1.044474ms)
+✔ insufficient recipe has no partial debit (0.320512ms)
+✔ pick grade gates iron (0.520385ms)
+✔ save round trip excludes effects (2.962775ms)
+✔ reject corrupt foreign future nonfinite saves (1.183768ms)
+✔ melee and ranged kills gain distinct XP (1.230969ms)
+✔ death safely returns home and preserves stock (0.239435ms)
+✔ every named object has reachable interaction ground (290.962418ms)
+✔ puzzle sequences reset wrong input and unlock B4 (0.751183ms)
+✔ rail restored once and cart constrained (0.581666ms)
+✔ bike speeds land travel but not underground (0.522798ms)
+✔ teleport requires activated endpoints and proximity (0.403346ms)
+✔ plant water grow harvest eat (0.250474ms)
+✔ decoration consumes one crafted item on valid land (0.400579ms)
+✔ unique records and dialogue pauses world (0.240042ms)
+✔ all rail dismount positions are safe (10.707735ms)
+✔ rail corridor is free from solid scenery (0.374988ms)
+✔ B4 record cannot bypass restoration (0.229349ms)
+✔ restored tunnel opens and stays open after reload (1.258015ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 348.522969

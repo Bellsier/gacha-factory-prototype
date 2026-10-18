@@ -1,0 +1,1506 @@
+
+> gacha-factory-prototype@1.0.0 test
+> node tests/regression.test.js
+
+[PASS] save/load: fresh start — gold=0
+[PASS] save/load: fresh start — tickets=0
+[PASS] save/load: fresh start — firstGachaGranted=false
+[PASS] save/load: fresh start — characters=[]
+[PASS] save/load: crossing 50G grants firstGachaGranted
+[PASS] save/load: crossing 50G grants a ticket
+[PASS] save/load: worker pulled
+[PASS] save/load: saveGame() succeeds
+[PASS] save/load: payload actually written
+[PASS] save/load: gold restored — 50 vs 50
+[PASS] save/load: tickets restored
+[PASS] save/load: firstGachaGranted restored
+[PASS] save/load: characters restored (order + all fields)
+[PASS] craftQueue: exact remaining time restored — 2.7
+[PASS] craftQueue: resumes via the normal tick loop after reload — 2.7 -> 2.1999999999999997
+[PASS] reputation: autosave stores the save
+[PASS] reputation: totalPrestige persists across reload
+[PASS] reputation: the run is not reset (the worker is still there)
+[PASS] reputation: the header shows the value
+[PASS] corrupted save: falls back to a clean default state
+[PASS] field validation: non-numeric resource field falls back to 0
+[PASS] field validation: valid sibling field (coal=42) is preserved
+[PASS] field validation: non-array characters becomes []
+[PASS] field validation: non-integer runCount falls back to 1
+[PASS] field validation: valid permanent field (totalPrestige=5) is preserved
+[PASS] field validation: invalid craftQueue value becomes null
+[PASS] field validation: valid gold(999) is preserved
+[PASS] negative values: gold=-100 rejected, falls back to 0
+[PASS] negative values: tickets=-1 rejected, falls back to 0
+[PASS] negative values: totalPrestige=-1 rejected, falls back to 0
+[PASS] negative values: resources.iron=-5 rejected, falls back to 0
+[PASS] negative values: products.steel=-2 rejected, falls back to 0
+[PASS] negative values: facility.iron=-3 rejected, falls back to 0
+[PASS] negative values: workforce.iron=-1 rejected, falls back to 0
+[PASS] negative values: hqLevel=-2 rejected, falls back to 0
+[PASS] negative values: craftQueue.steel=-4.2 rejected, falls back to null
+[PASS] negative values: craftQueue.alloy=3.1 (valid) preserved
+[PASS] negative values: worker with negative mining is dropped entirely
+[PASS] NaN rejected by isFiniteNumber-family checks
+[PASS] Infinity rejected by isFiniteNumber-family checks
+[PASS] -Infinity rejected by isNonNegativeFinite
+[PASS] NaN rejected by isNonNegativeInt
+[PASS] future saveVersion: game boots with safe default state
+[PASS] future saveVersion: saveBlocked is set
+[PASS] future saveVersion: saveGame() refuses to write
+[PASS] future saveVersion: original raw data is never overwritten
+[PASS] storage unavailable: game still boots normally
+[PASS] storage unavailable: save attempt fails safely (no throw)
+[PASS] tick loop never autosaves on its own (50 ticks, 0 writes) — writes=0
+[PASS] explicit saveGame() call writes exactly once — writes=1
+[PASS] visibilitychange(hidden) triggers a save
+[PASS] tickLoop() source contains no saveGame() call
+[PASS] BALANCE: mult() matches reference formula (hqLevel=0)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=2)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=5)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=0)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=2)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=5)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=0)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=2)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=5)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=0)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=2)
+[PASS] BALANCE: mult() matches reference formula (hqLevel=5)
+[PASS] BALANCE: hqCost() matches reference (L0)
+[PASS] BALANCE: hqCost() matches reference (L1)
+[PASS] BALANCE: hqCost() matches reference (L3)
+[PASS] BALANCE: hqCost() matches reference (L8)
+[PASS] BALANCE: hqCost() matches reference (L15)
+[PASS] BALANCE: facilityCost() matches reference (L0)
+[PASS] BALANCE: workforceCost() matches reference (L0)
+[PASS] BALANCE: facilityCost() matches reference (L1)
+[PASS] BALANCE: workforceCost() matches reference (L1)
+[PASS] BALANCE: facilityCost() matches reference (L3)
+[PASS] BALANCE: workforceCost() matches reference (L3)
+[PASS] BALANCE: facilityCost() matches reference (L8)
+[PASS] BALANCE: workforceCost() matches reference (L8)
+[PASS] BALANCE: facilityCost() matches reference (L15)
+[PASS] BALANCE: workforceCost() matches reference (L15)
+[PASS] BALANCE: workerUpgradeCost(mining) matches reference (L0)
+[PASS] BALANCE: workerUpgradeCost(mining) matches reference (L1)
+[PASS] BALANCE: workerUpgradeCost(mining) matches reference (L3)
+[PASS] BALANCE: workerUpgradeCost(mining) matches reference (L8)
+[PASS] BALANCE: workerUpgradeCost(carry) matches reference (L0)
+[PASS] BALANCE: workerUpgradeCost(carry) matches reference (L1)
+[PASS] BALANCE: workerUpgradeCost(carry) matches reference (L3)
+[PASS] BALANCE: workerUpgradeCost(carry) matches reference (L8)
+[PASS] BALANCE: workerUpgradeCost(move) matches reference (L0)
+[PASS] BALANCE: workerUpgradeCost(move) matches reference (L1)
+[PASS] BALANCE: workerUpgradeCost(move) matches reference (L3)
+[PASS] BALANCE: workerUpgradeCost(move) matches reference (L8)
+[PASS] BALANCE: workerEffective() matches reference (1,2,1)
+[PASS] BALANCE: workerEffective() matches reference (2,3,2)
+[PASS] BALANCE: workerEffective() matches reference (3,5,3)
+[PASS] BALANCE: workerEffective() matches reference (5,8,5)
+[PASS] BALANCE: workerEffective() matches reference (10,10,10)
+[PASS] BALANCE: autoSellCost() matches reference (sell=5)
+[PASS] BALANCE: autoSellCost() matches reference (sell=20)
+[PASS] BALANCE: autoSellCost() matches reference (sell=45)
+[PASS] BALANCE: autoSellCost() matches reference (sell=80)
+[PASS] BALANCE: autoSellCost() matches reference (sell=400)
+[PASS] BALANCE: autoSellCost() matches reference (sell=420)
+[PASS] BALANCE: prestigeGain no longer exists
+[PASS] tick: TICK_MS is 100 (unchanged engine constant)
+[PASS] tick: TICKS_PER_SECOND derives to exactly 10
+[PASS] tick: derived per-tick resource fraction is bit-identical to rate/10
+[PASS] tick: derived per-tick craft-queue fraction is bit-identical to 0.1
+[PASS] worker id: every new worker has a non-empty string id
+[PASS] worker id: ids are unique across pulls
+[PASS] worker id: upgrading worker #2 leaves its id unchanged
+[PASS] worker id: upgrade applies ONLY to worker #2
+[PASS] worker id: worker #1 id unaffected by an unrelated upgrade
+[PASS] worker id: reassigning worker #1 leaves its id unchanged
+[PASS] worker id: reassignment applies ONLY to worker #1
+[PASS] reorder: targetId is indeed the pre-reversal last worker
+[PASS] reorder: the CORRECT worker (by id) is upgraded after reorder
+[PASS] reorder: every other worker is completely unaffected
+[PASS] save/load: worker count preserved
+[PASS] save/load: worker order preserved (by id)
+[PASS] save/load: every worker field identical (stats/levels/id/order)
+[PASS] legacy save: both workers load successfully
+[PASS] legacy save: every worker got a fresh id
+[PASS] legacy save: backfilled ids are distinct
+[PASS] legacy save: worker #1 stats/rarity untouched
+[PASS] legacy save: worker #2 stats/levels (upgrade progress) untouched
+[PASS] duplicate id: both workers survive (no data loss)
+[PASS] duplicate id: ids are distinct after resolution
+[PASS] duplicate id: the FIRST occurrence keeps the original id
+[PASS] duplicate id: both workers retain their original stats/rarity
+[PASS] valid id: a well-formed existing id is preserved exactly
+[PASS] flow: starts with 0 gold, 0 tickets, no workers
+[PASS] flow: manual mining accumulates resources
+[PASS] flow: crafting steel produces product
+[PASS] flow: selling steel yields gold
+[PASS] flow: crossing 50G granted the first ticket
+[PASS] flow: gacha pull produced a worker
+[PASS] flow: worker is assigned to an unlocked resource
+[PASS] flow: auto rate is now > 0 for the worker's resource
+[PASS] flow: there is no prestige button
+[PASS] flow: completing an order gives reputation
+[PASS] flow: the run keeps going (worker and gold stay)
+[PASS] flow: reputation persists after a reload
+[PASS] Task6-A: no-worker hint text is the original "뽑으세요" guidance
+[PASS] Task6-B: iron-only worker mentions coal as the missing side
+[PASS] Task6-B: iron-only worker does not claim full automation
+[PASS] Task6-C: coal-only worker mentions iron as the missing side
+[PASS] Task6-C: coal-only worker does not claim full automation
+[PASS] Task6-D: both sides covered shows the full-automation hint
+[PASS] Task6-E: after autoCraft is on, the automation-complete hint no longer shows
+[PASS] Task6-E: prestige-related guidance is shown instead
+[PASS] Task6-E: milestone log appears exactly once after reaching the condition — count=1
+[PASS] Task6-E: milestone log does NOT repeat across ticks / repeated calls — count=1
+[PASS] Task6-F: both workers on iron shows the partial-automation hint
+[PASS] Task6-F: reassigning the 2nd worker to coal completes automation
+[PASS] Task6-F: reassignment-triggered milestone logs exactly once — count=1
+[PASS] Task6-G: autoLineLogged is true before save
+[PASS] Task6-G: autoLineLogged persists as true after reload
+[PASS] Task6-G: no duplicate milestone log after reload — count=0
+[PASS] Task6-G2: flag set before completing an order
+[PASS] Task6-G2: the flag is not reset by an order (there is no run reset any more)
+[PASS] Task6-H: locked site cards still render (existing UI preserved)
+[PASS] Task6-H: manaVein card mentions its minerals
+[PASS] Task6-H: manaVein card mentions only recipes that actually use its resources (from real RECIPES data)
+[PASS] Task6-H: manaVein card does not falsely mention ruins/spaceStation recipes
+[PASS] Task9-A: coalBrick exists in RECIPES
+[PASS] Task9-A: coalBrick.need = {coal:3}
+[PASS] Task9-A: coalBrick.out = 1
+[PASS] Task9-A: coalBrick.sell = 4
+[PASS] Task9-A: coalBrick.craftTime = 0
+[PASS] Task9-B: startCraft succeeds with exactly 3 coal
+[PASS] Task9-B: coal reduced to 0
+[PASS] Task9-B: coalBrick product +1
+[PASS] Task9-C: canCraft() is false with only 2 coal
+[PASS] Task9-C: startCraft() refuses with only 2 coal
+[PASS] Task9-C: coal untouched on failed craft
+[PASS] Task9-C: no product created on failed craft
+[PASS] Task9-D: product cleared after sell
+[PASS] Task9-D: gold increased by 4 * mult()
+[PASS] Task9-E: auto-craft produced coalBrick on a tick with enough coal
+[PASS] Task9-E: craftQueue.coalBrick stays null (craftTime=0 never queues)
+[PASS] Task9-E: craftQueue.coalBrick still null after more ticks
+[PASS] Task9-F: autoSellCost is computed (not hardcoded) as sell*20 = 80
+[PASS] Task9-F: buy-auto-sell button exists for coalBrick
+[PASS] Task9-F: autoSell.coalBrick true after purchase
+[PASS] Task9-F: autoSellOn.coalBrick true after purchase
+[PASS] Task9-F: auto-sell cleared the product on tick
+[PASS] Task9-F: auto-sell added gold on tick
+[PASS] Task9-G: steel.need unchanged (iron:2, coal:1)
+[PASS] Task9-G: steel.sell unchanged (5)
+[PASS] Task9-G: steel.craftTime unchanged (0)
+[PASS] Task9-G: steel production identical whether coalBrick auto-craft is on or off — 0 vs 0
+[PASS] Task9-H: legacy save (no coalBrick key) loads without error
+[PASS] Task9-H: coalBrick product defaults to 0
+[PASS] Task9-H: coalBrick autoCraft defaults to false
+[PASS] Task9-H: coalBrick autoSell defaults to false
+[PASS] Task9-H: coalBrick autoSellOn defaults to true
+[PASS] Task9-H: coalBrick craftQueue defaults to null
+[PASS] Task9-H: pre-existing steel data untouched
+[PASS] Task9-H: coalBrick data round-trips through save/load
+[PASS] Task9-UI: coalBrick recipe card renders via existing buildRecipes()
+[PASS] Task9-UI: card shows the need text (석탄 3)
+[PASS] Task9-UI: card has a craft button
+[PASS] Task9-UI: card has a sell button
+[PASS] Task9-UI: card has an auto-craft checkbox
+[PASS] Task13: permanent exposes totalPrestige/runCount/tickets/firstGachaGranted
+[PASS] Task13: permanent starts at fresh-game defaults
+[PASS] Task13: boot is a named, callable function (not an anonymous IIFE)
+[PASS] Task13: checkFirstGachaMilestone exists as its own function
+[PASS] Task13: calling it directly grants the ticket at the threshold
+[PASS] Task13: it does not re-grant once already granted
+[PASS] Task13: mineResource(iron) adds manualAmount(iron)
+[PASS] Task13: upgradeFacility fails with insufficient resources, no state change
+[PASS] Task13: upgradeFacility succeeds when funded
+[PASS] Task13: upgradeWorkforce succeeds when funded
+[PASS] Task13: unlockSite fails with insufficient gold, no state change
+[PASS] Task13: unlockSite succeeds when funded
+[PASS] Task13: buyAutoSell fails with insufficient gold, no state change
+[PASS] Task13: buyAutoSell succeeds when funded and sets both flags
+[PASS] Task13: reassignWorker fails for an unknown id (no throw)
+[PASS] Task13: reassignWorker succeeds and updates the resource
+[PASS] Task13: upgradeWorkerStat fails with insufficient gold
+[PASS] Task13: upgradeWorkerStat succeeds when funded
+[PASS] Task16: freshRunState craftFacility defaults to 1
+[PASS] Task16: craftQueue remains a plain map (not an array)
+[PASS] Task16: craftQueue still keyed by recipe with null idle values
+[PASS] Task16: the original nine recipes keep their keys and order (Task 78 appends more)
+[PASS] Task16: legacy save without craftFacility loads as default 1
+[PASS] Task16: sibling fields still restore (gold/hqLevel)
+[PASS] Task16: craftQueue values restore without migration
+[PASS] Task16: saveVersion stays 1 on the next write
+[PASS] Task16: craftFacility=0 is rejected and becomes 1
+[PASS] Task16: negative craftFacility is rejected and becomes 1
+[PASS] Task16: non-integer craftFacility is rejected and becomes 1
+[PASS] Task16: new save writes craftFacility
+[PASS] Task16: new save still uses saveVersion 1
+[PASS] Task16: craftFacility round-trips through save/load
+[PASS] Task16: sibling gold also round-trips
+[PASS] Task16: upgradeCraftFacility exists
+[PASS] Task16: craftFacilityCost exists
+[PASS] Task16: first upgrade cost matches expCost(100, 1.5, 0)
+[PASS] Task16: upgrade refused with insufficient gold
+[PASS] Task16: upgrade succeeds when funded
+[PASS] Task16: gold is deducted by the quoted cost
+[PASS] Task16: level increases by 1
+[PASS] Task16: next cost uses expCost at the new level
+[PASS] Task16: crystalAlloy.craftTime is still 3
+[PASS] Task16: timed startCraft queues craftTime seconds
+[PASS] Task16: timed startCraft does not grant product immediately
+[PASS] Task16: default level still subtracts 0.1s per tick
+[PASS] Task16: 3s craft still in progress after 2.9s at default level
+[PASS] Task16: 3s craft completes on the 30th tick at default level
+[PASS] Task16: upgraded craftFacility is 2 before timing check
+[PASS] Task16: upgraded tick progresses timed craft faster than 0.1s — progressed=0.10999999999999988
+[PASS] Task16: Lv.2 speed is 1.1x (0.11s per tick) — progressed=0.10999999999999988
+[PASS] Task16: upgraded 3s craft finishes in fewer than 30 ticks — ticks=28
+[PASS] Task16: steel stays craftTime 0
+[PASS] Task16: steel still crafts instantly after facility upgrades
+[PASS] Task16: coalBrick stays craftTime 0
+[PASS] Task16: coalBrick still crafts instantly (out=1, no queue)
+[PASS] Task16: alloy stays craftTime 0 and instant
+[PASS] Task16: autoCraft still produces instant steel on a tick
+[PASS] Task16: autoCraft still leaves steel craftQueue null
+[PASS] Task16: autoCraft still starts a timed recipe into craftQueue
+[PASS] Task16: autoCraft timed recipe still completes via tickLoop
+[PASS] Task16: autoSell purchase still works
+[PASS] Task16: autoSell gold cost unchanged
+[PASS] Task16: autoSell still clears stock on tick
+[PASS] Task16: autoSell still grants gold on tick
+[PASS] Task16: craftFacility is upgraded before the order
+[PASS] Task16: an order keeps craftFacility (no reset)
+[PASS] Task16: an order awards totalPrestige
+[PASS] Task16: an order leaves tickets / firstGachaGranted intact
+[PASS] Task16: an order keeps the workers
+[PASS] Task16: 개발 tab shows craft facility level
+[PASS] Task16: 개발 tab shows craft facility upgrade button
+[PASS] Task16: UI level text starts at 1
+[PASS] Task16: upgrade button quotes gold cost
+[PASS] Task16: clicking the UI button upgrades the facility
+[PASS] Task16: UI level text updates after upgrade
+[PASS] Task18-A: crystalAlloy.craftTime is 3
+[PASS] Task18-A: Lv.1 craftSpeed is 1
+[PASS] Task18-A: craftQueue starts at 3
+[PASS] Task18-A: Lv.1 remaining label is 3.0s
+[PASS] Task18-B: Lv.2 craftSpeed is 1.1
+[PASS] Task18-B: craftQueue remains 3 (display-only change)
+[PASS] Task18-B: Lv.2 remaining label is 2.7s
+[PASS] Task18-C: Lv.3 craftSpeed is 1.2
+[PASS] Task18-C: Lv.3 remaining label is 2.5s
+[PASS] Task18-D: a tick reduced craftQueue below 3
+[PASS] Task18-D: label matches craftQueue / craftSpeed() — 제작 중... 2.6s
+[PASS] Task18-E: steel still crafts instantly at Lv.3
+[PASS] Task18-E: coalBrick still crafts instantly at Lv.3
+[PASS] Task18-E: alloy still crafts instantly at Lv.3
+[PASS] Task103: fixture — the file is a saveVersion 1 mid-game save
+[PASS] Task103: fixture — gold, resources and products load exactly
+[PASS] Task103: fixture — the five workers keep ids, stats, levels and resource
+[PASS] Task103: fixture — facility, workforce, HQ and craft facility levels
+[PASS] Task103: fixture — research, sites, auto-craft, stock target, auto-sell
+[PASS] Task103: fixture — both workshops keep recipe, level, auto and the craft in progress
+[PASS] Task103: fixture — base, all 26 mines (positions, grades, states) and the undiscovered list
+[PASS] Task103: fixture — the open tunnel and the player standing beyond the mountain
+[PASS] Task103: fixture — reputation, tickets and every company (a fixed and a repeat order open together)
+[PASS] Task103: fixture — load then save writes the same run and permanent data (plus the empty torch list and ruined village, Task 112/113)
+[PASS] Task103: fixture — the save structure is unchanged at every level (plus the empty torch list, Task 112)
+[PASS] Task103: fixture — the loaded game keeps running (income flows, the workshop finishes its craft)
+[PASS] Task103: no stage — setup: the page has no world stage and the game booted
+[PASS] Task103: no stage — securing and mining a world mine work
+[PASS] Task103: no stage — the tick runs and the secured mine pays
+[PASS] Task103: no stage — keyboard movement works and stops
+[PASS] Task103: no stage — walking up to a hidden mine discovers it
+[PASS] Task103: no stage — crafting, research and the tunnel job work
+[PASS] Task103: no stage — the remaining UI renders without errors
+[PASS] Task103: no stage — saving works and the save loads in a normal page
+[PASS] Task103: no stage — the fixture save loads the same
+[PASS] Task103: player — a new game starts on the base, idle, facing down
+[PASS] Task103: player — one tick moves PLAYER_SPEED / TICKS_PER_SECOND (3 / 10)
+[PASS] Task103: player — diagonal movement has the same speed
+[PASS] Task103: player — no key, no movement, idle pose
+[PASS] Task103: player — 4000 random steps with the tunnel closed stay on walkable ground
+[PASS] Task103: player — the closed mountain is never crossed (no mountain, no land beyond)
+[PASS] Task103: player — the walk did reach the mountain face (the test pushed against it)
+[PASS] Task103: player — walking into the face stops flush against the rock
+[PASS] Task103: player — pushing diagonally along the face slides along it
+[PASS] Task103: player — with the tunnel open the player walks through to the land beyond
+[PASS] Task103: player — walking around beyond the mountain never enters the rock
+[PASS] Task103: player — a saved position and facing come back exactly
+[PASS] Task103: player — a position inside the closed mountain is moved onto the base on load
+[PASS] Task103: core — the multiplier starts at exactly 1
+[PASS] Task103: core — a manual mining click adds 1 ore at the start
+[PASS] Task103: core — steel takes 2 iron + 1 coal and is made at once
+[PASS] Task103: core — with no ore left steel cannot be made
+[PASS] Task103: core — selling pays sell price x multiplier (2 x 5G)
+[PASS] Task103: core — reaching 50G grants the first gacha ticket once
+[PASS] Task103: core — the first ticket is not granted twice
+[PASS] Task103: core — a pulled worker has an id, a rarity and an unlocked resource
+[PASS] Task103: core — a worker mines its rate per second through the tick
+[PASS] Task103: core — a timed craft takes its time, then adds the product
+[PASS] Task103: core — after craftTime seconds of ticks the product is there
+[PASS] Task103: core — HQ investment costs its price and raises the multiplier
+[PASS] Task103: mines — an undiscovered mine cannot be secured or mined
+[PASS] Task103: mines — walking within the discovery radius discovers it
+[PASS] Task103: mines — a discovered mine of an open site can be secured once
+[PASS] Task103: mines — mining a secured mine adds miningPower x multiplier
+[PASS] Task103: mines — a secured mine pays miningPower x grade x rate per second
+[PASS] Task103: mines — a mine whose site is locked cannot be secured
+[PASS] Task103: mines — after the site is unlocked it can be secured
+[PASS] Task103: mines — two mines cannot share a cell
+[PASS] Task103: tunnel — a new game has the tunnel closed and nothing beyond
+[PASS] Task103: tunnel — the job needs the research first
+[PASS] Task103: tunnel — the job costs 1000 + 5000 gold and 5 magic alloy
+[PASS] Task103: tunnel — a job in progress survives save/load
+[PASS] Task103: tunnel — it opens after 600 s and adds the land-beyond mines once
+[PASS] Task103: tunnel — the land beyond is walkable once open
+[PASS] Task103: tunnel — the open tunnel and its mines are kept, nothing is generated again
+[PASS] Task103: view state — the save structure is the fixture structure (no new keys anywhere but the Task 112 torch list)
+[PASS] Task103: view state — top level keys are exactly saveVersion, savedAt, permanent, run
+[PASS] Task103: view state — world keys are exactly the saved world fields
+[PASS] Task103: view state — the player keeps x, y, facing, pose only
+[PASS] Task103: view state — nothing about selection, camera, zoom or tabs is saved
+[PASS] Task103: view state — saveVersion is 1
+[PASS] Task103: handoff — the ZIP file list is index.html, the stylesheet and every script the page loads
+[PASS] Task103: handoff — CRC-32 matches the standard check value
+[PASS] Task103: handoff — ZIP entries read back with their names, contents and CRCs
+[PASS] Task103: handoff — the single HTML inlines the stylesheet and every script in page order, with no local file left
+[PASS] Task103: handoff — the single HTML boots the game, plays the core loop and saves (saveVersion 1)
+[PASS] Task104: one world unit is 4 tiles of 16 px (64 px at zoom 1)
+[PASS] Task104: integer zoom — PC 1280x800 -> 3, phone 390x664 -> 2, 1920x1080 -> 4, tiny -> 1
+[PASS] Task104: the drawn world is the bounds plus a 2-unit forest edge
+[PASS] Task104: the camera centres on the player away from the edges
+[PASS] Task104: at a corner the camera stops so nothing past the drawn world shows
+[PASS] Task104: a view larger than the world is centred on it
+[PASS] Task104: world -> screen -> world round trip (whole pixels)
+[PASS] Task104: the player is drawn at the screen centre
+[PASS] Task104: the drawn position glides from the last tick to the new one
+[PASS] Task104: walked distance follows the glide
+[PASS] Task104: a big jump (load) snaps instead of sliding across the map
+[PASS] Task104: walk frames cycle 0-3 while walking, 0 when standing
+[PASS] Task104: nothing of the view is in the game state
+[PASS] Task104: tunnel closed — 96 x 96 tiles over the drawn world
+[PASS] Task104: tunnel closed — every walkable spot is drawn as ground (never as rock or forest)
+[PASS] Task104: tunnel closed — nothing drawn as rock or forest edge can be walked on
+[PASS] Task104: tunnel closed — the land beyond is drawn (fogged while closed)
+[PASS] Task104: tunnel open — 96 x 96 tiles over the drawn world
+[PASS] Task104: tunnel open — every walkable spot is drawn as ground (never as rock or forest)
+[PASS] Task104: tunnel open — nothing drawn as rock or forest edge can be walked on
+[PASS] Task104: tunnel open — the land beyond is drawn (fogged while closed)
+[PASS] Task104: closed tunnel — the recess in front of the gate is floor, behind it is rock
+[PASS] Task104: open tunnel — the passage runs through the range
+[PASS] Task104: a dirt yard around the workshop and a road towards the tunnel
+[PASS] Task104: the painted ground is 1536 x 1536 px, fully opaque
+[PASS] Task104: the ground looks the same every time (fixed pattern, nothing random)
+[PASS] Task104: the land beyond is under fog until the tunnel opens
+[PASS] Task104: draw list — the workshop, its lamp, every mine once, the workshop huts and the player
+[PASS] Task104: draw list — mine looks follow discovery and securing
+[PASS] Task104: draw list — the craft hut look follows its level tier
+[PASS] Task104: draw list — sorted back to front by y
+[PASS] Task104: draw list — the closed gate is drawn and no land-beyond scenery yet
+[PASS] Task104: draw list — once open, the gate is gone and the scenery beyond appears
+[PASS] Task104: without a 2D canvas (jsdom) the renderer draws nothing and does not fail
+[PASS] Task105: the player has 4 directions x 4 walk frames, 16 x 22, all inside
+[PASS] Task105: walking frames differ from standing (legs and arms move)
+[PASS] Task105: the four directions look different
+[PASS] Task105: facing left is the mirror of facing right
+[PASS] Task105: the miner wears a helmet with a lamp facing down and to the side, not from behind
+[PASS] Task105: every resource has its own ore colour
+[PASS] Task105: an ore boulder shows its resource colour; an undiscovered one shows none
+[PASS] Task105: a secured vein carries the teal flag, an unsecured one does not
+[PASS] Task105: the workshop cabin and the three craft hut tiers
+[PASS] Task105: every kind of scenery beyond the mountain has its own sprite
+[PASS] Task105: the art is drawn in code — no image files or image URLs in the top-down code
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+[PASS] Task105: without a canvas, baking a sprite returns nothing and does not fail
+[PASS] Task106: the top-down view is the default — world canvas, HUD, minimap, dock
+[PASS] Task106: the five tabs stay in the dock with their content (Task 114 adds 마을 as a sixth)
+[PASS] Task106: no panel is open at the start (the world is the screen)
+[PASS] Task106: a dock button opens its panel
+[PASS] Task106: pressing the open tab again closes it
+[PASS] Task106: Escape closes a panel
+[PASS] Task106: the log opens as its own panel
+[PASS] Task106: the close button closes it
+[PASS] Task106: only one panel at a time
+[PASS] Task106: ?view=classic keeps the old page (no world canvas, 2.5D stage in place)
+[PASS] Task106: the view choice is kept in its own key, not in the game save
+[PASS] Task106: the remembered choice applies on the next visit; ?view=topdown switches back
+[PASS] Task106: far from everything there is nothing to act on
+[PASS] Task106: within reach (1.1) of an unsecured vein the action is "secure"
+[PASS] Task106: just out of reach (1.3) it is not offered
+[PASS] Task106: E secures the vein through the game's own secureMine
+[PASS] Task106: next the action is "mine" with the amount
+[PASS] Task106: E and Space mine it (miningPower x multiplier each)
+[PASS] Task106: E typed in a field and Space on a button do not act
+[PASS] Task106: the remote panel buttons still work (kept by decision)
+[PASS] Task106: a vein of a locked site says what is needed and stays unsecured
+[PASS] Task106: an undiscovered vein is not offered (walking near discovers it instead)
+[PASS] Task106: E at the workshop door opens the craft (개발) panel
+[PASS] Task106: a craft hut is a target too
+[PASS] Task106: the action button shows the action and does it
+[PASS] Task106: with nothing in reach the button is idle
+[PASS] Task106: joystick — inside the dead zone nothing is held
+[PASS] Task106: joystick — 8 directions
+[PASS] Task106: joystick — a mostly-sideways push is one direction
+[PASS] Task106: joystick directions walk the player and letting go stops
+[PASS] Task106: the stick and the action button exist for touch screens
+[PASS] Task106: after using the new screen the save has exactly the fixture's structure (saveVersion 1)
+[PASS] Task106: no camera, zoom, panel or joystick state in the save
+[PASS] Task107: every vein, the workshop and every craft hut is an obstacle
+[PASS] Task107: boxes are the small base of each picture (vein under 0.3 wide, cabin walls 0.78, hut 0.5) and the feet 0.18 x 0.12
+[PASS] Task107: the door steps (workshop and hut points) stay free; a vein centre does not
+[PASS] Task107: walking into the cabin from the door stops at its wall
+[PASS] Task107: standing against the cabin wall the player is drawn in front of the cabin (sorted by the footprint front)
+[PASS] Task107: walking into the cabin wall from the east stops flush against it
+[PASS] Task107: pushing diagonally along the wall slides along it
+[PASS] Task107: a craft hut stops the player at its wall
+[PASS] Task107: walking straight at a vein, the player glides round it (side step under 0.2) and never walks through it
+[PASS] Task107: brushing a vein's corner slips past it
+[PASS] Task107: the cabin is too wide to glide round — the player stops
+[PASS] Task107: the mountain face still stops the player flush
+[PASS] Task107: walking speed is unchanged (3 units a second)
+[PASS] Task107: 6000 random steps among 8 huts and the veins never end inside an obstacle or the rock
+[PASS] Task107: standing inside a vein (older save) the player can walk out left
+[PASS] Task107: standing inside a vein (older save) the player can walk out right
+[PASS] Task107: standing inside a vein (older save) the player can walk out up
+[PASS] Task107: standing inside a vein (older save) the player can walk out down
+[PASS] Task107: once out, walking back does not enter it again
+[PASS] Task107: a saved position on top of a vein is kept exactly on load (nothing is moved or rewritten)
+[PASS] Task107: ...and the player simply walks off it
+[PASS] Task107: the save keeps its structure (saveVersion 1, no obstacle data)
+[PASS] Task107: in 25 generated worlds (8 huts, tunnel open, survey) every standable spot is connected and every vein can be reached
+[PASS] Task107: the fixture save's world is fully reachable too
+[PASS] Task108: the dusk tint stays between 0.10 and 0.34 (never too dark)
+[PASS] Task108: it changes slowly and smoothly over an 8-minute cycle
+[PASS] Task108: the helmet lamp is a cone pointing where the player faces, plus a soft aura
+[PASS] Task108: the lamp turns with the player
+[PASS] Task108: the workshop lamp, its two windows and each hut's forge give light
+[PASS] Task108: every discovered vein glows softly in its ore colour, a secured one more
+[PASS] Task108: a hidden vein never glows (light must not give it away)
+[PASS] Task108: extra lights (the workers') are added
+[PASS] Task108: lights flicker gently but stay within 12%
+[PASS] Task108: at 60 fps the effects stay full; slower frames step down; fast frames step back up
+[PASS] Task108: touch screens (phones) start one step lower, others at full
+[PASS] Task108: three cloud shadows drift slowly east
+[PASS] Task108: no fireflies in the brighter part of the cycle, some at dusk
+[PASS] Task108: more fireflies over the land beyond once the tunnel is open
+[PASS] Task108: trees and grass sway a little (tree lean under 0.03, grass under 0.1) and keep moving
+[PASS] Task108: grass tufts dot the open land, always the same, clear of veins, huts and the workshop yard
+[PASS] Task108: the tufts are drawn (as decoration, not scenery of the land beyond)
+[PASS] Task108: light and atmosphere change nothing in the game and draw nothing without a canvas
+[PASS] Task108: nothing about light reaches the save
+[PASS] Task109: one figure per hired worker, same ids
+[PASS] Task109: every worker stands on free ground (not in rock, a vein or a building)
+[PASS] Task109: workers stand apart (at least 0.34)
+[PASS] Task109: a worker works at a vein of its own resource, close by, facing it
+[PASS] Task109: secured veins are used first
+[PASS] Task109: a worker with no vein of its resource waits in the workshop yard
+[PASS] Task109: the same state gives the same places (no randomness, cached)
+[PASS] Task109: the shirt shows the rarity; helmet, hair and skin vary by worker; legendary has a gold pickaxe
+[PASS] Task109: the pickaxe swing has 4 different frames inside a 20 x 24 sprite
+[PASS] Task109: facing left is the mirror of facing right
+[PASS] Task109: a gold pickaxe for legendary workers
+[PASS] Task109: a working worker cycles raise, overhead, strike, recover
+[PASS] Task109: workers swing at their own pace (rarer is a little faster, phases differ)
+[PASS] Task109: a waiting worker stands still, resting on its pickaxe
+[PASS] Task109: each worker has a small helmet lamp
+[PASS] Task109: workers are in the draw list, sorted with everything else
+[PASS] Task109: worker output (autoRate) and the game state are exactly as before
+[PASS] Task109: nothing about where workers stand or how they move is saved
+[PASS] Task109: workers do not block the player (only veins and buildings do)
+[PASS] Task109: 20 workers on two veins all get a free spot apart from each other
+[PASS] Task109: as many as fit stand by their vein, the rest wait in the yard
+[PASS] Task109: the fixture save shows its five workers, each on free ground
+[PASS] Task110: on the same side of the mountain a worker walks straight to its spot
+[PASS] Task110: with the tunnel closed nothing is routed through it
+[PASS] Task110: to a vein beyond the mountain: the tunnel mouth, its far exit, then the spot
+[PASS] Task110: and back the other way (exit, mouth, spot), each worker on its own lane
+[PASS] Task110: the tunnel waypoints are open ground
+[PASS] Task110: a worker already inside the tunnel skips the mouth
+[PASS] Task110: lanes stay well inside the tunnel
+[PASS] Task110: the workers come out of the workshop door
+[PASS] Task110: ...one after another (the rest are still inside)
+[PASS] Task110: they walk (drawn walking, with a walk frame)
+[PASS] Task110: every worker reaches its spot and works there (or waits in the yard)
+[PASS] Task110: on the way nobody walked through a vein or a building, or into rock
+[PASS] Task110: nobody needed to be set down (no stuck worker)
+[PASS] Task110: the worker without a vein waits in the yard, resting
+[PASS] Task110: output (autoRate) never changed while they walked
+[PASS] Task110: the walk changes nothing in the game state
+[PASS] Task110: given a new vein, a worker sets off for it
+[PASS] Task110: ...and works there once arrived
+[PASS] Task110: with no valid vein left, they walk back to the yard and wait
+[PASS] Task110: a worker who leaves is gone from the world too
+[PASS] Task110: walking (almost) straight down a worker keeps facing the same way
+[PASS] Task110: the walk has 4 frames (legs and a little bob) inside the 20 x 24 sprite
+[PASS] Task110: walking left is the mirror of walking right
+[PASS] Task110: the helmet lamps follow the workers
+[PASS] Task110: nothing about the walk is saved (saveVersion 1, workers keep their 9 fields)
+[PASS] Task110: a worker walks round the player standing in its way and arrives
+[PASS] Task110: even with the player on its spot, the worker gets there (never stuck for good)
+[PASS] Task110: workers still never block the player
+[PASS] Task110: the fixture save's five workers all reach their veins
+[PASS] Task110: those working beyond the mountain went through the tunnel (never over the rock)
+[PASS] Task110: and nobody was stuck
+[PASS] Task110: in 6 generated worlds 16 workers each walk to their veins (and again after new jobs) without getting stuck, through anything or into rock
+[PASS] Task110: ...including workers walking to veins beyond the mountain, past its trees and rocks
+[PASS] Task111: with the tunnel closed the land beyond (and its scenery) is out of play
+[PASS] Task111: trees, boulders, crystal clusters, the cart, timber supports and the shaft entrance are solid
+[PASS] Task111: grass, the clearing, digging marks and the low exposed veins stay walkable
+[PASS] Task111: each block is the small foot of its picture (under 0.45 wide, 0.2 deep)
+[PASS] Task111: the drawn scenery is exactly the world's scenery (nothing solid is invisible, nothing visible is missing)
+[PASS] Task111: nothing that would wall ground in had to be left out of the current scenery (all pieces kept)
+[PASS] Task111: pieces on a vein are still left out (0.9), so a vein is always readable and reachable
+[PASS] Task111: the quick nearby lookup agrees with the full list
+[PASS] Task111: walking into a tree trunk stops (or glides round it), never through it
+[PASS] Task111: grass is walked straight through
+[PASS] Task111: (a position inside a tree, as an older save could have)
+[PASS] Task111: ...walks out of it and is not let back in
+[PASS] Task111: scenery does not change the terrain (mountain, tunnel and walkability as before)
+[PASS] Task111: nothing about scenery or obstacles is saved
+[PASS] Task111: beyond the mountain every open spot is reachable from the tunnel exit despite the trees and rocks
+[PASS] Task111: the fixture save's veins beyond can all be walked to (and its workers have free spots)
+[PASS] Task112: a new game starts with no torches
+[PASS] Task112: the torch goes just in front of the player (by facing)
+[PASS] Task112: on open ground it is set down
+[PASS] Task112: standing by it, the same action picks it up again
+[PASS] Task112: not on a vein
+[PASS] Task112: not on the workshop door step or inside its walls
+[PASS] Task112: not in front of a hut's door or in it
+[PASS] Task112: not on the mountain
+[PASS] Task112: not outside the world
+[PASS] Task112: two torches keep a little apart
+[PASS] Task112: at most 12 torches stand at once (keeps the lighting light on phones)
+[PASS] Task112: not on a tree or rock beyond the mountain
+[PASS] Task112: a torch never blocks the player (it is thin)
+[PASS] Task112: every torch stands in the world, sorted with everything else
+[PASS] Task112: each torch gives a soft warm flickering light
+[PASS] Task112: the helmet lamp, workshop lamp and windows are still there
+[PASS] Task112: the torch has a 3-frame flame inside its 10 x 22 sprite
+[PASS] Task112: the game is otherwise untouched (output unchanged)
+[PASS] Task112: torches are saved as plain points (saveVersion 1)
+[PASS] Task112: ...and come back in the same places
+[PASS] Task112: a torch button is on the screen and says what it will do
+[PASS] Task112: the button sets a torch down (phone and PC)
+[PASS] Task112: T picks it up again (PC)
+[PASS] Task112: and T sets one down
+[PASS] Task112: typing a "t" in a field does nothing to torches
+[PASS] Task112: a refused spot says why (shown as a floating note)
+[PASS] Task112: a save from before torches loads with none
+[PASS] Task112: ...and the rest of its world is as saved
+[PASS] Task112: broken torch entries are dropped, good ones kept exactly, at most 12
+[PASS] Task112: a torch field that is not a list means no torches
+[PASS] Task113: two facilities to restore beside the workshop: the appraiser (감정소) and the museum (박물관)
+[PASS] Task113: each is restored in two steps (clearing, then rebuilding), paid in gold and early products only
+[PASS] Task113: a relic codex of 12, each with a name, a rarity and a weight
+[PASS] Task113: unidentified relics are their own collectible: the crafting resource 고대 유물 stays as it was
+[PASS] Task113: a new game starts with a ruined village and no relics
+[PASS] Task113: a save without a village (the fixture) loads with a ruined village
+[PASS] Task113: broken village values are dropped or reset, good ones kept exactly
+[PASS] Task113: a museum site that is not a point is not kept
+[PASS] Task113: a village field that is not an object means a fresh ruined village
+[PASS] Task113: the village is saved in run.village with saveVersion 1
+[PASS] Task113: village.js loads after player.js and before ui.js (index.html, tests and the simulator agree)
+[PASS] Task114: a new game gives both facilities a site near the workshop when it starts
+[PASS] Task114: the sites keep clear of mines, later expansion mines, craft huts, the workshop yard and each other
+[PASS] Task114: both doors can be walked to from the workshop door, every vein is still reachable and nothing is cut off
+[PASS] Task114: each facility's walls are an obstacle, ruined or not (ids appraiser, museum)
+[PASS] Task114: the door step is free to stand on
+[PASS] Task114: walking up to the appraiser stops at its wall (at the door), never inside
+[PASS] Task114: at the door the facility is the interaction target, named (Task 115: with its next step)
+[PASS] Task114: acting on it goes through the village rules (no gold yet: nothing happens, the reason is given)
+[PASS] Task114: the 마을 panel opens from the dock in the top-down screen
+[PASS] Task114: the panel lists the workshop and both facilities with their state
+[PASS] Task114: both facilities are in the draw list as ruins, sorted by the front of their walls
+[PASS] Task114: each facility has its own picture for ruin, cleared and open (inside 44x40 / 60x48)
+[PASS] Task114: craft huts built afterwards keep clear of the sites (8 built)
+[PASS] Task114: the sites are saved and come back exactly (never moved)
+[PASS] Task114: an older save gets sites when it loads; its mines and huts are not moved or removed
+[PASS] Task114: in the fixture both doors and every vein can be reached, nothing is cut off
+[PASS] Task114: in 12 generated worlds (8 huts before or after, expansions, tunnel, survey) the sites follow the rules and everything stays reachable
+[PASS] Task114: the classic screen keeps working and has the village panel too
+[PASS] Task115: with no gold the first step is blocked and says why
+[PASS] Task115: the museum waits for the appraiser
+[PASS] Task115: at the museum door before that, the target is locked and says so
+[PASS] Task115: at the appraiser door the target offers the next step with its cost
+[PASS] Task115: the phone action button reads 복구
+[PASS] Task115: E clears the rubble: stage 1, exactly 100G paid
+[PASS] Task115: the next step is the rebuild, paid in gold and products
+[PASS] Task115: without the products nothing is paid and the reason floats up
+[PASS] Task115: with them, the appraiser opens: 400G, 8 steel and 4 coal bricks paid once
+[PASS] Task115: an open facility takes no more payments
+[PASS] Task115: the panel shows the museum step with its cost, disabled while short, with the reason
+[PASS] Task115: ...and enabled once affordable
+[PASS] Task115: the panel button clears the museum rubble (1,200G)
+[PASS] Task115: ...and rebuilds it (3,000G, 20 steel, 5 iron tools); the card then shows it open
+[PASS] Task115: each step wrote a log line
+[PASS] Task115: both are drawn as open buildings now
+[PASS] Task115: open facilities light their windows
+[PASS] Task115: the walls still block and the door step stays free once rebuilt
+[PASS] Task115: restoration is saved and comes back
+[PASS] Task115: the workshop is listed first as the village's production centre
+[PASS] Task115: on the classic screen the panel button restores too
+[PASS] Task116: hand mining still gives exactly its usual amount (no change to resources)
+[PASS] Task116: every 8 hand minings of an ordinary vein turn up one unidentified relic
+[PASS] Task116: the crafting resource 고대 유물 is not touched
+[PASS] Task116: worker output (autoRate) is unchanged
+[PASS] Task116: finding one writes a log line
+[PASS] Task116: automatic mining (the tick) finds none
+[PASS] Task116: a 고대 유물 vein counts 3, and still gives its resource
+[PASS] Task116: a vein beyond the mountain counts 2
+[PASS] Task116: at most 20 are held; while full, mining finds none and adds no progress
+[PASS] Task116: mining with E shows "미감정 유물!" when one turns up
+[PASS] Task116: no appraisal before the appraiser is open
+[PASS] Task116: at the open appraiser the target offers appraisal with the count; the button reads 감정
+[PASS] Task116: E appraises one: it becomes a known relic, registered in the codex
+[PASS] Task116: the codex shows all 12, unknown ones as ???
+[PASS] Task116: the panel button appraises too
+[PASS] Task116: appraising 60 registers the whole codex (new ones are likelier), every relic owned at least once
+[PASS] Task116: rare relics stay rarer than common ones
+[PASS] Task116: with nothing left, the button is disabled and the door target just opens the panel
+[PASS] Task116: relics, the codex and progress are saved and come back exactly
+[PASS] Task116: the same appraisal count gives the same next relic after loading (no randomness)
+[PASS] Task116: on the classic screen the panel appraises too
+[PASS] Task116: the classic mine button finds relics too (the same mineMine)
+[PASS] Task117: no donations before the museum is open
+[PASS] Task117: at the open museum the target offers to donate the new relics; the button reads 기증
+[PASS] Task117: E donates one of each kind owned: they go on display and leave the owned relics (duplicates stay)
+[PASS] Task117: donating gives no gold (no rewards yet)
+[PASS] Task117: a kind already on display cannot be donated again
+[PASS] Task117: with nothing new the door shows the display count
+[PASS] Task117: the museum lights one display niche per two relics on show
+[PASS] Task117: its picture changes as niches light up
+[PASS] Task117: the panel shows the display room: cases for what is on show, empty cases for the rest
+[PASS] Task117: a new relic is listed for donation
+[PASS] Task117: its 기증 button donates it
+[PASS] Task117: the whole collection can be put on show (12/12)
+[PASS] Task117: the display is saved and comes back
+[PASS] Task117: the crafting resource 고대 유물 was never used
+[PASS] Task117: on the classic screen the panel donates too
+[PASS] Task117: an older save restores, appraises and donates; its mines, huts and resources are untouched (saveVersion 1)
+[PASS] PR35: every restoration step is paid exactly once, and the stage survives a save and load each time
+[PASS] PR35: once open, pressing again (panel or E, many times) takes nothing more
+[PASS] PR35: 7 hand minings leave progress 7 and no relic yet
+[PASS] PR35: after a save and load the progress is the same and nothing extra was found
+[PASS] PR35: the 8th mining after loading turns up exactly one
+[PASS] PR35: appraising one relic gives one result
+[PASS] PR35: with none left, appraising again gives nothing (E at the door just opens the panel)
+[PASS] PR35: the same codex and owned relic after loading (no second copy)
+[PASS] PR35: the relic is donated once
+[PASS] PR35: donating it again in the same session is refused
+[PASS] PR35: after loading, a duplicate of a kind on display cannot be donated again (no second display)
+[PASS] PR35: no gold came from donating
+[PASS] PR35: a save listing a relic on display several times keeps it once; bad stages fall back to ruins
+[PASS] PR35: saveVersion stays 1
+[PASS] Task27: fresh run has world state
+[PASS] Task27: base starts at the new-game base position (2,0)
+[PASS] Task27: base starts at level 1
+[PASS] Task27: fresh world has the seeded starting mines
+[PASS] Task27: valid base fields survive sanitization
+[PASS] Task27: valid mine data survives sanitization
+[PASS] Task27: mine without an id receives an id
+[PASS] Task27: duplicate mine ids are replaced
+[PASS] Task27: sanitized mine ids are unique
+[PASS] Task27: invalid base fields fall back independently
+[PASS] Task27: invalid mine position falls back independently
+[PASS] Task27: invalid mine resource falls back to a real resource
+[PASS] Task27: invalid mine grade falls back to 1
+[PASS] Task27: invalid mine power falls back to 1
+[PASS] Task27: invalid development state falls back to unsecured
+[PASS] Task27: legacy save without world still loads
+[PASS] Task27: legacy save receives fresh world defaults
+[PASS] Task27: save still uses saveVersion 1
+[PASS] Task27: world survives save/load
+[PASS] Task27: mine values survive save/load
+[PASS] Task28: valid mine is added
+[PASS] Task28: mine keeps its gameplay data
+[PASS] Task28: mine receives generated id
+[PASS] Task28: valid provided mine id is preserved
+[PASS] Task28: first mine is accepted
+[PASS] Task28: duplicate coordinates are rejected
+[PASS] Task28: duplicate coordinate rejection does not mutate state
+[PASS] Task28: invalid mine is rejected #1
+[PASS] Task28: invalid mine leaves state unchanged #1
+[PASS] Task28: invalid mine is rejected #2
+[PASS] Task28: invalid mine leaves state unchanged #2
+[PASS] Task28: invalid mine is rejected #3
+[PASS] Task28: invalid mine leaves state unchanged #3
+[PASS] Task28: invalid mine is rejected #4
+[PASS] Task28: invalid mine leaves state unchanged #4
+[PASS] Task28: invalid mine is rejected #5
+[PASS] Task28: invalid mine leaves state unchanged #5
+[PASS] Task28: invalid mine is rejected #6
+[PASS] Task28: invalid mine leaves state unchanged #6
+[PASS] Task28: first mine keeps requested id
+[PASS] Task28: second mine is added despite id collision
+[PASS] Task28: colliding id is replaced with a generated id
+[PASS] Task30: unsecured mine is created
+[PASS] Task30: secureMine transitions mine to secured
+[PASS] Task30: securing an already secured mine is rejected
+[PASS] Task30: invalid mine id is rejected
+[PASS] Task30: failed securing leaves mine state unchanged
+[PASS] Task31: unsecured mine cannot be mined
+[PASS] Task31: mine is secured before mining
+[PASS] Task31: secured mine can be mined manually
+[PASS] Task31: mining adds miningPower to shared resource storage
+[PASS] Task31: repeated mining accumulates in shared storage
+[PASS] Task31: invalid mine id does not mutate storage
+[PASS] Task32: world mine panel renders a registered mine
+[PASS] Task32: unsecured mine shows secure action
+[PASS] Task32: unsecured mine disables mining action
+[PASS] Task32: secured mine enables mining action
+[PASS] Task33: base panel renders
+[PASS] Task33: base level is rendered
+[PASS] Task33: base coordinates are rendered
+[PASS] Task34: fresh run starts with two mines
+[PASS] Task34: starting iron mine is present near the base
+[PASS] Task34: starting coal mine is present near the base
+[PASS] Task34: starting mines begin unsecured
+[PASS] Task34: starting mines use grade 1 and miningPower 1
+[PASS] Task34: saves without world data receive the starting seed
+[PASS] Task34: explicitly saved empty world.mines is preserved
+[PASS] Task35: shared storage panel renders
+[PASS] Task35: iron is shown in shared storage
+[PASS] Task35: coal is shown in shared storage
+[PASS] Task35: shared storage amount refreshes from state.resources
+[PASS] Task35: world mining uses the same shared storage value
+[PASS] Task36: fresh world has a workshops collection
+[PASS] Task36: valid workshop fields survive sanitization
+[PASS] Task36: workshop without id receives an id
+[PASS] Task36: duplicate workshop ids are replaced
+[PASS] Task36: workshop ids are unique
+[PASS] Task36: invalid workshop position falls back safely
+[PASS] Task36: invalid workshop level falls back to 1
+[PASS] Task36: saveVersion remains 1
+[PASS] Task36: workshop data survives save/load
+[PASS] Task37: valid workshop is added
+[PASS] Task37: workshop data is preserved
+[PASS] Task37: workshop receives generated id
+[PASS] Task37: valid custom workshop id is preserved
+[PASS] Task37: duplicate workshop coordinates are rejected
+[PASS] Task37: duplicate coordinate rejection leaves state unchanged
+[PASS] Task37: invalid workshop rejected #1
+[PASS] Task37: invalid workshop leaves state unchanged #1
+[PASS] Task37: invalid workshop rejected #2
+[PASS] Task37: invalid workshop leaves state unchanged #2
+[PASS] Task37: invalid workshop rejected #3
+[PASS] Task37: invalid workshop leaves state unchanged #3
+[PASS] Task37: invalid workshop rejected #4
+[PASS] Task37: invalid workshop leaves state unchanged #4
+[PASS] Task37: invalid workshop rejected #5
+[PASS] Task37: invalid workshop leaves state unchanged #5
+[PASS] Task37: invalid workshop rejected #6
+[PASS] Task37: invalid workshop leaves state unchanged #6
+[PASS] Task37: invalid workshop rejected #7
+[PASS] Task37: invalid workshop leaves state unchanged #7
+[PASS] Task37: invalid workshop rejected #8
+[PASS] Task37: invalid workshop leaves state unchanged #8
+[PASS] Task37: first workshop keeps requested id
+[PASS] Task37: second workshop is accepted despite id collision
+[PASS] Task37: colliding workshop id is replaced
+[PASS] Task38: workshop panel renders
+[PASS] Task38: empty workshop panel has a clear empty state
+[PASS] Task38: registered workshop renders as a card
+[PASS] Task38: workshop level is shown
+[PASS] Task38: workshop coordinates are shown
+[PASS] Task38: workshop UI refreshes after renderAll
+[PASS] Task39: workshop starts without a recipe target
+[PASS] Task39: valid recipe can be assigned
+[PASS] Task39: assigned recipe is stored on workshop
+[PASS] Task39: assigning the same recipe again is rejected
+[PASS] Task39: invalid recipe is rejected
+[PASS] Task39: invalid recipe leaves workshop unchanged
+[PASS] Task39: recipe can be cleared
+[PASS] Task39: cleared workshop has no recipe target
+[PASS] Task39: unknown workshop is rejected
+[PASS] Task39: workshop recipe target survives save/load
+[PASS] Task39: valid workshop recipe survives sanitization
+[PASS] Task39: invalid workshop recipe becomes null
+[PASS] Task39: missing workshop recipe becomes null
+[PASS] Task40: workshop manual craft succeeds
+[PASS] Task40: workshop consumes shared iron
+[PASS] Task40: workshop consumes shared coal
+[PASS] Task40: workshop creates product
+[PASS] Task41: timed workshop craft starts
+[PASS] Task41: timed workshop has progress
+[PASS] Task41: timed workshop does not output early
+[PASS] Task41: timed workshop eventually outputs product
+[PASS] Task41: timed workshop clears progress after completion
+[PASS] Task42: level 1 craft starts
+[PASS] Task42: level 2 craft starts
+[PASS] Task42: higher workshop level shortens timed craft
+[PASS] Task43: auto workshop starts/finishes instant recipe
+[PASS] Task43: auto workshop consumes inputs
+[PASS] Task44: workshop UI has recipe selector
+[PASS] Task44: workshop UI has craft button
+[PASS] Task44: workshop UI has auto toggle
+[PASS] Task45: workshop UI shows completed instant craft state
+[PASS] Task46: workshop production state saves
+[PASS] Task46: workshop recipe survives save/load
+[PASS] Task46: workshop auto state survives save/load
+[PASS] Task46: workshop progress survives save/load
+[PASS] Task47: base expansion succeeds with next region cost
+[PASS] Task47: base level increases
+[PASS] Task47: next region becomes unlocked
+[PASS] Task47: expansion consumes region cost
+[PASS] Task48: expansion seeds new world mines
+[PASS] Task48: seeded mines use expanded region resources
+[PASS] Task48: seeded mines start unsecured
+[PASS] Task49: first expansion succeeds
+[PASS] Task49: repeated same-region expansion is rejected
+[PASS] Task49: repeated expansion does not duplicate seeded mines
+[PASS] Task50: base panel shows next-region expansion button
+[PASS] Task50: expansion button shows cost
+[PASS] Task51: calm workshop ambience panel exists
+[PASS] Task51: ambience panel contains calm copy
+[PASS] Task52: workshop level 2 is faster than level 1
+[PASS] Task52: level 1 keeps base craft time
+[PASS] Task53: mine-to-workshop loop has required inputs
+[PASS] Task53: mine-to-workshop craft completes
+[PASS] Task54: full loop state saves
+[PASS] Task54: saved workshop remains available
+[PASS] Task54: saved produced product remains available
+[PASS] stabilize: miningPower 0 sanitizes to 1
+[PASS] stabilize: workshop progress 0 sanitizes to null
+[PASS] stabilize: workshop NaN progress sanitizes to null
+[PASS] stabilize: workshop Infinity progress sanitizes to null
+[PASS] stabilize: timed craft starts before recipe change
+[PASS] stabilize: recipe change is rejected while crafting
+[PASS] stabilize: busy workshop keeps original recipe
+[PASS] stabilize: busy workshop keeps remaining progress
+[PASS] stabilize: rejected recipe change does not spawn extra product
+[PASS] stabilize: second craft while busy is rejected
+[PASS] stabilize: unknown workshop craft is rejected
+[PASS] stabilize: mining tab shows next-site unlock control
+[PASS] stabilize: unlockSite still consumes gold
+[PASS] stabilize: unlockSite seeds the new region mines
+[PASS] stabilize: world mine panel shows seeded mines after unlock
+[PASS] stabilize: base expansion button moves to the following region
+[PASS] stabilize: turning auto on crafts an instant recipe immediately
+[PASS] stabilize: auto flag is stored on the workshop
+[PASS] stabilize: auto workshop status is visible
+[PASS] stabilize: auto flag survives save/load
+[PASS] stabilize: saveVersion remains 1 after workshop auto save
+[PASS] Task56: fresh world has a single player
+[PASS] Task56: player starts on the base
+[PASS] Task56: player starts idle
+[PASS] Task56: player sprite is on the world stage
+[PASS] Task56: world stage shows idle pose
+[PASS] Task56: ArrowRight is accepted
+[PASS] Task56: holding right increases x
+[PASS] Task56: moving player faces right
+[PASS] Task56: moving player uses walk pose
+[PASS] Task56: sprite walk class updates
+[PASS] Task56: releasing keys returns to idle
+[PASS] Task56: WASD up is accepted
+[PASS] Task56: holding up decreases y
+[PASS] Task56: unknown direction is rejected
+[PASS] Task56: x is clamped to the world max
+[PASS] Task56: y is clamped to the world min
+[PASS] Task56: walking past the edge keeps the player inside
+[PASS] Task56: player position saves
+[PASS] Task56: player x survives save/load
+[PASS] Task56: player facing survives save/load
+[PASS] Task56: loaded player is idle
+[PASS] Task56: saveVersion remains 1 after player save
+[PASS] Task56: legacy world without player still sanitizes
+[PASS] Task56: invalid player coords fall back inside bounds
+[PASS] Task56: invalid facing falls back to down
+[PASS] Task56: existing starting mines remain
+[PASS] Task56: player movement does not consume resources
+[PASS] Task95: setup — a number field exists in the page
+[PASS] Task95: setup — holding A walks left
+[PASS] Task95: releasing A inside a field lets go of the key
+[PASS] Task95: the player stops and stays put after the release
+[PASS] Task95: ArrowRight released in a select is let go
+[PASS] Task95: D released in a textarea is let go
+[PASS] Task95: ArrowUp released in a input is let go
+[PASS] Task95: an arrow key released in a field keeps its default (no preventDefault there)
+[PASS] Task95: keys pressed inside a field still do not move the player
+[PASS] Task95: setup — holding S
+[PASS] Task95: moving the focus into a field drops the held key
+[PASS] Task95: no walking while the field has the focus
+[PASS] Task95: focusing a button does not drop the held key
+[PASS] Task95: walking with the page focused still works and arrows do not scroll
+[PASS] Task95: nothing about movement is saved (saveVersion 1, player fields unchanged)
+[PASS] Task57: world mine layer exists inside worldStage
+[PASS] Task57: one stage node per state.world.mines entry
+[PASS] Task57: starting iron mine is drawn
+[PASS] Task57: starting coal mine is drawn
+[PASS] Task57: resource type has its own visual class
+[PASS] Task57: unsecured state is visible on stage
+[PASS] Task57: iron mine position comes from mine.x/mine.y
+[PASS] Task57: coal mine position comes from mine.x/mine.y
+[PASS] Task57: exactly one base object on stage
+[PASS] Task57: base position comes from state.world.base
+[PASS] Task57: player uses the same world->stage conversion
+[PASS] Task57: player on base spot shares base screen position
+[PASS] Task57: world bounds map inside the stage
+[PASS] Task57: conversion is monotonic
+[PASS] Task57: world bounds are -10..10 (Task 62)
+[PASS] Task57: index.html has no hard-coded mine nodes
+[PASS] Task57: mine layer starts empty in markup
+[PASS] Task57: securing from the mine list marks stage node secured
+[PASS] Task57: stage mines match world mine list
+[PASS] Task57: expansion succeeds
+[PASS] Task57: expanded mines appear on stage
+[PASS] Task57: expanded list and stage still agree
+[PASS] Task57: new mine drawn at its seeded coordinates
+[PASS] Task57: re-render does not duplicate mine nodes
+[PASS] Task57: re-render keeps a single base marker
+[PASS] Task57: player still moves with world objects present
+[PASS] Task57: walking does not change mine data
+[PASS] Task57: tick does not rebuild mine nodes
+[PASS] Task57: empty mine data draws no mine nodes
+[PASS] Task58: nothing selected on a new game
+[PASS] Task58: clicking the base selects it
+[PASS] Task58: base shows selected mark
+[PASS] Task58: clicking iron mine selects it
+[PASS] Task58: selecting iron releases the base
+[PASS] Task58: only iron is marked selected
+[PASS] Task58: iron -> coal switches selection
+[PASS] Task58: iron is no longer marked after switching
+[PASS] Task58: selecting base while a mine is selected moves the selection
+[PASS] Task58: clicking a mine label selects its mine
+[PASS] Task58: clicking empty stage space clears the selection
+[PASS] Task58: clicking the stage itself clears the selection
+[PASS] Task58: player sprite is not a selection target
+[PASS] Task58: clicks outside the stage keep the selection
+[PASS] Task58: unknown mine id is rejected
+[PASS] Task58: unknown type is rejected
+[PASS] Task58: selection cannot be mutated from outside
+[PASS] Task58: securing still updates the stage state
+[PASS] Task58: selection is kept after securing
+[PASS] Task58: secured mine can be selected again
+[PASS] Task58: expansion succeeds
+[PASS] Task58: selection kept across renderAll
+[PASS] Task58: newly expanded mana mine is selectable
+[PASS] Task58: newly expanded crystal mine is selectable
+[PASS] Task58: selection of a removed mine is dropped
+[PASS] Task58: WASD movement works while something is selected
+[PASS] Task58: moving does not change the selection
+[PASS] Task58: selection does not add fields to state.world
+[PASS] Task58: selection does not touch mine data
+[PASS] Task58: save succeeds with a selection
+[PASS] Task58: save data has no selection
+[PASS] Task58: saveVersion stays 1
+[PASS] Task58: reload starts with nothing selected
+[PASS] Task58: reload still restores the saved world
+[PASS] Task99: setup — the three kinds of checkbox are on the page and enabled
+[PASS] Task99: with checkbox 1 focused, the movement key walks and stops on release
+[PASS] Task99: with checkbox 2 focused, the movement key walks and stops on release
+[PASS] Task99: with checkbox 3 focused, the movement key walks and stops on release
+[PASS] Task99: an arrow key on a checkbox does not scroll the page
+[PASS] Task99: clicking the auto-craft checkbox still toggles it
+[PASS] Task99: a input (number) still keeps the movement keys
+[PASS] Task99: a select (select-one) still keeps the movement keys
+[PASS] Task99: a textarea (textarea) still keeps the movement keys
+[PASS] Task99: the typing rule by element
+[PASS] Task99: nothing new is saved (saveVersion 1)
+[PASS] Task59: info box lives inside worldStage
+[PASS] Task59: info box hidden with nothing selected
+[PASS] Task59: base selection shows the info box
+[PASS] Task59: base info title
+[PASS] Task59: base info level from state
+[PASS] Task59: base info position from state
+[PASS] Task59: iron info lines
+[PASS] Task59: info type switches to mine
+[PASS] Task59: iron -> coal switches info
+[PASS] Task59: only one info block is shown
+[PASS] Task59: empty space click hides the info box
+[PASS] Task59: securing flips info to 확보됨
+[PASS] Task59: secured info still names iron
+[PASS] Task59: info kept after renderWorldObjects
+[PASS] Task59: info kept after renderAll
+[PASS] Task59: base level reads current state
+[PASS] Task59: expansion succeeds
+[PASS] Task59: base info after expansion shows new level
+[PASS] Task59: new mana mine info
+[PASS] Task59: new crystal mine info
+[PASS] Task59: removed selected mine hides info
+[PASS] Task59: info box is click-through (pointer-events none in CSS)
+[PASS] Task59: movement still works with info shown
+[PASS] Task59: movement leaves info as is
+[PASS] Task59: info render adds no fields to state.world
+[PASS] Task59: info render leaves mine objects unchanged
+[PASS] Task59: save succeeds with info shown
+[PASS] Task59: save data has no selection/info
+[PASS] Task59: reload hides the info box
+[PASS] Task60: worldWorkshopLayer exists inside worldStage
+[PASS] Task60: workshop layer starts empty in markup
+[PASS] Task60: fresh state has no workshops
+[PASS] Task60: empty workshops draw no markers
+[PASS] Task60: fresh start does not invent a workshop
+[PASS] Task60: one workshop draws one marker
+[PASS] Task60: marker uses worldToStagePercent coordinates
+[PASS] Task60: rendering does not add workshop fields
+[PASS] Task60: renderAll shows each workshop
+[PASS] Task60: second marker uses its own coordinates
+[PASS] Task60: markers do not share one screen position
+[PASS] Task60: renderWorldObjects refreshes a moved marker
+[PASS] Task60: refresh does not duplicate markers
+[PASS] Task60: clearing workshops removes every marker
+[PASS] Task60: workshop layer is click-through
+[PASS] Task60: workshop marker is click-through
+[PASS] Task60: workshop marker is not selected on its own
+[PASS] Task60: clicking a workshop marker does not select it
+[PASS] Task60: workshop click adds no selection type
+[PASS] Task60: base selection still works
+[PASS] Task60: base info still shows
+[PASS] Task60: workshop marker stays unselected while the base is selected
+[PASS] Task60: mine selection still works
+[PASS] Task60: mine info still shows
+[PASS] Task60: empty space still clears selection and info
+[PASS] Task60: rendering workshops adds no world fields
+[PASS] Task60: save succeeds without new workshop fields
+[PASS] Task60: saveVersion stays 1
+[PASS] Task60: saved workshop keeps the existing fields only
+[PASS] Task60: player movement still works
+[PASS] Task60: movement does not change workshop data
+[PASS] Task60: securing a mine still works
+[PASS] Task60: mining still works
+[PASS] Task60: crafting still works
+[PASS] Task60: selling still works
+[PASS] Task60: expansion still works
+[PASS] Task60: workshop marker remains after the core loop
+[PASS] Task60: core loop does not create extra workshops
+[PASS] Task59: mining still works
+[PASS] Task59: crafting still works
+[PASS] Task59: selling still works
+[PASS] Task59: info follows secured state through the loop
+[PASS] Task61: projection returns scale and depth
+[PASS] Task61: far row sits higher than near row
+[PASS] Task61: far row is narrower than near row
+[PASS] Task61: near row has scale 1
+[PASS] Task61: far objects are drawn smaller
+[PASS] Task61: scale depends only on depth
+[PASS] Task61: scale grows toward the camera
+[PASS] Task61: camera is centred on the world
+[PASS] Task61: rows are symmetric around the centre
+[PASS] Task61: depth is 0 on far row and 1 on near row
+[PASS] Task61: every in-bounds point stays inside the stage
+[PASS] Task61: straight world lines stay straight on screen
+[PASS] Task61: far rows are foreshortened
+[PASS] Task61: ground is drawn as an SVG plane
+[PASS] Task61: grid has one line per world unit on both axes
+[PASS] Task61: world bounds are outlined
+[PASS] Task61: grid uses the same projection as objects
+[PASS] Task61: re-render does not duplicate the ground
+[PASS] Task61: objects carry their depth scale
+[PASS] Task61: nearer mine is drawn larger
+[PASS] Task61: nearer mine is drawn in front
+[PASS] Task61: base carries depth scale too
+[PASS] Task61: player on the base is drawn in front of it
+[PASS] Task61: player north of coal is behind it
+[PASS] Task61: player further away looks smaller
+[PASS] Task61: player south of coal is in front of it
+[PASS] Task61: walking toward the camera moves 3 units/s (PLAYER_SPEED unchanged)
+[PASS] Task61: walking toward the camera raises depth order
+[PASS] Task61: walking toward the camera grows the player
+[PASS] Task61: world bounds unchanged
+[PASS] Task61: workshop marker carries depth scale and order
+[PASS] Task61: info box is above the deepest possible object
+[PASS] Task61: object layers do not isolate depth (no layer z-index)
+[PASS] Task61: stage isolates its depth stack
+[PASS] Task61: mines stay selectable
+[PASS] Task61: clicking the ground clears selection
+[PASS] Task61: save data has no view/camera fields
+[PASS] Task62: new game base is at (2,0)
+[PASS] Task62: player starts on the base
+[PASS] Task62: starting mines sit around the base
+[PASS] Task62: only the two starting mines exist
+[PASS] Task62: world bounds are -10..10 on both axes
+[PASS] Task62: in-bounds negative positions are not clamped
+[PASS] Task62: walking west from the base reaches negative x
+[PASS] Task62: walking north reaches negative y
+[PASS] Task62: west/north edges clamp at -10
+[PASS] Task62: west world edge still clamps in the clamp function
+[PASS] Task62: east/south edges clamp at 10
+[PASS] Task62: diagonal speed is still normalised
+[PASS] Task62: movement ends idle
+[PASS] Task62: expansion still works
+[PASS] Task62: expansion seeds are placed relative to the base
+[PASS] Task62: site unlock structure is unchanged
+[PASS] Task62: older save still loads
+[PASS] Task62: older save keeps its base position
+[PASS] Task62: older save keeps every mine exactly
+[PASS] Task62: older save gets no new/regenerated mines
+[PASS] Task62: older save keeps workshops and player
+[PASS] Task62: game boots from the older save
+[PASS] Task62: older save can still expand
+[PASS] Task62: older save expansion uses its own base as origin
+[PASS] Task62: saveVersion stays 1
+[PASS] Task62: base is drawn slightly east of the stage centre
+[PASS] Task62: world origin is on the camera centre line
+[PASS] Task62: whole -10..10 world is inside the stage
+[PASS] Task62: north (negative y) is farther and smaller
+[PASS] Task62: base marker drawn at (2,0)
+[PASS] Task62: player drawn on the base at start
+[PASS] Task62: player on base is in front of it
+[PASS] Task62: mine north of the base is drawn behind it
+[PASS] Task62: ground grid covers -10..10
+[PASS] Task62: base info shows (2, 0)
+[PASS] Task62b: world coord -10 is valid (x)
+[PASS] Task62b: world coord 10 is valid (x)
+[PASS] Task62b: world coord -10 / 10 are valid (y)
+[PASS] Task62b: world coord -11 is rejected
+[PASS] Task62b: world coord 11 is rejected
+[PASS] Task62b: far-out coords are rejected
+[PASS] Task62b: non-integer / non-number coords are rejected
+[PASS] Task62b: 0 and the base (2,0) are valid
+[PASS] Task62b: mine can be created at (-10,-10)
+[PASS] Task62b: mine can be created at (10,10)
+[PASS] Task62b: mine is not created at (-11,0)
+[PASS] Task62b: mine is not created at (0,11)
+[PASS] Task62b: mine is not created at (11,0) or (0,-11)
+[PASS] Task62b: rejected mines leave state unchanged
+[PASS] Task62b: workshop can be created at (-10,-10)
+[PASS] Task62b: workshop can be created at (10,10)
+[PASS] Task62b: workshop is not created at (-11,0)
+[PASS] Task62b: workshop is not created at (0,11)
+[PASS] Task62b: workshop is not created at (11,0) or (0,-11)
+[PASS] Task62b: rejected workshops leave state unchanged
+[PASS] Task62b: sanitize keeps base on the bounds
+[PASS] Task62b: sanitize keeps mine on the bounds
+[PASS] Task62b: sanitize keeps workshop on the bounds
+[PASS] Task62b: out-of-bounds base falls back to the new-game base
+[PASS] Task62b: out-of-bounds mine axis falls back like any invalid coord
+[PASS] Task62b: out-of-bounds workshop axis falls back like any invalid coord
+[PASS] Task62b: new-game base and start mines are inside the bounds
+[PASS] Task62b: every seeded expansion mine is placed inside the bounds
+[PASS] Task62b: farthest seeded mine sits exactly on the east edge
+[PASS] Task63: new game has a mine list
+[PASS] Task63: at least one iron mine
+[PASS] Task63: at least one coal mine
+[PASS] Task63: new game layout obeys every rule
+[PASS] Task63: mine data keeps the existing shape
+[PASS] Task63: starter mines start grade 1 / power 1 / unsecured
+[PASS] Task63: base and player unchanged by generation
+[PASS] Task63: new world size is starters + distance rings (Task 64: 14)
+[PASS] Task63: six real new games all produce valid layouts
+[PASS] Task63: 300 seeded generations all obey the rules
+[PASS] Task63: extreme random values still give valid layouts
+[PASS] Task63: a broken random source cannot break the rules
+[PASS] Task63: starters are clear of the expansion seed cells (>= 4 from base)
+[PASS] Task63: different random values give different layouts
+[PASS] Task63: many distinct layouts across seeds — distinct=46
+[PASS] Task63: same random sequence gives the same layout
+[PASS] Task63: the starter iron position is not fixed
+[PASS] Task63: extra mines obey the same rules and only use start-site resources
+[PASS] Task63: extra resource pool can be supplied
+[PASS] Task63: extra mines stop when the world is full (no overlap, no base cell)
+[PASS] Task63: new run start resources are the open site only (iron, coal)
+[PASS] Task63: a base on the world edge still gets in-bounds starters
+[PASS] Task63: save succeeds
+[PASS] Task63: loadGame returns the identical mines
+[PASS] Task63: booting from the save keeps the identical mines (no re-generation)
+[PASS] Task63: a second save/boot round trip still keeps them
+[PASS] Task63: saveVersion stays 1
+[PASS] Task63: an existing save keeps its own mines exactly — [["mine_start_iron",9,-9,"iron",1,1,"secured"],["mine_start_coal",-9,9,"coal",1,1,"unsecured"],["mine_old_extra",0,-5,"mana",2,3,"unsecured"]]
+[PASS] Task63: an existing save with no mines is not refilled
+[PASS] Task63: a save without any world gets a valid new world
+[PASS] Task63: WORLD_MINE_SEEDS still exists for site expansion
+[PASS] Task63: new game does not use WORLD_MINE_SEEDS
+[PASS] Task63: site expansion still works
+[PASS] Task63: every site seed is added on expansion (no collision with random starters)
+[PASS] Task63: unlockedSites still drives expansion
+[PASS] Task63: random starter mine can be selected
+[PASS] Task63: info shows the selected starter
+[PASS] Task63: securing works
+[PASS] Task63: mining into shared storage works
+[PASS] Task63: crafting works
+[PASS] Task63: selling works
+[PASS] Task63: expansion works
+[PASS] Task63: stage shows every mine
+[PASS] Task63: progress and layout survive save/load — [["mine_start_iron",0,-1,"iron",1,1,"secured"],["mine_start_coal",4,1,"coal",1,1,"secured"],["mine_ring_near_1",3,-3,"coal",1,1,"unsecured"],["mine_ring_near_2",-1,1,"coal",1,1,"unsecured"],["mine_ring_near_3",0,3,"coal",1,1,"unsecured"],["mine_ring_mid_1",8,-3,"coal",1,1,"unsecured"],["mine_ring_mid_2",-1,-4,"coal",1,1,"unsecured"],["mine_ring_mid_3",5,4,"iron",1,1,"unsecured"],["mine_ring_mid_4",7,4,"coal",1,1,"unsecured"],["mine_ring_far_1",-2,-7,"mana",2,1,"unsecured"],["mine_ring_far_2",5,-7,"rareMetal",3,1,"unsecured"],["mine_ring_far_3",0,-8,"mana",2,1,"unsecured"],["mine_ring_outer_1",-3,-9,"plasma",4,1,"unsecured"],["mine_ring_outer_2",10,-8,"relic",3,1,"unsecured"],["mine_manaVein_mana",6,0,"mana",2,1,"unsecured"],["mine_manaVein_crystal",2,4,"crystal",2,1,"unsecured"]] vs [["mine_start_iron",0,-1,"iron",1,1,"secured"],["mine_start_coal",4,1,"coal",1,1,"secured"],["mine_ring_near_1",3,-3,"coal",1,1,"unsecured"],["mine_ring_near_2",-1,1,"coal",1,1,"unsecured"],["mine_ring_near_3",0,3,"coal",1,1,"unsecured"],["mine_ring_mid_1",8,-3,"coal",1,1,"unsecured"],["mine_ring_mid_2",-1,-4,"coal",1,1,"unsecured"],["mine_ring_mid_3",5,4,"iron",1,1,"unsecured"],["mine_ring_mid_4",7,4,"coal",1,1,"unsecured"],["mine_ring_far_1",-2,-7,"mana",2,1,"unsecured"],["mine_ring_far_2",5,-7,"rareMetal",3,1,"unsecured"],["mine_ring_far_3",0,-8,"mana",2,1,"unsecured"],["mine_ring_outer_1",-3,-9,"plasma",4,1,"unsecured"],["mine_ring_outer_2",10,-8,"relic",3,1,"unsecured"],["mine_manaVein_mana",6,0,"mana",2,1,"unsecured"],["mine_manaVein_crystal",2,4,"crystal",2,1,"unsecured"]]
+[PASS] Task63: a new run (prestige) builds a valid generated world
+[PASS] Task64: ring counts shrink outward (reference table)
+[PASS] Task64: rings are contiguous from the starter distance outward
+[PASS] Task64: nearest ring holds only iron/coal
+[PASS] Task64: rarest available resource rises outward
+[PASS] Task64: commonest available resource rises outward (never falls)
+[PASS] Task64: grade follows the resource site tier
+[PASS] Task64: 300 seeded worlds obey every ring rule (counts, pools, grades, bounds, spacing)
+[PASS] Task64: extreme / broken random sources still obey the rules
+[PASS] Task64: near ring always has 5 mines, all iron/coal, with at least one of each
+[PASS] Task64: outer ring can produce a top-tier resource
+[PASS] Task64: far ring can produce a tier-3 resource
+[PASS] Task64: outer ring never drops below tier 3
+[PASS] Task64: average resource tier rises with distance — 1.00 < 1.21 < 2.33 < 3.31
+[PASS] Task64: top-tier mines appear in some worlds
+[PASS] Task64: top-tier mines stay limited (at most 2 per world, only in the outer ring)
+[PASS] Task64: mine count per ring falls outward
+[PASS] Task64: weighted pick covers the first weight band
+[PASS] Task64: weighted pick covers the middle bands
+[PASS] Task64: weighted pick covers the last band
+[PASS] Task64: weighted pick ignores unknown or non-positive entries
+[PASS] Task64: other base positions (edges, old-save origin) still give valid ring layouts
+[PASS] Task64: stage draws every generated mine
+[PASS] Task64: mine list accounts for every generated mine
+[PASS] Task64: five real new games all follow the ring rules
+[PASS] Task64: a far rare mine exists from the start
+[PASS] Task64: a mine of a locked site cannot be secured
+[PASS] Task64: its list button is disabled and says the site must be unlocked
+[PASS] Task64: starter (open site) mines can still be secured
+[PASS] Task64: after its site is unlocked the far mine can be secured
+[PASS] Task64: and mined into shared storage
+[PASS] Task64: list button is enabled once its site is open
+[PASS] Task64: expansion works on a ring world
+[PASS] Task64: all six seeded expansion mines are added (seed cells were kept free)
+[PASS] Task64: no two mines share a cell after expanding
+[PASS] Task64: loadGame returns the identical ring world (all 14 mines, same order)
+[PASS] Task64: booting from the save keeps the identical ring world
+[PASS] Task64: an older 2-mine save stays exactly 2 mines (no ring generation on load)
+[PASS] Task64: saveVersion stays 1
+[PASS] Task64: a ring mine can be selected on the stage
+[PASS] Task64: info shows its grade
+[PASS] Task64: mining works
+[PASS] Task64: crafting works
+[PASS] Task64: selling works
+[PASS] Task64: expansion works
+[PASS] Task64: progress survives save/load
+[PASS] Task65: 500 seeded worlds — mid ring always 4 mines with mana+crystal <= 1
+[PASS] Task65: other Task 64 ring rules still hold in those worlds (counts, pools, grades, spacing)
+[PASS] Task65: mid-tier mine is optional — some worlds have one, some none, never two — one=410 none=90
+[PASS] Task65: forced-high random gives exactly one mid-tier mine — crystal/coal/coal/coal
+[PASS] Task65: the rest of the mid ring is iron/coal
+[PASS] Task65: forced-low random gives an all-basic mid ring — iron/iron/iron/iron
+[PASS] Task65: far/outer rings are not capped (forced-high still picks their last entry)
+[PASS] Task65: limit not reached keeps every weight
+[PASS] Task65: limit reached removes the whole group
+[PASS] Task65: ring without limits is unchanged
+[PASS] Task65: helper does not mutate the ring table
+[PASS] Task65: six real new games respect the mid-ring cap
+[PASS] Task65: a new world starts with every ring mine undiscovered
+[PASS] Task65: starter mines start discovered
+[PASS] Task65: undiscovered mine is drawn as an unknown rock
+[PASS] Task65: undiscovered mine is not in the mine list
+[PASS] Task65: list notes how many are still hidden
+[PASS] Task65: undiscovered mine cannot be secured
+[PASS] Task65: info hides an undiscovered mine's identity
+[PASS] Task65: walking within the radius discovers it
+[PASS] Task65: discovery is logged
+[PASS] Task65: the stage now shows its resource
+[PASS] Task65: it now appears in the mine list
+[PASS] Task65: it now appears on the exploration map
+[PASS] Task65: discovering again is a no-op
+[PASS] Task65: distance exactly 2.5 discovers
+[PASS] Task65: distance 2.6 does not discover
+[PASS] Task65: the game tick runs discovery
+[PASS] Task65: standing still discovers nothing new
+[PASS] Task65: an undiscovered basic mine cannot be secured
+[PASS] Task65: once discovered (open site) it can be secured
+[PASS] Task65: discovered but site-locked still cannot be secured (Task 64 rule kept)
+[PASS] Task65: exploration map lives in the world stage
+[PASS] Task65: map shows the base at its world position
+[PASS] Task65: map shows exactly the discovered mines
+[PASS] Task65: map never shows an undiscovered mine
+[PASS] Task65: map shows the player
+[PASS] Task65: the player dot follows movement
+[PASS] Task65: map sits top-left and never blocks clicks
+[PASS] Task65: map has a smaller mobile size
+[PASS] Task65: clicking the map area behaves like empty stage (clears selection)
+[PASS] Task65: expansion seed mines appear already discovered
+[PASS] Task65: and are on the map
+[PASS] Task65: hidden list survives save/load exactly
+[PASS] Task65: a discovered mine stays discovered after reload
+[PASS] Task65: mines survive save/load exactly
+[PASS] Task65: saveVersion stays 1
+[PASS] Task65: older save loads with nothing hidden
+[PASS] Task65: older save shows every mine in the list
+[PASS] Task65: hidden list keeps only unique ids of existing mines
+[PASS] Task65: a new run starts with its ring mines undiscovered
+[PASS] Task65: secure / mine / craft / sell loop still works
+[PASS] Task65: expansion still works
+[PASS] Task66: rock face matches the reference shape over the whole world height
+[PASS] Task66: tunnel mouth sits on the rock face at y=1
+[PASS] Task66: tunnel is cut 1 unit deep to a gate at x=-4.5
+[PASS] Task66: tunnel is locked
+[PASS] Task66: base and starter area are open ground
+[PASS] Task66: rock is not walkable
+[PASS] Task66: land beyond the range is not walkable
+[PASS] Task66: player keeps a 0.3 margin from rock
+[PASS] Task66: world bounds still apply
+[PASS] Task66: non-numbers are never walkable
+[PASS] Task66: every reachable point is east of the mountain face
+[PASS] Task66: the farthest-west reachable point is inside the tunnel recess (not beyond the gate)
+[PASS] Task66: the north and south world edges are reachable (no gap is needed to go around)
+[PASS] Task66: no reachable point lies beyond the range
+[PASS] Task66: walking west stops flush against the face on every row
+[PASS] Task66: the player is never inside rock
+[PASS] Task66: no tick moves the player farther than one step (no bounce/teleport)
+[PASS] Task66: pushing straight into rock does not move the player
+[PASS] Task66: diagonal into the face keeps sliding north along it
+[PASS] Task66: while sliding, x follows the face (ends flush at the y<-6 face)
+[PASS] Task66: sliding never enters rock
+[PASS] Task66: sliding uses the walk pose
+[PASS] Task66: sliding south along the face also works
+[PASS] Task66: open-ground diagonal speed still normalised
+[PASS] Task66: the player can walk into the tunnel mouth (past the face line)
+[PASS] Task66: the locked gate stops the player
+[PASS] Task66: nothing beyond the gate is reachable
+[PASS] Task66: inside the recess, rock on the sides blocks movement
+[PASS] Task66: walking back out of the tunnel works
+[PASS] Task66: tunnel is drawn on the stage and marked locked
+[PASS] Task66: tunnel shows a locked label
+[PASS] Task66: tunnel is placed from terrain data via the stage projection
+[PASS] Task66: mountain is drawn as many peaks
+[PASS] Task66: peaks carry depth scale and depth order
+[PASS] Task66: peaks are not a single rectangle (two rows, varied sizes)
+[PASS] Task66: front peaks leave the tunnel mouth open
+[PASS] Task66: ground shows the rock footprint and the land beyond
+[PASS] Task66: peaks never cover the base or starter mines (all west of the face)
+[PASS] Task66: re-rendering does not duplicate terrain
+[PASS] Task66: terrain never blocks clicks
+[PASS] Task66: clicking terrain behaves like empty ground
+[PASS] Task66: map shows the mountain
+[PASS] Task66: map shows the tunnel
+[PASS] Task66: map still shows base and player
+[PASS] Task66: map still hides undiscovered mines
+[PASS] Task66: map size / position unchanged
+[PASS] Task66: 300 seeded worlds — no mine on/behind the mountain or at the tunnel mouth
+[PASS] Task66: ring counts 5/4/3/2, pools and the mid cap still hold with the mountain
+[PASS] Task66: real new games put every mine on walkable ground
+[PASS] Task66: every expansion seed cell (relative to the base) is open ground
+[PASS] Task66: terrain is not written to the save
+[PASS] Task66: saveVersion stays 1
+[PASS] Task66: mines, discovery and base survive save/load
+[PASS] Task66: a walkable player position survives save/load
+[PASS] Task66: terrain is rebuilt after load
+[PASS] Task66: a saved position inside the mountain is moved onto the base
+[PASS] Task66: older mines beyond the mountain are kept as saved (not regenerated or moved)
+[PASS] Task66: an older secured mine beyond the mountain can still be mined from the list
+[PASS] Task66: secure / mine / craft / sell still work
+[PASS] Task66: discovery still works (radius rule unchanged)
+[PASS] Task66: expansion still works and its mines are on open ground
+[PASS] Task67: every in-bounds point is open / tunnel / mountain / beyond
+[PASS] Task67: region borders follow the rock face and the range width
+[PASS] Task67: only open ground and the front of the tunnel are walkable
+[PASS] Task67: walkability is exactly the Task 66 rule (unchanged)
+[PASS] Task67: outside the world bounds is "outside"
+[PASS] Task67: tunnel exit is on the back edge of the range at the tunnel row
+[PASS] Task67: the passage runs from the gate to the exit through the range
+[PASS] Task67: just past the exit is beyond, in the deep forest
+[PASS] Task67: the passage behind the gate is not walkable while locked
+[PASS] Task67: tunnel and beyond are both still locked
+[PASS] Task67: beyond never borders open ground directly (the range is between them)
+[PASS] Task67: every beyond point has an environment zone
+[PASS] Task67: zones run forest -> rocky -> abandoned mine -> rare, by distance from the tunnel exit
+[PASS] Task67: all four zones exist inside the current world bounds
+[PASS] Task67: non-beyond points have no zone
+[PASS] Task67: zones walking away from the exit never go back to a nearer zone
+[PASS] Task67: all of beyond is at far-ring distance or more from the base
+[PASS] Task67: abandoned mine and rare zones lie in the outer ring (>= 10 from the base)
+[PASS] Task67: new games still place no mine beyond or on the range
+[PASS] Task67: generation rules unchanged (14 mines, starters, mid cap)
+[PASS] Task67: no environment objects are created yet
+[PASS] Task67: older beyond-mountain mines keep coords / resource / grade / state
+[PASS] Task67: older hidden ids for beyond mines are kept
+[PASS] Task67: those mines sit in the beyond zones
+[PASS] Task67: they stay undiscovered while the tunnel is locked
+[PASS] Task67: a save/load round trip keeps them unchanged
+[PASS] Task67: zones / regions are not written to the save; saveVersion 1
+[PASS] Task68: a new game starts with the tunnel closed
+[PASS] Task68: closed tunnel reports locked and beyond inaccessible
+[PASS] Task68: closed — the passage and beyond are not walkable
+[PASS] Task68: walkability can be asked about a given tunnel state
+[PASS] Task68: no "LOCKED" constant is left in the terrain data
+[PASS] Task68: unlockTunnel opens a closed tunnel
+[PASS] Task68: unlockTunnel writes one log line
+[PASS] Task68: unlocked tunnel reports open and beyond accessible
+[PASS] Task68: opening twice is rejected and changes nothing
+[PASS] Task68: opening costs nothing (gold and resources untouched)
+[PASS] Task68: the player walks from open ground through the tunnel
+[PASS] Task68: ...and out onto the land beyond
+[PASS] Task68: every step on the way is walkable and never inside the mountain
+[PASS] Task68: the player reaches the west edge of the world
+[PASS] Task68: beyond the tunnel exit is the deep forest zone first
+[PASS] Task68: the player can walk back out through the tunnel to open ground
+[PASS] Task68: with the tunnel open, no point of the mountain itself is walkable
+[PASS] Task68: the whole passage through the range is walkable
+[PASS] Task68: all of the land beyond is walkable (keeping the margin from the rock)
+[PASS] Task68: open ground east of the face behaves exactly as before
+[PASS] Task68: outside the world bounds is still not walkable
+[PASS] Task68: inside the passage the rock on the side stops the player
+[PASS] Task68: ...on the other side too
+[PASS] Task68: from beyond, the mountain cannot be crossed back to open ground
+[PASS] Task68: sliding along the range from beyond never enters rock
+[PASS] Task68: ...and ends up in the tunnel rows after sliding north
+[PASS] Task68: beyond is walked at the normal speed
+[PASS] Task68: closed — the tunnel is drawn locked with the locked label
+[PASS] Task68: closed — the map tunnel is the recess only
+[PASS] Task68: open — the tunnel is drawn open, not locked
+[PASS] Task68: open — the label no longer says locked
+[PASS] Task68: open — the arch moves to the mouth, placed through the stage projection
+[PASS] Task68: re-rendering draws exactly one tunnel, one passage and one ground
+[PASS] Task68: peaks follow terrainPeaks() and leave the passage clear
+[PASS] Task68: the mountain footprint is still drawn
+[PASS] Task68: open — the map tunnel runs from the mouth through to the far exit
+[PASS] Task68: the open tunnel and passage are styled and click-through
+[PASS] Task68: clicking the passage behaves like empty ground
+[PASS] Task68: the open tunnel is saved as an additive boolean; saveVersion stays 1
+[PASS] Task68: only that flag is saved — no terrain data
+[PASS] Task68: the tunnel is still open after loading
+[PASS] Task68: a player saved beyond the mountain stays there
+[PASS] Task68: the loaded game draws the open tunnel
+[PASS] Task68: a saved closed tunnel stays closed
+[PASS] Task68: ...and a player beyond a closed tunnel is moved onto the base
+[PASS] Task68: older/invalid tunnel value #0 loads as closed, everything else kept
+[PASS] Task68: older/invalid tunnel value #1 loads as closed, everything else kept
+[PASS] Task68: older/invalid tunnel value #2 loads as closed, everything else kept
+[PASS] Task68: older/invalid tunnel value #3 loads as closed, everything else kept
+[PASS] Task68: older/invalid tunnel value #4 loads as closed, everything else kept
+[PASS] Task68: a save without a world loads with a closed tunnel
+[PASS] Task68: an open tunnel with corrupt player coordinates falls back to the base
+[PASS] Task68: an older mine beyond the mountain is still hidden at first
+[PASS] Task68: walking through the open tunnel discovers it by the usual rule
+[PASS] Task68: it is drawn on the exploration map once discovered
+[PASS] Task68: it still cannot be secured while its site is locked (existing rule)
+[PASS] Task68: an order after opening the tunnel keeps the tunnel open and the player in place
+[PASS] Task69: a new game places no mine beyond the mountain
+[PASS] Task69: opening the tunnel succeeds
+[PASS] Task69: 8 mines are added (3 forest, 2 rock, 2 half-dug mine, 1 rare)
+[PASS] Task69: every new mine obeys the zone / cell / pool / grade / hidden rules
+[PASS] Task69: the first 14 mines are untouched
+[PASS] Task69: earlier hidden ids are kept and the new ones are appended
+[PASS] Task69: new mines are all in the beyond region and none on the open side
+[PASS] Task69: opening again changes nothing (no second batch)
+[PASS] Task69: populating again adds nothing (every zone is full)
+[PASS] Task69: 150 seeded openings obey every rule
+[PASS] Task69: every new mine can be walked to through the open tunnel
+[PASS] Task69: all of them start undiscovered
+[PASS] Task69: the player gets through the tunnel to the west edge of the world
+[PASS] Task69: the whole route stayed on walkable ground and ended at the south edge
+[PASS] Task69: walking the land beyond discovers every one of them by the usual rule
+[PASS] Task69: new mines are drawn as unknown rocks on the stage
+[PASS] Task69: they stay off the exploration map and the mine list
+[PASS] Task69: the list says how many are still hidden
+[PASS] Task69: walking up to one discovers it with the usual rule
+[PASS] Task69: a discovered mine still cannot be secured before its site is unlocked (existing rule)
+[PASS] Task69: ...and can once its site is unlocked
+[PASS] Task69: the same random source gives the same layout
+[PASS] Task69: a different random source gives a different layout
+[PASS] Task69: the generator does not modify the mines it is given
+[PASS] Task69: ids are readable and unique
+[PASS] Task69: a broken random source never throws or loops
+[PASS] Task69: an empty zone table generates nothing
+[PASS] Task69: farther zones hold fewer mines than nearer ones (forest > rock > mine > rare)
+
+<--- Last few GCs --->
+
+[1614:0xc9fa000]   284988 ms: Scavenge (interleaved) 2031.3 (2046.1) -> 2029.4 (2054.8) MB, pooled: 0 MB, 31.61 / 0.00 ms  (average mu = 0.357, current mu = 0.341) allocation failure; 
+[1614:0xc9fa000]   287813 ms: Mark-Compact (reduce) 2037.8 (2056.6) -> 2026.8 (2039.4) MB, pooled: 0 MB, 61.91 / 0.00 ms  (+ 2373.9 ms in 132 steps since start of marking, biggest step 263.7 ms, walltime since start of marking 2705 ms) (average mu = 0.312
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0x75356c node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]
+ 2: 0xc52cd0  [node]
+ 3: 0xc52dbf  [node]
+ 4: 0xef6695  [node]
+ 5: 0xef66c2  [node]
+ 6: 0xef69ba  [node]
+ 7: 0xf076ba  [node]
+ 8: 0xf0ba60  [node]
+ 9: 0x199e0d1  [node]
+Aborted

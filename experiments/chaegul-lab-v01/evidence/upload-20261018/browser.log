@@ -1,0 +1,29 @@
+PASS 1-2 시작 및 실제 Canvas 캐릭터 화면
+PASS 3 WASD 이동
+PASS 4 나무 및 바위 충돌
+PASS 5-6 광맥 채굴·공용 저장소
+PASS 7 공방 연구·곡괭이 제작
+PASS 자전거 제작·탑승
+PASS 10 NPC 대화
+PASS 농사 심기·물주기
+PASS 마을 복구·등불 배치
+PASS 8 다른 지상 지역 이동
+PASS 9 근접 전투·몬스터 처치
+PASS 고원 철 채굴·사원 퍼즐
+PASS 활성화한 장치 간 순간이동
+PASS 강철 곡괭이·농작물 수확
+PASS 늪지 수로 복구·주민
+PASS 수정 광맥·연구 시설
+PASS 산맥 터널 개통·통과
+PASS 화산 특수광석·지열시설
+PASS 11 지하 B1 진입
+PASS 13 기존 철도 복구·수레·안전 하차
+PASS b2 복구 퍼즐
+PASS b3 복구 퍼즐
+PASS 12 B4까지 이동
+PASS 연구실 복원 탐험 목표 완료
+PASS 14 마을 왕복 귀환
+PASS 15 저장·새로고침 복원
+PASS 11개 지역 방문·11개 기록
+PASS 800x600 화면 크기 변경
+PASS 콘솔 및 JavaScript 오류 0

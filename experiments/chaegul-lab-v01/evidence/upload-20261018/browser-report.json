@@ -1,0 +1,271 @@
+{
+  "url": "http://127.0.0.1:43191/",
+  "started": "2026-10-18T11:37:01.887Z",
+  "checks": [
+    {
+      "name": "1-2 시작 및 실제 Canvas 캐릭터 화면",
+      "passed": true
+    },
+    {
+      "name": "3 WASD 이동",
+      "passed": true
+    },
+    {
+      "name": "4 나무 및 바위 충돌",
+      "passed": true
+    },
+    {
+      "name": "5-6 광맥 채굴·공용 저장소",
+      "passed": true
+    },
+    {
+      "name": "7 공방 연구·곡괭이 제작",
+      "passed": true
+    },
+    {
+      "name": "자전거 제작·탑승",
+      "passed": true
+    },
+    {
+      "name": "10 NPC 대화",
+      "passed": true
+    },
+    {
+      "name": "농사 심기·물주기",
+      "passed": true
+    },
+    {
+      "name": "마을 복구·등불 배치",
+      "passed": true
+    },
+    {
+      "name": "8 다른 지상 지역 이동",
+      "passed": true
+    },
+    {
+      "name": "9 근접 전투·몬스터 처치",
+      "passed": true
+    },
+    {
+      "name": "고원 철 채굴·사원 퍼즐",
+      "passed": true
+    },
+    {
+      "name": "활성화한 장치 간 순간이동",
+      "passed": true
+    },
+    {
+      "name": "강철 곡괭이·농작물 수확",
+      "passed": true
+    },
+    {
+      "name": "늪지 수로 복구·주민",
+      "passed": true
+    },
+    {
+      "name": "수정 광맥·연구 시설",
+      "passed": true
+    },
+    {
+      "name": "산맥 터널 개통·통과",
+      "passed": true
+    },
+    {
+      "name": "화산 특수광석·지열시설",
+      "passed": true
+    },
+    {
+      "name": "11 지하 B1 진입",
+      "passed": true
+    },
+    {
+      "name": "13 기존 철도 복구·수레·안전 하차",
+      "passed": true
+    },
+    {
+      "name": "b2 복구 퍼즐",
+      "passed": true
+    },
+    {
+      "name": "b3 복구 퍼즐",
+      "passed": true
+    },
+    {
+      "name": "12 B4까지 이동",
+      "passed": true
+    },
+    {
+      "name": "연구실 복원 탐험 목표 완료",
+      "passed": true
+    },
+    {
+      "name": "14 마을 왕복 귀환",
+      "passed": true
+    },
+    {
+      "name": "15 저장·새로고침 복원",
+      "passed": true
+    },
+    {
+      "name": "11개 지역 방문·11개 기록",
+      "passed": true
+    },
+    {
+      "name": "800x600 화면 크기 변경",
+      "passed": true
+    },
+    {
+      "name": "콘솔 및 JavaScript 오류 0",
+      "passed": true
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "passed": true,
+  "finalState": {
+    "version": 1,
+    "region": "meadow",
+    "player": {
+      "x": 850,
+      "y": 740,
+      "hp": 4,
+      "facing": {
+        "x": 0,
+        "y": 1
+      },
+      "moving": false
+    },
+    "inventory": {
+      "stone": 10,
+      "copper": 6,
+      "wood": 2,
+      "iron": 6,
+      "crystal": 8,
+      "ember": 8,
+      "crop": 3,
+      "relic": 1
+    },
+    "xp": {
+      "mining": 48,
+      "melee": 5,
+      "ranged": 0
+    },
+    "pick": 3,
+    "sword": 2,
+    "research": {
+      "mining": true,
+      "craft": true,
+      "transport": true,
+      "ancient": true
+    },
+    "equipment": {
+      "pick2": true,
+      "pick3": true,
+      "sword": true,
+      "bike": true
+    },
+    "visited": [
+      "meadow",
+      "forest",
+      "frost",
+      "marsh",
+      "crystal",
+      "ridge",
+      "volcano",
+      "b1",
+      "b2",
+      "b3",
+      "b4"
+    ],
+    "records": [
+      "meadow",
+      "forest",
+      "frost",
+      "marsh",
+      "crystal",
+      "ridge",
+      "volcano",
+      "b1",
+      "b2",
+      "b3",
+      "b4"
+    ],
+    "flags": {
+      "well": true,
+      "rail": true,
+      "artisan": true,
+      "sluice": true,
+      "observatory": true,
+      "tunnel": true,
+      "geothermal": true,
+      "lab": true
+    },
+    "puzzles": {
+      "temple": 3,
+      "power": 3,
+      "heat": 3
+    },
+    "teleports": [
+      "meadow",
+      "forest",
+      "frost"
+    ],
+    "ore": {
+      "meadow-23": {
+        "hits": 4,
+        "readyAt": 110.8434000000062
+      },
+      "meadow-24": {
+        "hits": 4,
+        "readyAt": 46.51319999999982
+      },
+      "meadow-25": {
+        "hits": 4,
+        "readyAt": 164.40750000001748
+      },
+      "meadow-29": {
+        "hits": 1,
+        "readyAt": 38.32969999999973
+      },
+      "forest-30": {
+        "hits": 1,
+        "readyAt": 77.39460000000173
+      },
+      "frost-26": {
+        "hits": 4,
+        "readyAt": 100.32740000000406
+      },
+      "marsh-26": {
+        "hits": 4,
+        "readyAt": 125.80930000000929
+      },
+      "crystal-26": {
+        "hits": 4,
+        "readyAt": 137.82560000001183
+      },
+      "ridge-27": {
+        "hits": 4,
+        "readyAt": 146.62510000001362
+      },
+      "volcano-25": {
+        "hits": 4,
+        "readyAt": 155.22460000001536
+      }
+    },
+    "farm": {
+      "stage": 0,
+      "readyAt": 70.94539999999992
+    },
+    "decorations": [
+      {
+        "region": "meadow",
+        "x": 419.9370000000067,
+        "y": 621.388000000006
+      }
+    ],
+    "lanterns": 0,
+    "clock": 205.2398000000319,
+    "kills": 1
+  },
+  "finished": "2026-10-18T11:40:42.737Z"
+}
