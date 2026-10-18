@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "index.html: HTTP boot, isolated save, reload passed",
+    "chaegul-gongbang-lab-v0.1-single.html: HTTP boot, isolated save, reload passed"
+  ],
+  "errors": [],
+  "fileProtocol": {
+    "status": "blocked",
+    "error": "page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at file:///workspace/gacha-factory-prototype/experiments/chaegul-lab-v01/chaegul-gongbang-lab-v0.1-single.html"
+  },
+  "passed": true
+}

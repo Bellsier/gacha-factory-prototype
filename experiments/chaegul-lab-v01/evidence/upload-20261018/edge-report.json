@@ -1,0 +1,19 @@
+{
+  "checks": [
+    "Existing save/view keys remain untouched",
+    "JSON export downloads valid save",
+    "Future save preserved on manual save",
+    "Storage failure displayed without crash",
+    "Wide viewport stays inside rendered terrain"
+  ],
+  "fileProtocol": {
+    "status": "blocked",
+    "error": "page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at file:///workspace/work/chaegul-lab/artifacts/chaegul-gongbang-lab-v0.1-single.html\nCall log:\n\u001b[2m  - navigating to \"file:///workspace/work/chaegul-lab/artifacts/chaegul-gongbang-lab-v0.1-single.html\", waiting until \"load\"\u001b[22m\n"
+  },
+  "errors": [],
+  "wideViewportAlpha": [
+    255,
+    255
+  ],
+  "passed": true
+}

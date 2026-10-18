@@ -1,0 +1,36 @@
+
+> chaegul-gongbang-lab@0.1.0 test
+> node tests/core.test.cjs
+
+✔ 11 maps and no underground enemies (2.39559ms)
+✔ diagonal speed normalized (0.680016ms)
+✔ tree and rock collision (2.092516ms)
+✔ mining needs proximity and adds shared stock and XP (0.520863ms)
+✔ boundaries clamp long frame (0.211139ms)
+✔ workshop research and crafting debit once (0.309133ms)
+✔ insufficient recipe has no partial debit (0.142299ms)
+✔ pick grade gates iron (0.313179ms)
+✔ save round trip excludes effects (2.284157ms)
+✔ reject corrupt foreign future nonfinite saves (1.649377ms)
+✔ melee and ranged kills gain distinct XP (1.093972ms)
+✔ death safely returns home and preserves stock (0.547412ms)
+✔ every named object has reachable interaction ground (110.072026ms)
+✔ puzzle sequences reset wrong input and unlock B4 (0.549054ms)
+✔ rail restored once and cart constrained (0.282334ms)
+✔ bike speeds land travel but not underground (0.399996ms)
+✔ teleport requires activated endpoints and proximity (0.230317ms)
+✔ plant water grow harvest eat (0.158162ms)
+✔ decoration consumes one crafted item on valid land (0.260902ms)
+✔ unique records and dialogue pauses world (0.146655ms)
+✔ all rail dismount positions are safe (4.512211ms)
+✔ rail corridor is free from solid scenery (0.17688ms)
+✔ B4 record cannot bypass restoration (0.127056ms)
+✔ restored tunnel opens and stays open after reload (0.6621ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 144.600087
