@@ -130,7 +130,8 @@ function tdKey(win, target, key) {
   check('Task105: the four directions look different', new Set(all.map((row) => key(row[0]))).size === 4);
   const r0 = win.tdPlayerSprite('right', 0), l0 = win.tdPlayerSprite('left', 0);
   check('Task105: facing left is the mirror of facing right', l0.rects.every(([x, y, w, h, c], k) => x === 16 - r0.rects[k][0] - r0.rects[k][2] && y === r0.rects[k][1] && c === r0.rects[k][4]));
-  check('Task105: the miner wears a helmet with a lamp facing down and to the side, not from behind',
+  // (2026-10-18: the blue-haired northern miner carries a small lantern at the hip instead of a helmet lamp)
+  check('Task105: the miner\'s lantern shows from the front and the side, not from behind',
     key(win.tdPlayerSprite('down', 0)).includes(win.TD_PLAYER_COLORS.lamp) && key(r0).includes(win.TD_PLAYER_COLORS.lamp) && !key(win.tdPlayerSprite('up', 0)).includes(win.TD_PLAYER_COLORS.lamp));
   const resKeys = win.RESOURCES.map((r) => r.key);
   check('Task105: every resource has its own ore colour', resKeys.every((k) => win.TD_RES_COLORS[k]) && new Set(resKeys.map((k) => win.TD_RES_COLORS[k][0])).size === resKeys.length);
@@ -147,6 +148,37 @@ function tdKey(win, target, key) {
   const tdSrc = fs.readdirSync(path.join(__dirname, '..', 'js', 'topdown')).map((f) => fs.readFileSync(path.join(__dirname, '..', 'js', 'topdown', f), 'utf8')).join('\n');
   check('Task105: the art is drawn in code — no image files or image URLs in the top-down code', !/\.(png|jpe?g|gif|webp)\b|url\(|new Image\(|https?:\/\//i.test(tdSrc));
   check('Task105: without a canvas, baking a sprite returns nothing and does not fail', win.tdSpriteImage(win.tdPlayerSprite('down', 0)) === null);
+})();
+
+// 2026-10-18: the approved character sheet — the blue-haired northern miner
+(function test_character_northernMiner() {
+  const win = newDom(makeMemoryStorage()).window;
+  const C = win.TD_PLAYER_COLORS, dirs = ['down', 'up', 'left', 'right'];
+  const colours = (sp) => new Set(sp.rects.map((r) => r[4]));
+  const all = dirs.map((d) => [0, 1, 2, 3].map((f) => win.tdPlayerSprite(d, f)));
+  check('Character: cobalt hair, a brown parka, cream fur and ochre boots in every direction and frame',
+    all.every((row) => row.every((sp) => { const c = colours(sp); return c.has(C.hair) && c.has(C.parka) && c.has(C.fur) && c.has(C.boot); })));
+  check('Character: the face (eyes) shows from the front and the side, only hair from behind',
+    colours(all[0][0]).has(C.eye) && colours(all[3][0]).has(C.eye) && !colours(all[1][0]).has(C.eye) && !colours(all[1][0]).has(C.skin));
+  check('Character: the backpack and bedroll show from behind and the side, not from the front',
+    colours(all[1][0]).has(C.pack) && colours(all[1][0]).has(C.roll) && colours(all[3][0]).has(C.pack) && !colours(all[0][0]).has(C.roll));
+  // every frame stands on the same ground line (the boots' lowest row), so walking never makes the feet jump
+  const ground = (sp) => Math.max(...sp.rects.filter((r) => r[4] === C.boot || r[4] === C.bootDark).map((r) => r[1] + r[3]));
+  check('Character: every direction and frame stands on the same ground line (bottom row 21, above the shadow edge)',
+    all.every((row) => row.every((sp) => ground(sp) === 21)));
+  check('Character: the walk cycle bobs the body a pixel on each step', all.every((row) => {
+    const top = (sp) => Math.min(...sp.rects.filter((r) => r[4] === C.hair).map((r) => r[1]));
+    return top(row[1]) === top(row[0]) + 1 && top(row[3]) === top(row[0]) + 1 && top(row[2]) === top(row[0]);
+  }));
+  check('Character: the sprite keeps the size against the tiles (16 x 22, a quarter unit wide at 64 px a unit)',
+    all.every((row) => row.every((sp) => sp.w === 16 && sp.h === 22)) && win.TD_UNIT_PX === 64);
+  // movement, collision and saving are the game's, untouched by the drawing
+  const s = win.state, p = s.world.player, x0 = p.x;
+  win.setPlayerHeld('right', true); win.tickPlayer(); win.clearPlayerHeld(); win.tickPlayer();
+  check('Character: walking still moves one step a tick and the feet box is unchanged', Math.abs(p.x - x0 - win.BALANCE.world.PLAYER_SPEED / win.TICKS_PER_SECOND) < 1e-9 &&
+    win.PLAYER_FOOT.HALF_W === 0.09 && win.PLAYER_FOOT.HALF_H === 0.06);
+  win.saveGame();
+  check('Character: the save keeps exactly the same player fields', Object.keys(JSON.parse(win.localStorage.getItem('gachaFactorySave')).run.world.player).sort().join() === 'facing,pose,x,y');
 })();
 
 // -----------------------------------------------------------------------------

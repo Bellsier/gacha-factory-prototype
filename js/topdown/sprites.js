@@ -19,42 +19,104 @@ function tdPainter(w, h){
   return P;
 }
 
-// --- the player: a small miner with a helmet lamp. 16 x 22, feet at the bottom centre.
-const TD_PLAYER_COLORS = { helmet: '#e2b23c', helmetDark: '#b58a26', lamp: '#fff3b0', hair: '#5a3b28', skin: '#f0c8a0', skinShade: '#d9a982',
-  eye: '#2a2a2a', shirt: '#3fa58f', shirtDark: '#2f8270', overall: '#4a5d7a', overallDark: '#3a4a62', boot: '#5a3b28', pack: '#8a6440' };
+// --- the player: the blue-haired northern miner (the approved character sheet,
+// 2026-10-18). Cobalt hair, a soft gender-neutral face, a brown winter parka
+// with a cream fur collar and hem, teal pattern trim, a small backpack with a
+// bedroll, grey trousers and ochre fur-cuffed boots; a little lantern hangs at
+// the hip (the light the game's headlamp glow comes from). 16 x 22 like the
+// sprite it replaces, feet at the bottom centre, so the size against the tiles
+// and every collision and light offset stay the same. Left is the mirror of right.
+const TD_PLAYER_COLORS = {
+  hair: '#3d5c9e', hairDark: '#2a4176', hairLight: '#6487cc',
+  skin: '#f3d2b4', skinShade: '#dfb293', eye: '#4a3326', eyeLight: '#8a5c40', blush: '#eaa598', mouth: '#d99a86',
+  parka: '#a8774a', parkaDark: '#7c5333', parkaLight: '#c4935e', fur: '#f2e4ca', furShade: '#d6c1a0',
+  trim: '#4d8ca3', leather: '#6b4128', buckle: '#d8a84a', glove: '#5a3a26',
+  pants: '#6c7076', pantsDark: '#55595e', boot: '#bf8a4c', bootDark: '#8c5f30',
+  pack: '#8a5a36', packDark: '#6b4128', roll: '#8d9096', rollDark: '#6f7277',
+  lamp: '#fff3b0', lampFrame: '#4a3626',
+};
 function tdPlayerSprite(dir, frame){
   const C = TD_PLAYER_COLORS;
   const P = tdPainter(16, 22);
-  const bob = (frame === 1 || frame === 3) ? 1 : 0; // the body sinks a pixel on each step
-  const stepA = frame === 1 ? 1 : frame === 3 ? -1 : 0; // leg swing
+  const b = (frame === 1 || frame === 3) ? 1 : 0;       // the body sinks a pixel on each step
+  const s = frame === 1 ? 1 : frame === 3 ? -1 : 0;     // which leg swings forward
   const side = dir === 'left' || dir === 'right';
-  // shadow
-  P(4, 20, 8, 2, 'rgba(0,0,0,0.25)');
-  // legs and boots
+  P(3, 20, 10, 2, 'rgba(0,0,0,0.25)'); // shadow
+  // a boot with its fur cuff: x, top row, and how many rows of leg show above it
+  const boot = (x, y, w) => { P(x, y, w, 1, C.furShade); P(x, y + 1, w, 2, C.boot); P(x, y + 2, w, 1, C.bootDark); };
   if(side){
-    P(6 + stepA, 16 + bob, 3, 4, C.overallDark); P(6 + stepA, 19, 4, 2, C.boot);
-    P(8 - stepA, 16 + bob, 3, 4, C.overall); P(8 - stepA, 19, 4, 2, C.boot);
+    // legs scissor: the near leg forward on one step, back on the other (drawn facing right)
+    // the back foot lifts a pixel as it swings; both stand on the same ground line as the front view
+    const back = s === 0 ? 0 : 1;
+    P(6 - s, 16, 2, 2 - back, C.pantsDark); boot(5 - s, 18 - back, 3);
+    P(8 + s, 16, 2, 2, C.pants); boot(8 + s, 18, 3);
   } else {
-    P(5, 16 + bob, 3, 4 - Math.max(0, stepA), C.overallDark); P(5, 19 - Math.max(0, stepA), 3, 2, C.boot);
-    P(8, 16 + bob, 3, 4 - Math.max(0, -stepA), C.overallDark); P(8, 19 - Math.max(0, -stepA), 3, 2, C.boot);
+    // front and back: the stepping foot lifts a pixel
+    const l = Math.max(0, s), r = Math.max(0, -s);
+    P(5, 16, 2, 1, C.pants); boot(4, 18 - l, 3);
+    P(9, 16, 2, 1, C.pants); boot(9, 18 - r, 3);
+    P(5, 17 - l, 2, 1, C.pantsDark); P(9, 17 - r, 2, 1, C.pantsDark);
   }
-  // body
-  P(4, 9 + bob, 8, 5, C.shirt); P(4, 13 + bob, 8, 4, C.overall); P(5, 9 + bob, 1, 5, C.shirtDark);
-  if(dir === 'down'){ P(6, 12 + bob, 1, 2, C.overallDark); P(9, 12 + bob, 1, 2, C.overallDark); P(7, 14 + bob, 2, 1, C.helmet); }
-  if(dir === 'up') P(5, 9 + bob, 6, 5, C.pack);
-  // arms swing opposite to the legs
-  if(side){ P(7 - stepA, 10 + bob, 2, 4, C.shirtDark); P(7 - stepA, 14 + bob, 2, 1, C.skin); }
-  else { P(3, 10 + bob + Math.max(0, -stepA), 1, 4, C.shirtDark); P(3, 14 + bob + Math.max(0, -stepA), 1, 1, C.skin);
-         P(12, 10 + bob + Math.max(0, stepA), 1, 4, C.shirtDark); P(12, 14 + bob + Math.max(0, stepA), 1, 1, C.skin); }
-  // head
-  P(4, 3 + bob, 8, 6, C.skin); P(4, 8 + bob, 8, 1, C.skinShade);
-  if(dir === 'down'){ P(4, 3 + bob, 1, 3, C.hair); P(11, 3 + bob, 1, 3, C.hair); P(6, 6 + bob, 1, 1, C.eye); P(9, 6 + bob, 1, 1, C.eye); P(7, 8 + bob, 2, 1, '#c98a72'); }
-  else if(dir === 'up'){ P(4, 3 + bob, 8, 6, C.hair); P(4, 8 + bob, 8, 1, '#4a2f20'); }
-  else { P(4, 3 + bob, 4, 5, C.hair); P(10, 6 + bob, 1, 1, C.eye); P(12, 6 + bob, 1, 2, C.skin); }
-  // helmet with a lamp
-  P(3, 1 + bob, 10, 3, C.helmet); P(4, 0 + bob, 8, 1, C.helmet); P(3, 3 + bob, 10, 1, C.helmetDark);
-  if(dir === 'down') P(7, 1 + bob, 2, 2, C.lamp);
-  else if(side) P(12, 1 + bob, 2, 2, C.lamp);
+  if(dir === 'down'){
+    // parka body with a diagonal strap, a belt and the teal pattern above the fur hem
+    P(4, 10 + b, 8, 5, C.parka); P(4, 10 + b, 1, 5, C.parkaDark); P(11, 10 + b, 1, 5, C.parkaDark);
+    for(let k = 0; k < 3; k++) P(5 + k, 11 + b + k, 1, 1, C.leather);
+    P(4, 13 + b, 8, 1, C.leather); P(7, 13 + b, 2, 1, C.buckle);
+    P(5, 14 + b, 1, 1, C.trim); P(7, 14 + b, 2, 1, C.trim); P(10, 14 + b, 1, 1, C.trim);
+    P(3, 15 + b, 10, 1, C.fur); P(4, 15 + b, 1, 1, C.furShade); P(8, 15 + b, 1, 1, C.furShade); P(11, 15 + b, 1, 1, C.furShade);
+    // sleeves swing opposite to the legs; gloves; the lantern in the right hand (viewer's left)
+    const la = Math.max(0, -s), ra = Math.max(0, s);
+    P(2, 10 + b + la, 2, 4, C.parkaLight); P(2, 10 + b + la, 1, 4, C.parkaDark); P(2, 14 + b + la, 2, 1, C.glove);
+    P(12, 10 + b + ra, 2, 4, C.parkaLight); P(13, 10 + b + ra, 1, 4, C.parkaDark); P(12, 14 + b + ra, 2, 1, C.glove);
+    P(2, 15 + b + la, 2, 1, C.lampFrame); P(2, 16 + b + la, 2, 2, C.lamp); P(2, 18 + b + la, 2, 1, C.lampFrame);
+    // the big fur collar round the chin
+    P(3, 9 + b, 10, 2, C.fur); P(2, 10 + b, 1, 1, C.fur); P(13, 10 + b, 1, 1, C.fur); P(4, 10 + b, 8, 1, C.furShade);
+    // face: soft round cheeks, brown eyes with a light, a little blush
+    P(4, 4 + b, 8, 5, C.skin); P(5, 8 + b, 6, 1, C.skinShade);
+    P(5, 6 + b, 1, 2, C.eye); P(10, 6 + b, 1, 2, C.eye); P(5, 6 + b, 1, 1, C.eyeLight); P(10, 6 + b, 1, 1, C.eyeLight);
+    P(4, 8 + b, 1, 1, C.blush); P(11, 8 + b, 1, 1, C.blush); P(7, 8 + b, 2, 1, C.mouth);
+    // cobalt hair: a messy crown, spiky bangs and side locks to the collar
+    P(4, 1 + b, 8, 1, C.hair); P(3, 2 + b, 10, 2, C.hair); P(5, 0 + b, 1, 1, C.hair); P(8, 0 + b, 2, 1, C.hair); P(11, 1 + b, 1, 1, C.hairDark);
+    P(4, 4 + b, 8, 1, C.hair); P(4, 5 + b, 1, 1, C.hair); P(6, 5 + b, 2, 1, C.hair); P(9, 5 + b, 1, 1, C.hair); P(11, 5 + b, 1, 1, C.hair);
+    P(3, 4 + b, 1, 5, C.hair); P(12, 4 + b, 1, 5, C.hair); P(3, 7 + b, 1, 2, C.hairDark); P(12, 7 + b, 1, 2, C.hairDark);
+    P(5, 2 + b, 3, 1, C.hairLight); P(9, 1 + b, 1, 1, C.hairLight); P(4, 3 + b, 1, 1, C.hairDark); P(10, 3 + b, 2, 1, C.hairDark);
+  } else if(dir === 'up'){
+    // from behind: the backpack with its bedroll fills the back of the parka
+    P(4, 10 + b, 8, 5, C.parka); P(3, 15 + b, 10, 1, C.fur); P(5, 15 + b, 1, 1, C.furShade); P(10, 15 + b, 1, 1, C.furShade);
+    const la = Math.max(0, s), ra = Math.max(0, -s);
+    P(2, 10 + b + la, 2, 4, C.parkaLight); P(2, 10 + b + la, 1, 4, C.parkaDark); P(2, 14 + b + la, 2, 1, C.glove);
+    P(12, 10 + b + ra, 2, 4, C.parkaLight); P(13, 10 + b + ra, 1, 4, C.parkaDark); P(12, 14 + b + ra, 2, 1, C.glove);
+    P(4, 11 + b, 8, 5, C.pack); P(4, 15 + b, 8, 1, C.packDark); P(5, 12 + b, 2, 2, C.packDark); P(9, 12 + b, 2, 2, C.packDark); P(7, 11 + b, 2, 4, C.leather);
+    P(3, 9 + b, 10, 2, C.fur); P(4, 10 + b, 8, 1, C.furShade);
+    P(4, 10 + b, 8, 2, C.roll); P(4, 11 + b, 8, 1, C.rollDark); P(6, 10 + b, 1, 2, C.leather); P(9, 10 + b, 1, 2, C.leather);
+    // the back of the head: all hair, a few spikes and a darker nape
+    P(4, 1 + b, 8, 1, C.hair); P(3, 2 + b, 10, 7, C.hair); P(5, 0 + b, 1, 1, C.hair); P(8, 0 + b, 2, 1, C.hair);
+    P(4, 8 + b, 8, 1, C.hairDark); P(3, 6 + b, 1, 3, C.hairDark); P(12, 6 + b, 1, 3, C.hairDark);
+    P(5, 2 + b, 3, 1, C.hairLight); P(9, 3 + b, 2, 1, C.hairLight); P(6, 5 + b, 1, 2, C.hairDark); P(9, 6 + b, 1, 2, C.hairDark);
+  } else {
+    // facing right: the backpack and bedroll behind, the parka, one arm swinging with the lantern
+    P(2, 10 + b, 4, 6, C.pack); P(2, 10 + b, 1, 6, C.packDark); P(2, 15 + b, 4, 1, C.packDark); P(3, 12 + b, 2, 2, C.packDark);
+    P(2, 8 + b, 4, 2, C.roll); P(2, 9 + b, 4, 1, C.rollDark);
+    P(5, 10 + b, 7, 5, C.parka); P(11, 10 + b, 1, 5, C.parkaDark); P(5, 13 + b, 7, 1, C.leather); P(10, 13 + b, 1, 1, C.buckle);
+    P(7, 14 + b, 1, 1, C.trim); P(9, 14 + b, 1, 1, C.trim);
+    P(4, 15 + b, 9, 1, C.fur); P(6, 15 + b, 1, 1, C.furShade); P(10, 15 + b, 1, 1, C.furShade);
+    P(5, 10 + b, 1, 4, C.leather); // the pack strap over the shoulder
+    // the lantern hangs from the belt at the front of the hip, above the legs
+    P(11, 12 + b, 2, 1, C.lampFrame); P(11, 13 + b, 2, 2, C.lamp); P(11, 15 + b, 2, 1, C.lampFrame);
+    // the near arm swings forward and back
+    const ax = 8 + s;
+    P(ax, 10 + b, 2, 4, C.parkaLight); P(ax, 13 + b, 2, 1, C.parkaDark); P(ax, 14 + b, 2, 1, C.glove);
+    // the fur collar
+    P(4, 9 + b, 8, 2, C.fur); P(5, 10 + b, 6, 1, C.furShade);
+    // face in profile: cheek, one eye, a hint of nose
+    P(7, 4 + b, 5, 5, C.skin); P(8, 8 + b, 4, 1, C.skinShade); P(12, 6 + b, 1, 2, C.skin);
+    P(10, 6 + b, 1, 2, C.eye); P(10, 6 + b, 1, 1, C.eyeLight); P(10, 8 + b, 1, 1, C.blush);
+    // hair: crown, bangs over the brow, the back of the head and a lock by the ear
+    P(4, 1 + b, 8, 1, C.hair); P(3, 2 + b, 10, 2, C.hair); P(6, 0 + b, 1, 1, C.hair); P(9, 0 + b, 2, 1, C.hair);
+    P(3, 4 + b, 5, 5, C.hair); P(8, 4 + b, 5, 1, C.hair); P(9, 5 + b, 1, 1, C.hair); P(11, 5 + b, 2, 1, C.hair);
+    P(3, 7 + b, 2, 2, C.hairDark); P(7, 5 + b, 1, 3, C.hairDark); P(12, 2 + b, 1, 2, C.hairDark);
+    P(5, 2 + b, 3, 1, C.hairLight); P(4, 4 + b, 2, 1, C.hairLight);
+  }
   return P.done(dir === 'left');
 }
 
