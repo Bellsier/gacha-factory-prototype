@@ -848,6 +848,7 @@
   // Task 107: veins now block the feet; this test is about bounds and terrain,
   // so the random starter veins are taken off the straight routes it walks.
   win.state.world.mines = [];
+  win.villageObstacleBoxes = () => []; // Task 114: village walls block too; they are tested in Task 114
   const p = win.state.world.player;
   const hold = (dir, ticks) => { win.setPlayerHeld(dir, true); for(let i=0;i<ticks;i++) win.tickPlayer(); win.clearPlayerHeld(); win.tickPlayer(); };
   hold('left', 20);   // 2 s at 3 u/s = 6 units west
@@ -1761,6 +1762,7 @@ const T66_STEP = 3 / 10; // PLAYER_SPEED / TICKS_PER_SECOND
   };
   // Straight west on several rows: stops flush against the face, never inside.
   win.state.world.mines = []; // Task 107: veins block the feet; this is a terrain test, so the rows are cleared
+  win.villageObstacleBoxes = () => []; // Task 114: likewise the village walls (tested in Task 114)
   let rowsOk = true;
   [-9, -5, -1, 0, 2.5, 5, 9].forEach(y => {
     p.x = 3; p.y = y;
@@ -2098,6 +2100,7 @@ function t68Hold(win, keys, ticks) {
   const win = newDom(makeMemoryStorage()).window;
   win.unlockTunnel();
   win.state.world.mines = []; // Task 107: a terrain route test — no veins on the straight line (cleared after the land beyond is filled)
+  win.villageObstacleBoxes = () => []; // Task 114: nor village walls (tested in Task 114)
   const p = win.state.world.player;
   p.x = 0; p.y = 1;
   let allWalkable = true, sawTunnel = false, sawBeyond = false, neverMountain = true;
