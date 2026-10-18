@@ -185,6 +185,8 @@ function playerCanStand(x, y){
 
 function tickPlayer(){
   const player = state.world.player;
+  // Task 119: inside the house the room moves; the world position waits on the door step
+  if(typeof villageHomeInside === 'function' && villageHomeInside()){ player.pose = 'idle'; villageHomeTick(); return; }
   let dx = (playerHeld.right ? 1 : 0) - (playerHeld.left ? 1 : 0);
   let dy = (playerHeld.down ? 1 : 0) - (playerHeld.up ? 1 : 0);
   if(dx === 0 && dy === 0){
@@ -325,6 +327,7 @@ function torchAtHand(){
 // The one torch action: pick up the torch at hand, or set one down in front.
 //   { ok, action: 'place' | 'remove', text, x, y }
 function torchAct(){
+  if(typeof villageHomeInside === 'function' && villageHomeInside()) return { ok: false, action: 'place', text: '집 안에서는 횃불을 쓰지 않아요', x: 0, y: 0 }; // Task 119
   const near = torchAtHand();
   if(near >= 0){
     const t = worldTorches()[near];

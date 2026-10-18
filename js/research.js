@@ -98,9 +98,17 @@ function researchPrereqsMet(def){
   return (def.requires || []).every(isResearchDone);
 }
 
+// Task 122: the gold a research costs now (the museum's research bonus takes a few percent off;
+// products are paid in full). Only research entries (with a key) get the bonus.
+function researchGoldCost(def){
+  const gold = (def.cost || {}).gold || 0;
+  const pct = def.key && typeof villageResearchDiscountPercent === 'function' ? villageResearchDiscountPercent() : 0;
+  return pct > 0 ? Math.ceil(gold * (100 - pct) / 100) : gold;
+}
+
 function researchCostMet(def){
   const cost = def.cost || {};
-  if((cost.gold || 0) > state.gold) return false;
+  if(researchGoldCost(def) > state.gold) return false;
   return Object.keys(cost.products || {}).every(k => (state.products[k] || 0) >= cost.products[k]);
 }
 
@@ -125,7 +133,7 @@ function doResearch(key){
   if(!canResearch(key)) return false;
   const def = researchDef(key);
   const cost = def.cost || {};
-  state.gold -= cost.gold || 0;
+  state.gold -= researchGoldCost(def);
   Object.keys(cost.products || {}).forEach(k => { state.products[k] -= cost.products[k]; });
   if(!state.research) state.research = {};
   state.research[key] = true;

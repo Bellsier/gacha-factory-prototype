@@ -206,7 +206,7 @@
 
 ---
 
-## 4. 구현 순서와 실제 구현 (Task 104~117)
+## 4. 구현 순서와 실제 구현 (Task 104~122)
 
 각 묶음은 Task 3개이며, 묶음이 끝날 때마다 ZIP과 단일 HTML을 만들어 확인을 받는다(청사진 20장).
 
@@ -255,7 +255,23 @@
 
 **검증.** 각 Task의 jsdom 테스트(생성 월드와 고정 저장의 부지 규칙·도달 가능성, 정확한 비용, E와 패널 경로, 결정적 감정, 저장 왕복, 이전 화면), Chromium에서 실제 키·조이스틱으로 문까지 걸어가 복구·감정·기증. 결과는 PR에 적는다.
 
-**아직 아닌 것:** 광장·장식 정원·플레이어 집, 광물·보석 기증, 박물관 보상(꾸미기·연구 보너스는 보류), NPC·주민(23.9), 이전 2.5D 화면의 마을 그림(패널로는 모두 쓸 수 있음).
+**아직 아닌 것(Task 117 시점):** 광장·장식 정원·플레이어 집, 광물·보석 기증, 박물관 보상 → Task 118~122에서 구현. NPC·주민(23.9), 이전 2.5D 화면의 마을 그림은 여전히 없다(패널로는 모두 쓸 수 있음).
+
+### Task 118~122: 마을 구역 — 광장, 집, 정원, 광물 전시, 박물관 보상 (구현됨, 2026-10-18)
+
+결정과 충돌 정리는 청사진 24.9. 마을은 공방과 떨어진 **마을 구역**(광장 기준점 하나)이며 지금 배치는 임시다.
+
+| Task | 구현한 것 | 파일 |
+|---|---|---|
+| 118 | `VILLAGE.DISTRICT`: 광장(반지름 0.95)과 집 문·정원 중심의 상대 위치 5가지. `villageEnsureDistrict()`가 감정소·박물관 부지 다음에 한 번 고른다: 공방 문에서 3.5~7.5(넓히면 9.5), 4.5에 가까운 것부터, 0.5 간격. 터들(광장 사각, 집 벽+0.3, 정원)이 열린 초원이고 월드 끝 0.6, 공방 문 1.6, 광맥과 이후 광맥 칸 0.9, 제작소 문 1.0, 감정소·박물관 벽과 문 0.6, 터널 길 0.6, 횃불 0.3을 비킬 것. 그리고 `villageReachGrid(11)`(공방 문 ±11, 0.1 격자 채우기)로 집 벽을 세워도 집 문과 광장에 갈 수 있고 막힌 땅이 없을 것. 실패한 탐색은 월드가 바뀔 때까지 반복하지 않는다. 도로 `villageRoads()`: 0.2 격자, 벽·광맥에서 0.18 여유(없으면 걸을 수 있는 칸만)로 문에서 이미 깐 길(처음엔 광장)까지 너비 우선 탐색 후 직선으로 당긴다. 공방이 첫 길. 저장 키로 캐시. 그리기: 길과 광장은 타일 종류(ROAD, PLAZA)로 분류하고, 모양은 픽셀 단위로 덧칠한다(둥근 광장, 매끄러운 대각선). 광장 안내판(E: 마을 패널)과 가로등 2개, 제작소 건설 위치는 구역·도로에서 0.7 | `js/village.js`, `js/state.js`, `js/factory.js`, `js/systems.js`, `js/topdown/tiles.js`, `js/topdown/render.js`, `js/topdown/interact.js`, `js/ui.js` |
+| 119 | `VILLAGE.HOME`: 방 4.5×3.25, 문 틈(가운데 ±0.3), 고정 가구 8개(발밑 상자). `VILLAGE_HOME_SCENE`(저장 안 함). `villageHomeEnter/Exit`, `tickPlayer`가 집 안이면 `villageHomeTick`(같은 속도, `terrainAdvance`로 축마다 미끄러짐), 문 틈 아래로 걸어 나오면 나감. 집 안의 상호작용 대상은 문뿐. 렌더러는 `tdRenderHome`(방 그림 한 장 + 가구와 플레이어를 y 정렬, 방에 맞춘 카메라, 난로 빛), 미니맵·횃불 버튼 숨김(`body.td-inside`), 일꾼 걷기는 계속. 집 벽은 장애물(kind `house`) | `js/village.js`, `js/player.js`, `js/topdown/*`, `css/style.css`, `js/ui.js` |
+| 120 | `VILLAGE.GARDEN` 4×3칸(0.6×0.55 간격), `VILLAGE.DECOR` 기본 4종(발밑 너비 ≤0.4). `run.village.decor = [{kind, cell}]`. 놓기 검사: 칸 비었음, 플레이어 발밑 아님, 문 0.6·도로 가장자리 0.15·횃불에서 떨어짐, 그리고 정원·광장·집 문 주변 창(`villageReachArea`)에서 광장부터 채워 집 문과 주변 땅이 끊기지 않음(약 12ms). 들고 있는 장식(`VILLAGE_GARDEN_UI.carry`)은 막지 않고 머리 위에 그리며 저장은 원래 칸. 마을 장애물 상자는 캐시(바뀔 때만 다시 만듦) | `js/village.js`, `js/state.js`, `js/topdown/*`, `js/ui.js`, `css/style.css` |
+| 121 | `VILLAGE_SPECIMENS` 6종(광물: 철광석 30, 석탄 30, 희귀 금속 8 / 보석: 마정석 15, 결정 15, 우주 파편 4). `villageDonateSpecimen`: 박물관 운영, 처음인 종류, 창고에 충분할 때 정확히 차감하고 `{key, at}` 기록. 패널 버튼은 틱마다 가능 여부 갱신. 박물관 그림 앞에 표본 진열, 문 라벨에 광물·보석 수 | `js/village.js`, `js/state.js`, `js/ui.js`, `js/topdown/*` |
+| 122 | `VILLAGE_MUSEUM_REWARDS` 6단계. `villageRewardsEarned`, `villageHallLevel`, `villageResearchDiscountPercent`, `villageRewardDecorUnlocked`은 모두 전시 수에서 계산(저장 없음). `researchGoldCost(def)`가 연구 항목에만 할인 적용(`Math.ceil(gold × (100 − %) / 100)`), `researchCostMet`·`doResearch`·연구 카드가 사용. 보상 장식 3종, 박물관 그림의 꾸민 전시실 2단계, 도달 기록 | `js/village.js`, `js/research.js`, `js/ui.js`, `js/topdown/*`, `css/style.css` |
+
+**검증.** jsdom 테스트는 `tests/chunks/09.js`(Task 118~122, 125개)에 있다: 고정 시드 생성 월드 14개와 고정 저장의 구역 규칙·도로·도달 가능성, 저장 왕복과 잘못된 값, 집 출입·벽·가구·저장, 정원 가득 채우기와 이동·회수, 정확한 차감과 중복 거절, 보상 단계와 연구 비용, PR #35 시점 저장. Chromium에서 실제 키·조이스틱으로 광장까지 걷기, 집 출입, 정원 놓기·옮기기·회수, 패널 기증, 새로고침 유지(PC·휴대폰, ZIP·단일 HTML).
+
+**아직 아닌 것:** 별도 공간의 마을과 숲길, 가구 배치·휴식, 보석 장식물 제작, 상점, NPC, 이전 2.5D 화면의 마을·집 그림.
 
 ---
 

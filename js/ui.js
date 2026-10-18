@@ -374,7 +374,8 @@ function renderWorkshops(){
 function researchCostText(def){
   const cost = def.cost || {};
   const parts = [];
-  if(cost.gold) parts.push(fmt(cost.gold) + 'G (보유 ' + fmt(state.gold) + 'G)');
+  const gold = researchGoldCost(def), pct = gold < (cost.gold || 0) ? villageResearchDiscountPercent() : 0; // Task 122: the museum's bonus
+  if(cost.gold) parts.push(fmt(gold) + 'G' + (pct ? ' (박물관 보너스 -' + pct + '%)' : '') + ' (보유 ' + fmt(state.gold) + 'G)');
   Object.keys(cost.products || {}).forEach(k => {
     const recipe = recipeByKey(k);
     parts.push((recipe ? recipe.name : k) + ' ' + cost.products[k] + '개 (보유 ' + fmt(state.products[k] || 0) + '개)');
@@ -901,6 +902,7 @@ function renderVillage(){
   let html = '<div class="village-list">' +
     '<div class="village-card" data-village="workshop"><div class="village-head"><b>공방</b> <span class="village-stage">운영 중</span></div>' +
     '<div class="rate">마을의 중심 생산 시설. 제작과 판매는 개발 탭에서 합니다.</div></div>';
+  html += villagePlazaCard(v) + villageHouseCard(v) + villageGardenCard(v); // Task 118, 119, 120
   VILLAGE.ORDER.forEach(k => {
     const f = VILLAGE.FACILITIES[k], stage = villageStage(k), site = v.sites[k], step = villageNextStep(k);
     html += '<div class="village-card" data-village="' + k + '">' +
@@ -917,7 +919,82 @@ function renderVillage(){
   wrap.innerHTML = html;
   wrap.querySelectorAll('[data-village-restore]').forEach(btn => { btn.onclick = () => { if(villageRestore(btn.dataset.villageRestore)){ renderVillage(); renderCurrencies(); updateNumbers(); } }; });
   bindVillageOpenSections(wrap);
+  bindVillageGarden(wrap);
   refreshVillageButtons();
+}
+
+// Task 118: the plaza, the village's centre, and the roads from it.
+function villagePlazaCard(v){
+  const d = v.district, base = state.world.base;
+  let html = '<div class="village-card" data-village="plaza"><div class="village-head"><b>마을 광장</b> <span class="village-stage">' + (d ? '마을 중심' : '자리를 찾는 중') + '</span></div>';
+  if(d){
+    const names = { workshop: '공방', appraiser: '감정소', museum: '박물관', house: '집' };
+    const roads = villageRoads().map(r => names[r.to] || r.to);
+    html += '<div class="rate">공방에서 ' + Math.hypot(d.x - base.x, d.y - base.y).toFixed(1) + '칸 떨어진 곳 (' + d.x.toFixed(1) + ', ' + d.y.toFixed(1) + ')</div>' +
+      '<div class="rate" data-village-roads>도로: 광장 ↔ ' + (roads.length ? roads.join(' · ') : '없음') + '</div>';
+  } else html += '<div class="rate">빈 땅이 생기면 광장 자리를 정해요.</div>';
+  return html + '</div>';
+}
+
+// Task 119: the player's own house (going in is done at its door in the top-down screen).
+function villageHouseCard(v){
+  const inside = typeof villageHomeInside === 'function' && villageHomeInside();
+  let html = '<div class="village-card" data-village="house"><div class="village-head"><b>내 집</b> <span class="village-stage" data-village-house-state>' +
+    (!v.district ? '자리를 찾는 중' : inside ? '집 안' : '내 소유') + '</span></div>';
+  if(v.district){
+    const h = villageDistrictParts(v.district).house;
+    html += '<div class="rate">광장 옆 (' + h.x.toFixed(1) + ', ' + h.y.toFixed(1) + ') · 문 앞에서 E(휴대폰은 들어가기 버튼)로 들어가요.</div>' +
+      '<div class="rate">안에서는 문으로 걸어 나오거나 문 앞에서 E를 누르면 밖으로 나와요. 이전 화면에서는 집 안에 들어갈 수 없어요.</div>';
+  }
+  return html + '</div>';
+}
+
+// Task 120: the garden. Choose a kind, then a cell: set it down; a placed one can be moved
+// (옮기기, then the new cell) or taken back (회수). The same rules as in the top-down garden.
+function villageGardenCard(v){
+  const UI = VILLAGE_GARDEN_UI, list = villageDecorList(), n = villageGardenCellCount();
+  let html = '<div class="village-card" data-village="garden"><div class="village-head"><b>정원</b> <span class="village-stage" data-village-garden-count>' +
+    (v.district ? '장식 ' + list.length + ' / ' + n : '자리를 찾는 중') + '</span></div>';
+  if(!v.district) return html + '</div>';
+  html += '<div class="rate">광장 옆 정원에 장식을 칸마다 하나씩 놓아요(무료). 탑다운 화면에서는 칸 앞에서 E로 놓거나 들어 옮기고, R(휴대폰은 장식 버튼)로 회수해요.</div>' +
+    '<div class="village-garden-kinds">';
+  VILLAGE.DECOR.forEach(d => {
+    const open = villageDecorUnlocked(d.key);
+    html += '<button data-decor-select="' + d.key + '"' + (d.key === villageDecorSelected() ? ' class="is-selected"' : '') + (open ? '' : ' disabled') + ' title="' + d.desc + '">' +
+      d.name + (open ? '' : ' · 박물관 보상') + '</button>';
+  });
+  html += '</div><div class="village-garden-grid">';
+  for(let cell = 0; cell < n; cell++){
+    const i = villageDecorAt(cell);
+    if(i >= 0){
+      const d = villageDecorDef(list[i].kind);
+      html += '<div class="village-garden-cell is-used' + (UI.panelMove === cell || UI.carry === cell ? ' is-moving' : '') + '" data-garden-cell="' + cell + '"><b>' + d.name + '</b><br>' +
+        '<button data-decor-move="' + cell + '">' + (UI.panelMove === cell ? '취소' : '옮기기') + '</button><button data-decor-remove="' + cell + '">회수</button></div>';
+    } else {
+      html += '<div class="village-garden-cell" data-garden-cell="' + cell + '"><button data-decor-put="' + cell + '">' + (UI.panelMove >= 0 ? '여기로' : '놓기') + '</button></div>';
+    }
+  }
+  return html + '</div><div class="rate" data-garden-msg>' + (UI.msg || '') + '</div></div>';
+}
+
+function bindVillageGarden(wrap){
+  const UI = VILLAGE_GARDEN_UI, done = (msg) => { UI.msg = msg || ''; renderVillage(); };
+  wrap.querySelectorAll('[data-decor-select]').forEach(b => { b.onclick = () => { villageDecorSelect(b.dataset.decorSelect); done(''); }; });
+  wrap.querySelectorAll('[data-decor-move]').forEach(b => { b.onclick = () => { const c = +b.dataset.decorMove; UI.panelMove = UI.panelMove === c ? -1 : c; done(UI.panelMove >= 0 ? '옮길 칸을 고르세요' : ''); }; });
+  wrap.querySelectorAll('[data-decor-remove]').forEach(b => { b.onclick = () => { const k = villageDecorRemove(+b.dataset.decorRemove); done(k ? villageDecorDef(k).name + '을(를) 회수했어요' : ''); }; });
+  wrap.querySelectorAll('[data-decor-put]').forEach(b => { b.onclick = () => {
+    const cell = +b.dataset.decorPut;
+    if(UI.panelMove >= 0){
+      const from = UI.panelMove, i = villageDecorAt(from), why = i < 0 ? '' : villageDecorPlaceProblem(villageDecorList()[i].kind, cell, from);
+      if(why || !villageDecorMove(from, cell)){ done(why || '옮길 수 없어요'); return; }
+      UI.panelMove = -1; if(UI.carry === from) UI.carry = -1;
+      done('옮겼어요');
+      return;
+    }
+    const kind = villageDecorSelected(), why = villageDecorPlaceProblem(kind, cell);
+    if(why || !villageDecorPlace(kind, cell)){ done(why || '놓을 수 없어요'); return; }
+    done(villageDecorDef(kind).name + '을(를) 놓았어요');
+  }; });
 }
 
 // Task 116: unidentified relics held, and how much hand mining until the next one.
@@ -951,22 +1028,52 @@ function villageOpenSection(k){
       can.forEach(key => { const r = villageRelicByKey(key); html += '<div class="village-relic" data-village-donatable="' + key + '"><b>' + r.name + '</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span><br><button data-village-donate="' + key + '">기증</button></div>'; });
       html += '</div>';
     }
-    html += '<div class="rate" style="margin-top:8px;">전시실</div><div class="village-codex">';
+    const hall = villageHallLevel(); // Task 122: the decorated hall
+    html += '<div class="rate" style="margin-top:8px;">전시실' + (hall >= 2 ? ' · 완성' : hall >= 1 ? ' · 꾸민 전시실' : '') + '</div><div class="village-codex' + (hall ? ' is-hall-' + hall : '') + '" data-village-hall="' + hall + '">';
     VILLAGE_RELICS.forEach(r => {
       const on = v.donated.includes(r.key);
       html += '<div class="village-relic' + (on ? '' : ' is-unknown') + '" data-village-exhibit="' + r.key + '">' +
         (on ? '<b>' + r.name + '</b> <span class="rarity">' + VILLAGE_RARITY_NAMES[r.rarity] + '</span><br>' + r.desc : '<b>빈 진열장</b>') + '</div>';
     });
-    return html + '</div>';
+    return html + '</div>' + villageSpecimenSection() + villageRewardSection();
   }
   return '<div class="rate">운영 중</div>';
 }
+// Task 121: one sample of each mineral and gem, donated from the shared store (kept by the museum for good).
+function villageSpecimenSection(){
+  const list = villageSpecimenList(), v = villageState();
+  let html = '<div class="rate" style="margin-top:8px;" data-village-collection>전시 목록: 유물 ' + v.donated.length + '/' + VILLAGE_RELICS.length +
+    ' · 광물·보석 <b data-village-specimens>' + list.length + '</b>/' + VILLAGE_SPECIMENS.length + '</div>' +
+    '<div class="rate">광물과 보석은 종류마다 한 번, 정해진 양을 창고에서 기증해요. 기증한 표본은 박물관에 남고 돌려받지 않아요.</div><div class="village-codex">';
+  VILLAGE_SPECIMENS.forEach(d => {
+    const done = list.find(x => x.key === d.key);
+    html += '<div class="village-relic' + (done ? ' is-donated' : '') + '" data-village-specimen="' + d.key + '"><b>' + villageSpecimenName(d.key) + '</b> <span class="rarity">' + VILLAGE_SPECIMEN_GROUPS[d.group] + '</span><br>' + d.desc + '<br>' +
+      (done ? '<span class="rarity" data-village-specimen-done>기증 완료' + (done.at ? ' · ' + new Date(done.at).toLocaleDateString('ko-KR') : '') + '</span>'
+        : '<span class="rarity">창고 <span data-village-specimen-have="' + d.key + '">' + fmt(state.resources[d.key] || 0) + '</span> / 필요 ' + d.qty + '</span><br>' +
+          '<button data-village-donate-specimen="' + d.key + '">기증 (' + d.qty + '개)</button>') + '</div>';
+  });
+  return html + '</div>';
+}
+
+// Task 122: the museum's rewards by collection size (earned ones ticked; no gold).
+function villageRewardSection(){
+  const n = villageMuseumCollected(), next = villageNextReward();
+  let html = '<div class="rate" style="margin-top:8px;" data-village-rewards>수집 보상 · 수집 <b>' + n + '</b>/' + villageMuseumTotal() +
+    (next ? ' · 다음 보상까지 ' + (next.need - n) + '점' : ' · 모든 보상을 받았어요') + '</div><div class="village-rewards">';
+  VILLAGE_MUSEUM_REWARDS.forEach(r => {
+    const got = n >= r.need;
+    html += '<div class="village-reward' + (got ? ' is-earned' : '') + '" data-village-reward="' + r.need + '">' + (got ? '✓ ' : '') + '<b>' + r.need + '점</b> ' + r.name + '</div>';
+  });
+  return html + '</div><div class="rate">박물관 보상은 골드를 주지 않아요. 연구 보너스는 연구의 골드 비용에만 적용돼요.</div>';
+}
+
 function bindVillageOpenSections(wrap){
   const ap = wrap.querySelector('[data-village-appraise]');
   if(ap) ap.onclick = () => { if(villageAppraise()){ renderVillage(); updateNumbers(); } };
   const all = wrap.querySelector('[data-village-donate-all]');
   if(all) all.onclick = () => { if(villageDonateAll()){ renderVillage(); updateNumbers(); } };
   wrap.querySelectorAll('[data-village-donate]').forEach(btn => { btn.onclick = () => { if(villageDonate(btn.dataset.villageDonate)){ renderVillage(); updateNumbers(); } }; });
+  wrap.querySelectorAll('[data-village-donate-specimen]').forEach(btn => { btn.onclick = () => { if(villageDonateSpecimen(btn.dataset.villageDonateSpecimen)){ renderVillage(); renderSharedStorage(); updateNumbers(); } }; }); // Task 121
 }
 
 // Per tick: which village buttons can be pressed now, and why not.
@@ -978,6 +1085,9 @@ function refreshVillageButtons(){
   const un = wrap.querySelector('[data-village-unidentified]'), pr = wrap.querySelector('[data-village-progress]'), vs = villageState();
   if(un && un.textContent !== String(vs.unidentified)) un.textContent = String(vs.unidentified);
   if(pr && pr.textContent !== String(VILLAGE.RELIC.EVERY - vs.digProgress)) pr.textContent = String(VILLAGE.RELIC.EVERY - vs.digProgress);
+  // Task 121: a specimen can be donated once the store holds enough
+  wrap.querySelectorAll('[data-village-donate-specimen]').forEach(btn => { btn.disabled = !!villageSpecimenBlocker(btn.dataset.villageDonateSpecimen); });
+  wrap.querySelectorAll('[data-village-specimen-have]').forEach(el => { const t = fmt(state.resources[el.dataset.villageSpecimenHave] || 0); if(el.textContent !== t) el.textContent = t; });
   wrap.querySelectorAll('[data-village-restore]').forEach(btn => {
     const why = villageRestoreBlocker(btn.dataset.villageRestore);
     btn.disabled = !!why;

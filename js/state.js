@@ -96,6 +96,11 @@ function freshRunState(){
 //   owned        appraised relics in hand: relic key -> count
 //   codex        relic keys registered in the codex (appraised at least once)
 //   donated      relic keys donated to the museum (one of each, on display)
+//   district     Task 118: the plaza point and the layout of the house and garden
+//                lots round it ({x, y, layout}; null = not yet chosen)
+//   decor        Task 120: decorations set down in the garden ([{kind, cell}], one per cell)
+//   specimens    Task 121: minerals and gems donated to the museum, one of each kind, in
+//                order, with when ([{key, at}], `at` a Date.now() value)
 // The facility and relic lists are in js/village.js; this only checks shapes,
 // so it can run before that file is loaded.
 // ---------------------------------------------------------------------------
@@ -103,7 +108,42 @@ const VILLAGE_FACILITY_KEYS = ['appraiser', 'museum'];
 
 function freshVillageState(){
   return { sites: { appraiser: null, museum: null }, stage: { appraiser: 0, museum: 0 },
-    unidentified: 0, digProgress: 0, appraised: 0, owned: {}, codex: [], donated: [] };
+    unidentified: 0, digProgress: 0, appraised: 0, owned: {}, codex: [], donated: [], district: null, decor: [], specimens: [] };
+}
+
+// Task 121: missing or invalid (any older save) -> none donated. Known raw resources (the
+// museum's list when js/village.js is loaded), each once; a missing time is kept as 0.
+function sanitizeVillageSpecimens(raw){
+  if(!Array.isArray(raw)) return [];
+  const keys = typeof VILLAGE_SPECIMEN_KEYS !== 'undefined' ? VILLAGE_SPECIMEN_KEYS : RESOURCES.map(r => r.key);
+  const out = [];
+  raw.forEach(d => {
+    if(!isPlainObject(d) || !keys.includes(d.key) || out.some(o => o.key === d.key)) return;
+    out.push({ key: d.key, at: isNonNegativeFinite(d.at) ? d.at : 0 });
+  });
+  return out;
+}
+
+// Task 120: missing or invalid (any older save) -> an empty garden. Known kinds (when js/village.js
+// is loaded), whole cells of the garden grid, one decoration per cell.
+function sanitizeVillageDecor(raw){
+  if(!Array.isArray(raw)) return [];
+  const V = typeof VILLAGE !== 'undefined' ? VILLAGE : null;
+  const kinds = V && V.DECOR ? V.DECOR.map(d => d.key) : null, cells = V && V.GARDEN ? V.GARDEN.COLS * V.GARDEN.ROWS : 12;
+  const out = [], used = new Set();
+  raw.forEach(d => {
+    if(!isPlainObject(d) || typeof d.kind !== 'string' || (kinds && !kinds.includes(d.kind)) || !Number.isInteger(d.cell) || d.cell < 0 || d.cell >= cells || used.has(d.cell)) return;
+    used.add(d.cell); out.push({ kind: d.kind, cell: d.cell });
+  });
+  return out;
+}
+
+// Task 118: missing or invalid (any older save) -> null, chosen again on load.
+function sanitizeVillageDistrict(raw){
+  const site = sanitizeVillageSite(raw);
+  if(!site || !Number.isInteger(raw.layout) || raw.layout < 0) return null;
+  if(typeof VILLAGE !== 'undefined' && VILLAGE.DISTRICT && raw.layout >= VILLAGE.DISTRICT.LAYOUTS.length) return null;
+  return { x: site.x, y: site.y, layout: raw.layout };
 }
 
 function sanitizeVillageSite(raw){
@@ -127,6 +167,9 @@ function sanitizeVillageState(raw){
     digProgress: isNonNegativeInt(raw.digProgress) ? raw.digProgress : 0,
     appraised: isNonNegativeInt(raw.appraised) ? raw.appraised : 0,
     owned, codex: keyList(raw.codex), donated: keyList(raw.donated),
+    district: sanitizeVillageDistrict(raw.district),
+    decor: sanitizeVillageDecor(raw.decor),
+    specimens: sanitizeVillageSpecimens(raw.specimens),
   };
   VILLAGE_FACILITY_KEYS.forEach(k => {
     out.sites[k] = sanitizeVillageSite(sites[k]);

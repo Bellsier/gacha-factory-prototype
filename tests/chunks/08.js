@@ -4402,15 +4402,3 @@ function t94FromRaw(mutate) {
   check('Task94: saveVersion is still 1 and a company keeps exactly its existing save fields', sv.saveVersion === 1 && Object.keys(sv.permanent.companies.forge).sort().join(',') === 'lastRepeat,open,orderIndex,orderTimer,repeatDone,score,sent,tradeTimer');
 })();
 
-// SUMMARY
-// =============================================================================
-
-allDoms.forEach((d) => { try { d.window.close(); } catch (e) { /* ignore */ } });
-
-console.log('');
-console.log(`Total: ${passCount + failCount}  Pass: ${passCount}  Fail: ${failCount}`);
-if (failures.length) {
-  console.log('\nFailures:');
-  failures.forEach((f) => console.log(' - ' + f));
-}
-process.exit(failCount === 0 ? 0 : 1);

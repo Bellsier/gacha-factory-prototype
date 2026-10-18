@@ -65,13 +65,47 @@ function tdUpdateActionButton(){
     if(torch.textContent !== label) torch.textContent = label;
     torch.classList.toggle('is-full', !take && worldTorches().length >= TORCH.MAX);
   }
+  tdUpdateGardenButton();
   const btn = document.getElementById('tdAction');
   if(!btn) return;
   const t = TD.target;
   const label = !t ? '·' : t.action === 'mine' ? '캐기' : t.action === 'secure' ? '확보' : t.action === 'open' ? '열기'
-    : t.action === 'restore' ? '복구' : t.action === 'appraise' ? '감정' : t.action === 'donate' ? '기증' : '잠김'; // Task 115~117: village actions
+    : t.action === 'restore' ? '복구' : t.action === 'appraise' ? '감정' : t.action === 'donate' ? '기증'
+    : t.action === 'enter' ? '들어가기' : t.action === 'exit' ? '나가기'
+    : t.action === 'decorPlace' ? '놓기' : t.action === 'decorPick' ? '들기' : t.action === 'decorDrop' ? '내려놓기' : '잠김'; // Task 115~120: village actions
   if(btn.textContent !== label) btn.textContent = label;
+  btn.classList.toggle('is-long', label.length >= 4);
   btn.classList.toggle('is-idle', !t || t.action === 'locked');
+}
+
+// Task 120: the garden button (phone) / R and Q (keyboard). Shown at the garden:
+// takes back the carried decoration or the one in front, else picks the next kind to set down.
+function tdGardenButtonMode(){
+  const t = TD.target;
+  if(typeof VILLAGE_GARDEN_UI === 'undefined' || !t || t.type !== 'garden') return VILLAGE_GARDEN_UI && VILLAGE_GARDEN_UI.carry >= 0 ? 'take' : null;
+  return VILLAGE_GARDEN_UI.carry >= 0 || t.action === 'decorPick' ? 'take' : 'cycle';
+}
+function tdUpdateGardenButton(){
+  const b = document.getElementById('tdDecor');
+  if(!b) return;
+  const mode = tdGardenButtonMode();
+  b.classList.toggle('is-on', !!mode);
+  const label = mode === 'take' ? (TD.touch ? '' : '[R] ') + '장식 회수' : mode === 'cycle' ? (TD.touch ? '' : '[Q] ') + '다음 장식: ' + villageDecorDef(villageDecorNext()).name : '';
+  if(b.textContent !== label) b.textContent = label;
+}
+function tdGardenButtonNow(mode){
+  const m = mode || tdGardenButtonMode();
+  if(m === 'take'){
+    const r = tdGardenTakeBack();
+    if(r.text) tdAddFloat(r.text, r.x, r.y, r.ok ? '#ffd27a' : '#b8c0c6');
+    return r.ok;
+  }
+  if(m === 'cycle'){
+    const k = villageDecorCycle(), t = TD.target;
+    if(t) tdAddFloat('놓을 장식: ' + villageDecorDef(k).name, t.x, t.y, '#fff3b0');
+    return true;
+  }
+  return false;
 }
 
 // --- virtual joystick (phone) -------------------------------------------------
@@ -135,7 +169,8 @@ function tdInit(){
     '<button id="tdClose" class="td-close" type="button" aria-label="패널 닫기">닫기 ✕</button>' +
     '<div id="tdStick" class="td-stick" aria-label="이동"><div class="td-knob"></div></div>' +
     '<button id="tdAction" class="td-action is-idle" type="button" aria-label="행동">·</button>' +
-    '<button id="tdTorch" class="td-torch" type="button" aria-label="횃불 놓기 또는 거두기">횃불 놓기</button>';
+    '<button id="tdTorch" class="td-torch" type="button" aria-label="횃불 놓기 또는 거두기">횃불 놓기</button>' +
+    '<button id="tdDecor" class="td-decor" type="button" aria-label="정원 장식 회수 또는 바꾸기"></button>';
   body.appendChild(hud);
   TD.mini = document.getElementById('tdMinimap');
   const tabbar = document.querySelector('.tabbar');
@@ -156,6 +191,7 @@ function tdInit(){
   document.getElementById('tdClose').onclick = tdClosePanels;
   document.getElementById('tdAction').onclick = () => { tdInteractNow(); };
   document.getElementById('tdTorch').onclick = () => { tdTorchNow(); };
+  document.getElementById('tdDecor').onclick = () => { tdGardenButtonNow(); }; // Task 120
   tdBindStick(document.getElementById('tdStick'), document.querySelector('#tdStick .td-knob'));
   // E / Space acts, Escape closes panels (never while typing in a field)
   document.addEventListener('keydown', (e) => {
@@ -167,6 +203,8 @@ function tdInit(){
       tdInteractNow();
     }
     if(e.key === 't' || e.key === 'T') tdTorchNow(); // Task 112
+    if(e.key === 'r' || e.key === 'R') tdGardenButtonNow('take'); // Task 120: take a decoration back
+    if((e.key === 'q' || e.key === 'Q') && tdGardenButtonMode() === 'cycle') tdGardenButtonNow('cycle'); // ...or choose the next kind
   });
   // clicking the world puts the keyboard back on the world (out of any panel field)
   canvas.addEventListener('pointerdown', () => { if(document.activeElement && document.activeElement !== body && document.activeElement.blur) document.activeElement.blur(); });

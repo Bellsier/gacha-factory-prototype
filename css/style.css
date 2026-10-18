@@ -430,6 +430,7 @@
   body.td-touch .td-action{display:block; position:fixed; right:22px; bottom:98px; width:86px; height:86px; border-radius:50%; z-index:2; touch-action:manipulation;
     background:rgba(214,139,61,0.92); border:3px solid #ffd27a; color:#1a1208; font-family:var(--font-display); font-weight:700; font-size:1.05rem;}
   body.td-touch .td-action.is-idle{opacity:0.45;}
+  body.td-touch .td-action.is-long{font-size:0.82rem; letter-spacing:-0.02em;} /* Task 120: 들어가기, 내려놓기 stay on one line */
   body.td-touch.td-panel-open .td-stick, body.td-touch.td-panel-open .td-action, body.td-touch.td-log-open .td-stick, body.td-touch.td-log-open .td-action{display:none;}
   /* Task 112: the torch button (PC: bottom right; phone: above the action button) */
   .td-torch{display:none;}
@@ -438,6 +439,13 @@
   body.view-topdown .td-torch.is-full{opacity:0.5;}
   body.td-touch .td-torch{right:16px; bottom:196px; padding:8px 10px; font-size:0.74rem; border-radius:18px; max-width:104px; line-height:1.25;}
   body.td-panel-open .td-torch, body.td-log-open .td-torch{display:none;}
+  body.td-inside #tdMinimap, body.td-inside .td-torch{display:none;} /* Task 119: inside the house */
+  /* Task 120: the garden button (take a decoration back / the next kind), only at the garden */
+  .td-decor{display:none;}
+  body.view-topdown .td-decor.is-on{display:block; position:fixed; right:14px; bottom:62px; z-index:2; width:auto; padding:7px 12px; border-radius:8px; touch-action:manipulation;
+    background:rgba(22,28,32,0.86); color:#d9f0d0; border:1px solid rgba(160,220,140,0.5); font-size:0.8rem;}
+  body.td-touch .td-decor.is-on{right:16px; bottom:248px; padding:8px 10px; font-size:0.74rem; border-radius:18px; max-width:120px; line-height:1.25;}
+  body.td-panel-open .td-decor, body.td-log-open .td-decor, body.td-inside .td-decor{display:none !important;}
   @media (max-width: 760px){
     body.view-topdown .tabbar{left:0; right:0; bottom:0; transform:none; border-radius:0; border-width:1px 0 0; gap:4px; padding:6px 6px calc(6px + env(safe-area-inset-bottom));}
     body.view-topdown .tab-btn, body.view-topdown .td-log-btn{flex:1; padding:9px 2px; font-size:0.78rem;}
@@ -449,6 +457,7 @@
     body.view-topdown.td-panel-open .tab-panel.active, body.view-topdown.td-log-open #logSection{top:auto; height:72vh; height:72dvh; width:100vw; border-left:none; border-top:1px solid var(--line); border-radius:12px 12px 0 0; padding:48px 12px 80px;}
     .td-close{top:auto; bottom:calc(72dvh - 44px);}
     body.view-topdown:not(.td-touch) .td-torch{bottom:70px;} /* Task 112: above the full-width dock */
+    body.view-topdown:not(.td-touch) .td-decor.is-on{bottom:112px;} /* Task 120: above the torch button */
   }
 
 /* Task 114~117: the village panel (마을 탭) */
@@ -462,3 +471,20 @@
 .village-relic{border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:0.8rem; background:rgba(0,0,0,0.15);}
 .village-relic.is-unknown{opacity:0.5;}
 .village-relic .rarity{font-size:0.7rem; opacity:0.75;}
+
+/* Task 120: the garden card in the 마을 panel */
+.village-garden-kinds{display:flex; flex-wrap:wrap; gap:4px; margin:6px 0;}
+.village-garden-kinds button{flex:0 0 auto; padding:4px 8px; font-size:0.78rem;}
+.village-garden-kinds button.is-selected{outline:2px solid #ffd27a;}
+.village-garden-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:4px; margin-top:4px;}
+.village-garden-cell{border:1px dashed rgba(160,200,140,0.5); border-radius:6px; padding:4px; min-height:54px; font-size:0.74rem; text-align:center; background:rgba(90,140,80,0.12);}
+.village-garden-cell.is-used{border-style:solid; background:rgba(90,140,80,0.25);}
+.village-garden-cell.is-moving{outline:2px solid #ffd27a;}
+.village-garden-cell button{padding:2px 6px; font-size:0.72rem; margin:2px 1px 0;}
+.village-relic.is-donated{border-color:rgba(226,178,60,0.7); background:rgba(226,178,60,0.1);} /* Task 121 */
+/* Task 122: the museum's rewards and the decorated hall */
+.village-rewards{display:flex; flex-direction:column; gap:3px; margin:4px 0;}
+.village-reward{font-size:0.78rem; padding:3px 6px; border-radius:5px; border:1px solid var(--line); opacity:0.7;}
+.village-reward.is-earned{opacity:1; border-color:rgba(226,178,60,0.7); background:rgba(226,178,60,0.12);}
+.village-codex.is-hall-1, .village-codex.is-hall-2{padding:6px; border-radius:8px; border:2px solid rgba(176,82,74,0.6); background:rgba(176,82,74,0.08);}
+.village-codex.is-hall-2{border-color:rgba(226,178,60,0.8); background:rgba(226,178,60,0.08);}

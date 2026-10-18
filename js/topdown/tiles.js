@@ -5,7 +5,7 @@
 // (no canvas needed, so it is testable) and then drawn as one image.
 // Nothing here is saved.
 // ---------------------------------------------------------------------------
-const TD_TILE = { GRASS: 0, BEYOND: 1, ROCK: 2, TUNNEL: 3, EDGE: 4, PATH: 5 };
+const TD_TILE = { GRASS: 0, BEYOND: 1, ROCK: 2, TUNNEL: 3, EDGE: 4, PATH: 5, ROAD: 6, PLAZA: 7, GARDEN: 8 }; // Task 118/120: village ground
 
 // Integer hash of a cell and a salt -> [0, 1). Fixed, so the ground looks the same every time.
 function tdHash(a, b, salt){
@@ -22,7 +22,8 @@ function tdSegDist(px, py, ax, ay, bx, by){
 }
 
 // Tile type at a world point (the tile's centre).
-function tdTileAt(x, y, tunnelOpen, base){
+// Task 118: `village` (villageGroundLayout(), optional) adds the plaza, the garden and the roads on open ground.
+function tdTileAt(x, y, tunnelOpen, base, village){
   if(!terrainInBounds(x, y)) return TD_TILE.EDGE;
   const region = terrainRegionAt(x, y);
   if(region === 'mountain') return TD_TILE.ROCK;
@@ -34,23 +35,35 @@ function tdTileAt(x, y, tunnelOpen, base){
   // open ground: a small yard around the workshop and a dirt road to the tunnel mouth
   if(base){
     const t = terrainTunnel();
+    if(village){
+      if(Math.hypot(x - village.plaza.x, y - village.plaza.y) <= village.plaza.r) return TD_TILE.PLAZA;
+      const gd = village.garden;
+      if(gd && Math.abs(x - gd.x) < gd.hw && Math.abs(y - gd.y) < gd.hh) return TD_TILE.GARDEN;
+    }
     if(Math.hypot(x - base.x, y - base.y) <= 1.05) return TD_TILE.PATH;
+    if(village && village.roads.some(pts => tdPolyDist(pts, x, y) <= village.roadHalf)) return TD_TILE.ROAD;
     if(x >= t.mouthX && tdSegDist(x, y, base.x, base.y, t.mouthX, t.y) <= 0.3) return TD_TILE.PATH;
   }
   return TD_TILE.GRASS;
 }
 
+function tdPolyDist(points, x, y){
+  let d = Infinity;
+  for(let i = 0; i < points.length - 1; i++) d = Math.min(d, tdSegDist(x, y, points[i].x, points[i].y, points[i + 1].x, points[i + 1].y));
+  return d;
+}
+
 // The whole map: one entry per tile over the drawn world (bounds + forest edge).
-function tdBuildTileMap(tunnelOpen, base){
+function tdBuildTileMap(tunnelOpen, base, village){
   const r = topdownWorldRect(), n = TOPDOWN.TILES_PER_UNIT;
   const cols = Math.round((r.maxX - r.minX) * n), rows = Math.round((r.maxY - r.minY) * n);
   const types = new Uint8Array(cols * rows);
   for(let j = 0; j < rows; j++){
     for(let i = 0; i < cols; i++){
-      types[j * cols + i] = tdTileAt(r.minX + (i + 0.5) / n, r.minY + (j + 0.5) / n, tunnelOpen, base);
+      types[j * cols + i] = tdTileAt(r.minX + (i + 0.5) / n, r.minY + (j + 0.5) / n, tunnelOpen, base, village);
     }
   }
-  return { cols, rows, originX: r.minX, originY: r.minY, types, tunnelOpen: tunnelOpen === true };
+  return { cols, rows, originX: r.minX, originY: r.minY, types, tunnelOpen: tunnelOpen === true, village: village || null };
 }
 
 function tdTileType(map, i, j){
@@ -67,9 +80,13 @@ const TD_COLORS = {
   tunnel: [[86, 72, 58], [80, 67, 54], [92, 78, 62]], plank: [120, 92, 60], beam: [96, 70, 44],
   path: [[150, 122, 86], [143, 116, 81], [158, 129, 92]], pebble: [176, 152, 116],
   edge: [[38, 66, 44], [44, 74, 48], [33, 58, 39]], canopy: [56, 92, 58], trunk: [60, 44, 32],
+  // Task 118/120: the village's cobbled roads, the paved plaza and the garden lawn
+  road: [[164, 150, 128], [156, 142, 120], [172, 158, 136]], joint: [126, 114, 98],
+  plaza: [[190, 178, 156], [182, 170, 148], [196, 186, 166]], slab: [150, 138, 118], plazaRim: [128, 116, 98],
+  garden: [[96, 146, 80], [102, 152, 84], [90, 138, 76]], soil: [112, 88, 62],
 };
 
-const TD_WALKABLE_TYPES = [TD_TILE.GRASS, TD_TILE.BEYOND, TD_TILE.TUNNEL, TD_TILE.PATH];
+const TD_WALKABLE_TYPES = [TD_TILE.GRASS, TD_TILE.BEYOND, TD_TILE.TUNNEL, TD_TILE.PATH, TD_TILE.ROAD, TD_TILE.PLAZA, TD_TILE.GARDEN];
 
 // Paints the map into an RGBA buffer (TILE x TILE pixels per tile). Returns
 // { width, height, data } — the renderer puts it on a canvas once.
@@ -87,8 +104,10 @@ function tdPaintTileMap(map){
       const type = map.types[j * map.cols + i];
       const x0 = i * T, y0 = j * T;
       // base texture: small noise on 2x2 pixel blocks, so it reads as pixel art when zoomed
-      const pal = type === TD_TILE.GRASS ? TD_COLORS.grass : type === TD_TILE.BEYOND ? TD_COLORS.beyond : type === TD_TILE.ROCK ? TD_COLORS.rock :
-        type === TD_TILE.TUNNEL ? TD_COLORS.tunnel : type === TD_TILE.PATH ? TD_COLORS.path : TD_COLORS.edge;
+      // Task 118: road and plaza tiles are grass underneath; their exact shapes are painted over them below
+      const pal = type === TD_TILE.GRASS || type === TD_TILE.ROAD || type === TD_TILE.PLAZA ? TD_COLORS.grass : type === TD_TILE.BEYOND ? TD_COLORS.beyond : type === TD_TILE.ROCK ? TD_COLORS.rock :
+        type === TD_TILE.TUNNEL ? TD_COLORS.tunnel : type === TD_TILE.PATH ? TD_COLORS.path : type === TD_TILE.ROAD ? TD_COLORS.road :
+        type === TD_TILE.PLAZA ? TD_COLORS.plaza : type === TD_TILE.GARDEN ? TD_COLORS.garden : TD_COLORS.edge;
       for(let y = 0; y < T; y += 2){
         for(let x = 0; x < T; x += 2){
           const h = tdHash(x0 + x, y0 + y, 7);
@@ -129,6 +148,16 @@ function tdPaintTileMap(map){
             }
           }
         });
+      } else if(type === TD_TILE.GARDEN){
+        // Task 120: a tended lawn with small flowers, edged with a row of stones
+        if(h1 < 0.35){ const fx = x0 + 3 + Math.floor(h2 * 10), fy = y0 + 3 + Math.floor(h3 * 10), fc = pick(TD_COLORS.flower, h3); put(fx, fy, fc); put(fx + 1, fy, fc); }
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([di, dj]) => {
+          if(tdTileType(map, i + di, j + dj) === TD_TILE.GARDEN) return;
+          for(let k = 0; k < T; k += 3){
+            const ex = di === 1 ? x0 + T - 2 : di === -1 ? x0 : x0 + k, ey = dj === 1 ? y0 + T - 2 : dj === -1 ? y0 : y0 + k;
+            put(ex, ey, TD_COLORS.rim); put(ex + 1, ey, TD_COLORS.rim); put(ex, ey + 1, TD_COLORS.crack); put(ex + 1, ey + 1, TD_COLORS.crack);
+          }
+        });
       } else if(type === TD_TILE.EDGE){
         // dense forest canopy around the world
         if(h1 < 0.7){ const cx = x0 + 8 + Math.floor((h2 - 0.5) * 8), cy = y0 + 8 + Math.floor((h3 - 0.5) * 8), rr = 5 + Math.floor(h1 * 5);
@@ -157,6 +186,7 @@ function tdPaintTileMap(map){
       }
     }
   }
+  if(map.village) tdPaintVillageGround(map, put, W, H);
   if(!map.tunnelOpen){
     for(let j = 0; j < map.rows; j++) for(let i = 0; i < map.cols; i++){
       if(map.types[j * map.cols + i] !== TD_TILE.BEYOND) continue;
@@ -164,4 +194,49 @@ function tdPaintTileMap(map){
     }
   }
   return { width: W, height: H, data };
+}
+
+// Task 118: the roads and the plaza, painted pixel by pixel from their real
+// shapes (smooth diagonals, a round plaza) over the grass of their tiles.
+// Roads first (cobbles in staggered rows, a ragged edge), then the plaza
+// (slabs, a darker rim and a ring round its centre). The workshop yard keeps
+// its dirt. Pure: pixels only, from the same plain data as the tile types.
+function tdPaintVillageGround(map, put, W, H){
+  const V = map.village, U = TOPDOWN.TILE * TOPDOWN.TILES_PER_UNIT;
+  const toPx = (x, y) => [(x - map.originX) * U, (y - map.originY) * U];
+  const base = state && state.world ? state.world.base : null, yardR = 1.0 * U, [bx, by] = base ? toPx(base.x, base.y) : [-1e9, -1e9];
+  const hw = V.roadHalf * U;
+  V.roads.forEach(pts => {
+    for(let k = 0; k < pts.length - 1; k++){
+      const [ax, ay] = toPx(pts[k].x, pts[k].y), [cx, cy] = toPx(pts[k + 1].x, pts[k + 1].y);
+      const minX = Math.max(0, Math.floor(Math.min(ax, cx) - hw - 2)), maxX = Math.min(W - 1, Math.ceil(Math.max(ax, cx) + hw + 2));
+      const minY = Math.max(0, Math.floor(Math.min(ay, cy) - hw - 2)), maxY = Math.min(H - 1, Math.ceil(Math.max(ay, cy) + hw + 2));
+      for(let y = minY; y <= maxY; y++){
+        for(let x = minX; x <= maxX; x++){
+          const d = tdSegDist(x + 0.5, y + 0.5, ax, ay, cx, cy);
+          if(d > hw || Math.hypot(x + 0.5 - bx, y + 0.5 - by) < yardR) continue;
+          if(d > hw - 2 && tdHash(x, y, 41) < 0.45) continue; // a ragged edge into the grass
+          const row = Math.floor(y / 5), col = Math.floor((x + (row % 2) * 3) / 7);
+          const joint = y % 5 === 0 || (x + (row % 2) * 3) % 7 === 0;
+          const c = joint ? TD_COLORS.joint : TD_COLORS.road[Math.floor(tdHash(col, row, 43) * TD_COLORS.road.length)];
+          put(x, y, c, d > hw - 2 ? 0.75 : 1);
+        }
+      }
+    }
+  });
+  const pz = V.plaza, [cx, cy] = toPx(pz.x, pz.y), r = pz.r * U;
+  for(let y = Math.max(0, Math.floor(cy - r - 1)); y <= Math.min(H - 1, Math.ceil(cy + r + 1)); y++){
+    for(let x = Math.max(0, Math.floor(cx - r - 1)); x <= Math.min(W - 1, Math.ceil(cx + r + 1)); x++){
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      if(d > r) continue;
+      const rx = x - Math.floor(cx), ry = y - Math.floor(cy);
+      const row = Math.floor((ry + 1000) / 8), off = (row % 2) * 4;
+      const joint = (ry + 1000) % 8 === 0 || (rx + 1000 + off) % 8 === 0;
+      let c = joint ? TD_COLORS.slab : TD_COLORS.plaza[Math.floor(tdHash(Math.floor((rx + 1000 + off) / 8), row, 47) * TD_COLORS.plaza.length)];
+      if(d > r - 3) c = TD_COLORS.plazaRim;
+      else if(Math.abs(d - r * 0.3) < 1.5) c = TD_COLORS.plazaRim; // a ring round the centre
+      else if(!joint && tdHash(x, y, 49) < 0.004) c = TD_COLORS.grass[3]; // moss
+      put(x, y, c);
+    }
+  }
 }

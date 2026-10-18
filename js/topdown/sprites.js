@@ -141,6 +141,10 @@ function tdPropSprite(kind){
     case 'timberSupport': P = tdPainter(16, 22); P(2, 20, 12, 2, 'rgba(0,0,0,0.2)'); P(2, 4, 3, 17, '#7a5a36'); P(11, 4, 3, 17, '#7a5a36'); P(1, 2, 14, 3, '#8a6440'); break;
     case 'mineCart': P = tdPainter(20, 16); P(2, 14, 16, 2, 'rgba(0,0,0,0.22)'); P(2, 4, 16, 8, '#6a625a'); P(3, 5, 14, 3, '#3a3632'); P(4, 4, 3, 2, '#b8704f'); P(9, 3, 3, 2, '#2c3034'); P(4, 11, 4, 4, '#2b2b2b'); P(12, 11, 4, 4, '#2b2b2b'); break;
     case 'diggingMarks': P = tdPainter(16, 10); P(2, 3, 5, 2, '#6e5a42'); P(8, 6, 6, 2, '#6e5a42'); P(5, 7, 2, 1, '#8a7356'); break;
+    case 'villageBoard': // Task 118: the plaza's notice board
+      P = tdPainter(20, 24); P(3, 22, 14, 2, 'rgba(0,0,0,0.22)'); P(4, 10, 2, 13, '#5a3b28'); P(14, 10, 2, 13, '#5a3b28');
+      P(1, 2, 18, 11, '#7a5236'); P(2, 3, 16, 9, '#c9a26a'); P(1, 1, 18, 2, '#5a3b28');
+      P(4, 5, 5, 3, '#f0e6cc'); P(11, 4, 5, 4, '#e8dcc0'); P(5, 6, 3, 1, '#7a6a52'); P(12, 5, 3, 1, '#7a6a52'); P(12, 7, 2, 1, '#7a6a52'); P(6, 9, 8, 1, '#a07a50'); break;
     case 'lamp': P = tdPainter(8, 22); P(3, 6, 2, 16, '#4a3626'); P(1, 2, 6, 5, '#3a2a1e'); P(2, 3, 4, 3, '#ffd27a'); P(1, 20, 6, 2, 'rgba(0,0,0,0.25)'); break;
     default: P = tdPainter(8, 8); P(2, 2, 4, 4, '#888'); // unknown kind: a pebble
   }
@@ -151,7 +155,9 @@ function tdPropSprite(kind){
 //   stage 0 ruin (broken walls, rubble, weeds), 1 cleared (foundation and scaffolding), 2 open.
 //   The appraiser (감정소) is 44 x 40, the museum (박물관) 60 x 48; the door is at the bottom centre.
 //   `exhibits` (museum only) lights that many of its six display niches (one per two relics on show).
-function tdVillageSprite(key, stage, exhibits){
+//   Task 121: `specimens` (museum only, raw resource keys) stand as small crystals along its front.
+//   Task 122: `hall` (museum only) 1 hangs banners and sets flower pots by the door, 2 adds gold trim and lamps.
+function tdVillageSprite(key, stage, exhibits, specimens, hall){
   const museum = key === 'museum';
   const W = museum ? 60 : 44, H = museum ? 48 : 40, P = tdPainter(W, H);
   const cx = W / 2, groundY = H - 3;
@@ -202,6 +208,171 @@ function tdVillageSprite(key, stage, exhibits){
     if(k < lit) P(nx + 1, ny + 2, 1, 2, ['#c98a4a', '#9ab8c8', '#d8c070', '#b07ac8', '#7fd7ec', '#e6e1d8'][k]);
   }
   P(Math.round(cx) - 7, groundY - 31, 14, 4, '#e2b23c'); P(Math.round(cx) - 6, groundY - 30, 12, 2, '#5a3b28'); // the name board
+  // Task 122: the decorated hall
+  if((hall || 0) >= 1){
+    [fx + 2, fx + fw - 4].forEach(x => { P(x - 1, groundY - 21, 4, 9, '#b0524a'); P(x - 1, groundY - 21, 4, 1, '#e2b23c'); P(x, groundY - 13, 2, 2, '#b0524a'); });
+    [Math.round(cx) - 8, Math.round(cx) + 6].forEach(x => { P(x, groundY - 4, 3, 3, '#b8704f'); P(x, groundY - 6, 3, 2, '#4f8246'); P(x + 1, groundY - 7, 1, 1, '#e06f8a'); });
+  }
+  if((hall || 0) >= 2){
+    for(let k = 0; k < 10; k++){ const o = Math.floor(k * 25 / 9); P(Math.round(cx) - o, groundY - 34 + k, 1, 1, '#e2b23c'); P(Math.round(cx) + o - 1, groundY - 34 + k, 1, 1, '#e2b23c'); }
+    P(fx - 1, groundY - 24, fw + 2, 1, '#f2d68c');
+    [fx + 6, fx + fw - 8].forEach(x => { P(x, groundY - 27, 3, 3, '#3a2a1e'); P(x + 1, groundY - 26, 1, 1, '#ffd27a'); });
+  }
+  // Task 121: donated mineral and gem samples on little stands between the columns
+  (specimens || []).slice(0, 6).forEach((k, i) => {
+    const sx = [fx + 5, fx + 8, fx + 14, fx + fw - 17, fx + fw - 9, fx + fw - 6][i], c = TD_RES_COLORS[k] || ['#ccc', '#fff'];
+    P(sx - 1, groundY - 4, 4, 1, stoneDark); P(sx, groundY - 7, 2, 3, c[0]); P(sx, groundY - 7, 1, 1, c[1]);
+  });
+  return P.done(false);
+}
+
+// --- Task 119: the player's house (outside), 48 x 44, door at the bottom centre.
+function tdHouseSprite(){
+  const P = tdPainter(48, 44), groundY = 41;
+  P(3, 41, 42, 3, 'rgba(0,0,0,0.22)');
+  // walls: warm plaster over a stone footing, timber posts
+  P(6, 22, 36, 19, '#e8d6b0'); P(6, 37, 36, 4, '#9a9086'); P(6, 37, 36, 1, '#b4aaa0');
+  P(6, 22, 2, 15, '#8a6440'); P(40, 22, 2, 15, '#8a6440'); P(23, 22, 2, 4, '#8a6440');
+  // roof: green shingles
+  for(let k = 0; k < 15; k++){ const o = Math.floor(k * 6 / 14); P(9 - o, 6 + k, 30 + 2 * o, 1, k % 3 === 2 ? '#3f6b3a' : '#4f8246'); }
+  P(9, 6, 30, 1, 'rgba(255,255,255,0.22)'); P(2, 20, 44, 3, '#35592f');
+  P(33, 1, 6, 10, '#7a6a5e'); P(33, 1, 6, 2, '#958576'); // chimney
+  // door with a little step and a lantern
+  P(20, 27, 8, 14, '#5a3b28'); P(21, 28, 6, 13, '#8a5a36'); P(25, 34, 1, 2, '#e2b23c');
+  P(18, 40, 12, 1, '#b4aaa0');
+  P(29, 26, 2, 3, '#3a2a1e'); P(29, 27, 2, 2, '#ffd27a');
+  // windows with flower boxes
+  [[10, 26], [32, 26]].forEach(([x, y]) => {
+    P(x, y, 7, 7, '#5a3b28'); P(x + 1, y + 1, 5, 5, '#f3d27a'); P(x + 3, y + 1, 1, 5, '#5a3b28'); P(x + 1, y + 3, 5, 1, '#5a3b28');
+    P(x - 1, y + 7, 9, 2, '#8a6440'); P(x, y + 6, 2, 1, '#e06f8a'); P(x + 3, y + 6, 2, 1, '#f0d060'); P(x + 6, y + 6, 1, 1, '#e06f8a');
+  });
+  return P.done(false);
+}
+
+// --- Task 119: inside the player's house. The room picture (floor, walls,
+// windows, rug, the door gap) is one sprite; furniture stands in it as its own
+// sprites, sorted with the player. Sizes follow VILLAGE.HOME (64 px a unit).
+function tdHomeRoomSprite(){
+  const H = VILLAGE.HOME, U = TD_UNIT_PX, side = H.SIDE_PX, back = H.BACK_PX, bottom = H.BOTTOM_PX;
+  const fw = Math.round(H.ROOM.w * U), fh = Math.round(H.ROOM.h * U), W = fw + side * 2, Ht = back + fh + bottom;
+  const P = tdPainter(W, Ht);
+  // floor: planks in rows, the ends staggered
+  for(let y = 0; y < fh; y += 8){
+    const row = y / 8;
+    P(side, back + y, fw, 8, ['#a87a4e', '#a07248', '#ae8054'][row % 3]);
+    P(side, back + y + 7, fw, 1, '#7e5636');
+    for(let x = (row % 2) * 23 + 9; x < fw; x += 46) P(side + x, back + y, 1, 7, '#86603e');
+  }
+  // the back wall: plaster over wood panelling, two windows and a framed map
+  P(side, 0, fw, back, '#e6d6b4'); P(side, back - 16, fw, 16, '#8a6440'); P(side, back - 16, fw, 2, '#a07a50'); P(side, back - 2, fw, 2, '#5a3b28');
+  [[Math.round(fw * 0.22), 9], [Math.round(fw * 0.62), 9]].forEach(([x, y]) => {
+    P(side + x, y, 26, 20, '#5a3b28'); P(side + x + 2, y + 2, 22, 16, '#bfe0ec'); P(side + x + 12, y + 2, 2, 16, '#5a3b28'); P(side + x + 2, y + 9, 22, 2, '#5a3b28');
+    P(side + x + 3, y + 3, 4, 3, '#eef8fb'); P(side + x - 2, y + 20, 30, 3, '#7a5236');
+  });
+  P(side + Math.round(fw * 0.45), 12, 16, 12, '#7a5236'); P(side + Math.round(fw * 0.45) + 1, 13, 14, 10, '#e8dcc0'); P(side + Math.round(fw * 0.45) + 3, 16, 6, 1, '#a07a50'); P(side + Math.round(fw * 0.45) + 5, 19, 7, 1, '#4f8246');
+  // side walls and the bottom wall with the door gap
+  P(0, 0, side, Ht, '#5a3b28'); P(W - side, 0, side, Ht, '#5a3b28'); P(side - 2, 0, 2, Ht, '#3a2a1e'); P(W - side, 0, 2, Ht, '#3a2a1e');
+  const doorX = side + Math.round(H.DOOR.x * U), gap = Math.round(H.DOOR.half * U);
+  P(0, back + fh, W, bottom, '#5a3b28'); P(0, back + fh, W, 2, '#3a2a1e');
+  P(doorX - gap, back + fh, gap * 2, bottom, '#a07248'); P(doorX - gap + 3, back + fh - 6, gap * 2 - 6, 8, '#7a5236'); // the door mat
+  P(doorX - gap - 3, back + fh - 2, 3, bottom + 2, '#3a2a1e'); P(doorX + gap, back + fh - 2, 3, bottom + 2, '#3a2a1e');
+  // the rug
+  const rx = side + Math.round(H.RUG.x * U), ry = back + Math.round(H.RUG.y * U), rw = Math.round(H.RUG.w * U / 2), rh = Math.round(H.RUG.h * U / 2);
+  for(let y = -rh; y <= rh; y++){ const hw = Math.floor(rw * Math.sqrt(1 - (y * y) / (rh * rh + 0.01))); P(rx - hw, ry + y, hw * 2, 1, Math.abs(y) > rh - 3 || hw < 4 ? '#e2b23c' : '#b0524a'); }
+  for(let y = -rh + 5; y <= rh - 5; y += 4){ const hw = Math.floor((rw - 8) * Math.sqrt(1 - (y * y) / (rh * rh))); P(rx - hw, ry + y, hw * 2, 1, '#9a443e'); }
+  return P.done(false);
+}
+
+// Furniture by key, anchored at the bottom centre of its foot.
+function tdFurnitureSprite(key){
+  let P;
+  switch(key){
+    case 'bed':
+      P = tdPainter(52, 72); P(2, 68, 48, 4, 'rgba(0,0,0,0.2)');
+      P(2, 0, 48, 10, '#7a5236'); P(2, 0, 48, 2, '#9a6a40'); P(2, 8, 48, 62, '#6a4630'); // headboard, frame
+      P(5, 10, 42, 56, '#f0ece0'); P(9, 13, 34, 11, '#ffffff'); P(9, 22, 34, 2, '#dcd6c8'); // mattress, pillow
+      P(5, 28, 42, 38, '#4f7aa8'); P(5, 28, 42, 3, '#6a96c4'); for(let y = 34; y < 66; y += 6) P(5, y, 42, 1, '#43699a'); // blanket
+      break;
+    case 'shelf':
+      P = tdPainter(64, 58); P(2, 55, 60, 3, 'rgba(0,0,0,0.2)');
+      P(2, 0, 60, 56, '#7a5236'); P(5, 3, 54, 50, '#5a3b28');
+      [6, 22, 38].forEach((y, r) => { P(5, y + 13, 54, 3, '#8a6440');
+        for(let x = 7, k = 0; x < 56; x += 5 + (k % 3), k++) P(x, y + 2 + (k % 2), 4, 11 - (k % 2), ['#b0524a', '#4f7aa8', '#e2b23c', '#4f8246', '#c9a26a', '#8a5cd6'][(k + r * 2) % 6]); });
+      break;
+    case 'table':
+      P = tdPainter(48, 38); P(4, 35, 40, 3, 'rgba(0,0,0,0.2)');
+      P(6, 22, 3, 14, '#5a3b28'); P(39, 22, 3, 14, '#5a3b28');
+      P(2, 8, 44, 16, '#9a6a40'); P(2, 8, 44, 2, '#b8885a'); P(2, 22, 44, 2, '#6a4630');
+      P(10, 3, 6, 7, '#e8e4dc'); P(11, 4, 4, 2, '#7a5236'); // a cup
+      P(28, 2, 9, 8, '#e8dcc0'); P(29, 4, 7, 1, '#a07a50'); P(29, 6, 5, 1, '#a07a50'); // a notebook
+      break;
+    case 'stool':
+      P = tdPainter(16, 16); P(2, 14, 12, 2, 'rgba(0,0,0,0.2)'); P(3, 3, 10, 5, '#9a6a40'); P(3, 3, 10, 1, '#b8885a'); P(4, 8, 2, 7, '#5a3b28'); P(10, 8, 2, 7, '#5a3b28');
+      break;
+    case 'stove':
+      P = tdPainter(36, 50); P(2, 47, 32, 3, 'rgba(0,0,0,0.25)');
+      P(14, 0, 8, 18, '#4a4e58'); P(14, 0, 2, 18, '#5e636e'); // pipe
+      P(3, 16, 30, 32, '#4a4e58'); P(3, 16, 30, 3, '#6e747c'); P(3, 45, 30, 3, '#3a3e46');
+      P(9, 26, 18, 13, '#2a2c32'); P(11, 28, 14, 9, '#f07a30'); P(13, 31, 10, 6, '#f0a040'); P(16, 33, 4, 3, '#ffe08a'); // the fire
+      P(6, 20, 3, 3, '#e2b23c'); P(27, 20, 3, 3, '#e2b23c');
+      break;
+    case 'chest':
+      P = tdPainter(38, 30); P(2, 27, 34, 3, 'rgba(0,0,0,0.22)');
+      P(3, 6, 32, 22, '#8a5a36'); P(3, 6, 32, 7, '#9a6a40'); P(3, 12, 32, 2, '#5a3b28');
+      P(8, 6, 3, 22, '#77706a'); P(27, 6, 3, 22, '#77706a'); P(17, 12, 4, 5, '#e2b23c');
+      break;
+    case 'plant':
+      P = tdPainter(16, 24); P(3, 21, 10, 3, 'rgba(0,0,0,0.2)'); P(4, 14, 8, 8, '#b8704f'); P(4, 14, 8, 2, '#d08a62');
+      P.disc(8, 8, 5, '#3f6e44'); P(5, 4, 3, 3, '#5a8e57'); P(9, 6, 3, 3, '#5a8e57');
+      break;
+    default: P = tdPainter(8, 8); P(2, 2, 4, 4, '#888');
+  }
+  return P.done(false);
+}
+
+// --- Task 120: garden decorations, anchored at the bottom centre of their foot.
+function tdDecorSprite(key){
+  let P;
+  switch(key){
+    case 'flowerPot':
+      P = tdPainter(14, 18); P(2, 16, 10, 2, 'rgba(0,0,0,0.22)'); P(3, 10, 8, 7, '#b8704f'); P(3, 10, 8, 2, '#d08a62'); P(4, 16, 6, 1, '#8a5236');
+      P(5, 5, 2, 6, '#4f8246'); P(8, 4, 2, 7, '#5a8e57'); P(3, 2, 4, 4, '#e06f8a'); P(4, 3, 2, 2, '#f7c0cf'); P(8, 1, 4, 4, '#f0d060'); P(9, 2, 2, 2, '#fff3b0');
+      break;
+    case 'bench':
+      P = tdPainter(30, 20); P(2, 18, 26, 2, 'rgba(0,0,0,0.22)');
+      P(3, 2, 24, 3, '#9a6a40'); P(3, 2, 24, 1, '#b8885a'); P(3, 6, 24, 2, '#8a5a36'); // the back
+      P(2, 9, 26, 4, '#a87a4e'); P(2, 9, 26, 1, '#c49a6a'); P(2, 12, 26, 1, '#7a5236'); // the seat
+      P(4, 13, 3, 6, '#5a3b28'); P(23, 13, 3, 6, '#5a3b28'); P(4, 4, 2, 9, '#6a4630'); P(24, 4, 2, 9, '#6a4630');
+      break;
+    case 'lantern':
+      P = tdPainter(14, 26); P(2, 24, 10, 2, 'rgba(0,0,0,0.25)');
+      P(4, 17, 6, 8, '#8f8a84'); P(3, 23, 8, 2, '#77706a'); // the post
+      P(3, 9, 8, 8, '#9a958e'); P(5, 11, 4, 4, '#ffd27a'); P(6, 12, 2, 2, '#fff3b0'); // the light box
+      P(1, 6, 12, 3, '#77706a'); P(2, 5, 10, 1, '#a9a39a'); P(5, 3, 4, 2, '#8f8a84'); // the cap
+      break;
+    case 'shrub':
+      P = tdPainter(22, 20); P(3, 17, 16, 3, 'rgba(0,0,0,0.25)');
+      P.disc(11, 10, 8, '#3f6e44'); P.disc(10, 9, 6, '#4f8246'); P.disc(8, 7, 3, '#6a9e5f'); P(14, 6, 2, 2, '#e06f8a'); P(6, 12, 2, 2, '#f0d060');
+      break;
+    // Task 122: the museum's reward decorations
+    case 'oreStatue':
+      P = tdPainter(18, 28); P(2, 26, 14, 2, 'rgba(0,0,0,0.25)'); P(2, 21, 14, 6, '#8f8a84'); P(2, 21, 14, 1, '#a9a39a');
+      P(6, 9, 6, 12, '#b8704f'); P(5, 4, 8, 6, '#c98a62'); P(4, 3, 10, 3, '#e2b23c'); P(7, 4, 4, 1, '#fff3b0'); // a little miner in ore, a gold helmet
+      P(12, 8, 2, 9, '#6a4630'); P(11, 7, 5, 2, '#9a958e'); P(7, 12, 1, 2, '#e09a72'); P(10, 15, 1, 2, '#e09a72');
+      break;
+    case 'crystalFountain':
+      P = tdPainter(30, 26); P(2, 23, 26, 3, 'rgba(0,0,0,0.25)');
+      P(2, 15, 26, 9, '#8f8a84'); P(2, 15, 26, 2, '#a9a39a'); P(4, 17, 22, 5, '#4f9ec4'); P(5, 18, 8, 1, '#bff3ff'); // the basin and its water
+      P(12, 6, 6, 11, '#9a958e'); P(13, 2, 4, 6, '#7fd7ec'); P(14, 0, 2, 3, '#e8fbff'); P(10, 4, 2, 4, '#5fc0d8'); P(18, 5, 2, 3, '#5fc0d8'); // the crystal
+      P(8, 12, 1, 4, '#bff3ff'); P(21, 11, 1, 5, '#bff3ff');
+      break;
+    case 'goldenPick':
+      P = tdPainter(18, 30); P(2, 28, 14, 2, 'rgba(0,0,0,0.25)'); P(2, 22, 14, 7, '#77706a'); P(2, 22, 14, 1, '#958d85'); P(5, 24, 8, 2, '#e2b23c');
+      P(8, 6, 2, 16, '#b58a26'); P(8, 6, 1, 16, '#f2d68c'); // the haft
+      P(2, 3, 14, 3, '#e2b23c'); P(1, 4, 2, 3, '#b58a26'); P(15, 4, 2, 3, '#b58a26'); P(3, 3, 11, 1, '#fff3b0'); // the gold head
+      break;
+    default: P = tdPainter(8, 8); P(2, 2, 4, 4, '#888');
+  }
   return P.done(false);
 }
 
@@ -238,9 +409,10 @@ function tdBuildSpriteSheet(){
   Object.keys(TD_RES_COLORS).forEach(r => { sheet.ore[r] = { unsecured: tdSpriteImage(tdOreSprite(r, 'unsecured')), secured: tdSpriteImage(tdOreSprite(r, 'secured')) }; });
   sheet.ore.undiscovered = tdSpriteImage(tdOreSprite(null, 'undiscovered'));
   sheet.base = tdSpriteImage(tdBaseSprite());
+  sheet.house = tdSpriteImage(tdHouseSprite()); // Task 119
   sheet.torch = [0, 1, 2].map(f => tdSpriteImage(tdTorchSprite(f)));
   [1, 2, 3].forEach(t => { sheet.workshop[t] = tdSpriteImage(tdWorkshopSprite(t)); });
-  ['bigTree', 'sparseTree', 'grass', 'rock', 'clearing', 'exposedVein', 'undevelopedVein', 'rareVein', 'crystal', 'oldShaftEntrance', 'timberSupport', 'mineCart', 'diggingMarks', 'lamp']
+  ['bigTree', 'sparseTree', 'grass', 'rock', 'clearing', 'exposedVein', 'undevelopedVein', 'rareVein', 'crystal', 'oldShaftEntrance', 'timberSupport', 'mineCart', 'diggingMarks', 'lamp', 'villageBoard']
     .forEach(k => { sheet.prop[k] = tdSpriteImage(tdPropSprite(k)); });
   return sheet;
 }

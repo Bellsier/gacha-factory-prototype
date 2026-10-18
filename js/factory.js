@@ -109,7 +109,9 @@ function workshopBuildSpot(){
     state.world.mines.some(m => m.x === x && m.y === y) ||
     state.world.workshops.some(w => w.x === x && w.y === y) ||
     // Task 114: a new craft hut keeps clear of the village facility sites
-    (typeof villageSiteNear === 'function' && villageSiteNear(x, y, VILLAGE.SITE.WORKSHOP_CLEAR));
+    (typeof villageSiteNear === 'function' && villageSiteNear(x, y, VILLAGE.SITE.WORKSHOP_CLEAR)) ||
+    // Task 118: ...and of the plaza, the house and garden lots and the roads
+    (typeof villageGroundNear === 'function' && villageGroundNear(x, y, VILLAGE.DISTRICT.BUILD_CLEAR));
   for(let r = 1; r <= 4; r++){
     for(let dy = -r; dy <= r; dy++){
       for(let dx = -r; dx <= r; dx++){

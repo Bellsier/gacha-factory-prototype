@@ -471,7 +471,7 @@ function tickExploration(){
 
 function tickLoop(){
   // Task 114: a village without sites (a new game or an older save) gets them once
-  if(typeof villageEnsureSites === 'function' && state.village && state.village.sites && !(state.village.sites.appraiser && state.village.sites.museum)) villageEnsureSites();
+  if(typeof villageEnsureSites === 'function' && state.village && state.village.sites && !(state.village.sites.appraiser && state.village.sites.museum && state.village.district)) villageEnsureSites(); // Task 118: and the plaza
   tickMining();
   tickCrafting();
   tickWorkshops();
