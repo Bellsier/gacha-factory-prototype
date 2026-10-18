@@ -86,6 +86,6 @@ npm run package
 
 게임 자체는 빌드가 필요하지 않습니다. 브라우저 테스트에는 Playwright 및 Chromium과 실행 중인 HTTP 서버가 필요합니다. `GAME_URL`로 테스트 주소를 지정할 수 있습니다. `tools/`의 패키징 도구는 분리 소스에서 단일 HTML과 ZIP 배포물을 생성하는 용도입니다.
 
-환경 초기화로 작업 파일이 사라진 후 대화에 남은 소스를 복원했습니다. 현재 복원본의 전체 검증과 패키징은 진행 중이며 이 문서는 최종 통과 결과를 주장하지 않습니다. 최종 실행 결과는 별도 검증 보고서를 확인하세요.
+환경 초기화로 작업 파일이 사라진 후 대화에 남은 소스를 복원했습니다. 최종 실행 결과와 제한 사항은 [검증 보고서](docs/TEST-REPORT.md)를 확인하세요.
 
 설계 경계는 [docs/DESIGN.md](docs/DESIGN.md), 모듈과 통합 방법은 [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md), 진행 기록은 [docs/PROGRESS.md](docs/PROGRESS.md)에 있습니다.

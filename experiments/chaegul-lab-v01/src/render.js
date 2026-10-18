@@ -54,7 +54,7 @@ function object(c,o,g,t){
  }
 }
 G.render=function(canvas,g,t){
- const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height,zoom=Math.max(.65,Math.min(1.25,w/900,h/570)),vw=Math.min(G.W,w/zoom),vh=Math.min(G.H,h/zoom),p=g.state.player,cam={x:G.clamp(p.x-vw/2,0,G.W-vw),y:G.clamp(p.y-vh/2,0,G.H-vh),zoom};
+ const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height,zoom=Math.max(w/G.W,h/G.H,.65,Math.min(1.25,w/900,h/570)),vw=Math.min(G.W,w/zoom),vh=Math.min(G.H,h/zoom),p=g.state.player,cam={x:G.clamp(p.x-vw/2,0,G.W-vw),y:G.clamp(p.y-vh/2,0,G.H-vh),zoom};
  g.camera=cam;c.imageSmoothingEnabled=false;c.clearRect(0,0,w,h);c.save();c.scale(zoom,zoom);c.translate((w/zoom-vw)/2-cam.x,(h/zoom-vh)/2-cam.y);const r=g.world.region;rect(c,0,0,G.W,G.H,r.ground);
  for(let y=Math.floor(cam.y/32)*32;y<cam.y+vh+32;y+=32)for(let x=Math.floor(cam.x/32)*32;x<cam.x+vw+32;x+=32){const n=hash(x,y);rect(c,x,y,32,32,n>.52?r.light:r.dark);c.globalAlpha=.83;rect(c,x,y,32,32,r.ground);c.globalAlpha=1;if(n>.65){rect(c,x+8,y+14,2,5,r.light);rect(c,x+12,y+16,2,3,r.light);}}
  const road=g.world.underground?'#737b7970':'#b9a77a66';rect(c,0,492,G.W,56,road);rect(c,577,310,46,505,road);
