@@ -1291,3 +1291,67 @@ function t116OpenVillage(win, which) {
     back.saveVersion === 1 && back.run.village.stage.museum === 2 && back.run.village.donated.length >= 1 && t103Canon(back.run.world.mines) === mines &&
     t103Canon(back.run.world.workshops) === huts && t103Canon(back.run.resources) === res);
 })();
+
+// -----------------------------------------------------------------------------
+// PR #35 verification: no double payments or double rewards, save/load at every step
+// -----------------------------------------------------------------------------
+(function test_T117_noDoubles() {
+  const storage = makeMemoryStorage();
+  let win = newDom(storage).window;
+  const reload = () => { win.saveGame(); win = newDom(storage).window; return win.state; };
+  let s = win.state;
+  s.gold = 100000; s.products.steel = 100; s.products.coalBrick = 100; s.products.ironTool = 100;
+  const spent = () => ({ gold: s.gold, steel: s.products.steel, coalBrick: s.products.coalBrick, ironTool: s.products.ironTool });
+  const steps = [];
+  // every restoration step, saved and loaded in between: each step paid exactly once
+  for (const k of ['appraiser', 'museum']) {
+    for (let step = 0; step < 2; step++) {
+      const before = spent(), cost = win.VILLAGE.FACILITIES[k].stages[step].cost;
+      const ok = win.villageRestore(k);
+      const after = spent();
+      steps.push(ok && before.gold - after.gold === cost.gold && Object.keys(cost.products || {}).every((p) => before[p] - after[p] === cost.products[p]) &&
+        Object.keys(before).filter((p) => p !== 'gold' && !(cost.products || {})[p]).every((p) => before[p] === after[p]));
+      s = reload();
+      steps.push(s.village.stage[k] === step + 1);
+    }
+  }
+  check('PR35: every restoration step is paid exactly once, and the stage survives a save and load each time', steps.length === 8 && steps.every(Boolean));
+  const frozen = spent();
+  for (let i = 0; i < 5; i++) { win.villageRestore('appraiser'); win.villageRestore('museum'); }
+  const a = s.village.sites.appraiser, m = s.village.sites.museum;
+  for (let i = 0; i < 3; i++) { win.tdInteract(win.tdInteractTarget(a.x, a.y + 0.2)); win.tdInteract(win.tdInteractTarget(m.x, m.y + 0.2)); }
+  check('PR35: once open, pressing again (panel or E, many times) takes nothing more', JSON.stringify(spent()) === JSON.stringify(frozen));
+  // relic progress is not re-granted by saving and loading
+  win.secureMine('mine_start_iron');
+  for (let i = 0; i < 7; i++) win.mineMine('mine_start_iron');
+  check('PR35: 7 hand minings leave progress 7 and no relic yet', s.village.digProgress === 7 && s.village.unidentified === 0);
+  s = reload();
+  check('PR35: after a save and load the progress is the same and nothing extra was found', s.village.digProgress === 7 && s.village.unidentified === 0);
+  win.mineMine('mine_start_iron');
+  check('PR35: the 8th mining after loading turns up exactly one', s.village.unidentified === 1 && s.village.digProgress === 0);
+  // appraisal: one relic in, one result out; nothing to appraise gives nothing
+  const r = win.villageAppraise();
+  check('PR35: appraising one relic gives one result', !!r && s.village.unidentified === 0 && s.village.appraised === 1 && Object.values(s.village.owned).reduce((x, y) => x + y, 0) === 1);
+  check('PR35: with none left, appraising again gives nothing (E at the door just opens the panel)', win.villageAppraise() === null && win.tdInteract(win.tdInteractTarget(a.x, a.y + 0.2)).open === 'village' &&
+    s.village.appraised === 1);
+  s = reload();
+  check('PR35: the same codex and owned relic after loading (no second copy)', s.village.appraised === 1 && s.village.codex.length === 1 && Object.values(s.village.owned).reduce((x, y) => x + y, 0) === 1);
+  // donation: once per kind, also across a save and load; donating gives no gold
+  const key = s.village.codex[0], goldBefore = s.gold;
+  check('PR35: the relic is donated once', win.villageDonate(key) && s.village.donated.length === 1 && !s.village.owned[key]);
+  check('PR35: donating it again in the same session is refused', !win.villageDonate(key) && win.villageDonateAll() === 0 && s.village.donated.length === 1);
+  s.village.owned[key] = 1; // a duplicate appraised later
+  s = reload();
+  check('PR35: after loading, a duplicate of a kind on display cannot be donated again (no second display)', !win.villageDonate(key) && win.villageDonateAll() === 0 &&
+    s.village.donated.length === 1 && s.village.owned[key] === 1 && !win.tdInteract(win.tdInteractTarget(m.x, m.y + 0.2)).text.includes('기증'));
+  check('PR35: no gold came from donating', s.gold === goldBefore);
+  // a save that claims more than it has is cleaned up, not rewarded
+  const raw = JSON.parse(storage.getItem('gachaFactorySave'));
+  raw.run.village.donated = [key, key, key, 'notARelic'];
+  raw.run.village.stage = { appraiser: 9, museum: -1 };
+  storage.setItem('gachaFactorySave', JSON.stringify(raw));
+  const w3 = newDom(storage).window, v3 = w3.state.village;
+  check('PR35: a save listing a relic on display several times keeps it once; bad stages fall back to ruins', v3.donated.length === 1 && v3.donated[0] === key &&
+    v3.stage.appraiser === 0 && v3.stage.museum === 0);
+  check('PR35: saveVersion stays 1', JSON.parse(storage.getItem('gachaFactorySave')).saveVersion === 1);
+})();

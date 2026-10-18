@@ -47,6 +47,18 @@ npm test         # node tests/regression.test.js
 - 청크별 내용: 00 하네스(모듈 목록 `MODULE_FILES`, 상수 노출 `__expose`), 01~03 기본 시스템, 04 Task 103 안전장치(고정 저장 파일), 05 Task 104~112(탑다운), 06~08 Task 1~100의 회귀.
 - 고정 저장 파일: `tests/fixtures/save_v1_midgame.json`(전환 전 코드로 만든 중반 진행 저장, 터널 열림, 광맥 26개, 일꾼 5명, 명성 18). 기존 저장 호환의 기준이다.
 
+### GitHub Actions (main에 2026-10-17 추가)
+
+PR마다 다음 검사가 돈다. 같은 명령을 로컬에서 그대로 실행할 수 있다.
+
+| 검사 | 워크플로 | 하는 일 | 로컬 명령 |
+|---|---|---|---|
+| Node.js CI | `.github/workflows/node.js.yml` | Node 22에서 `npm install`, `npm test` | `npm test` |
+| Biome | `.github/workflows/quality.yml` | `biome.json`, `renovate.json`, `tests/browser-smoke.cjs`만 린트(포매터 끔). 게임 코드(`js/`, `css/`, `index.html`, `tests/chunks/`)는 대상이 아니다 | `npx --yes @biomejs/biome@2.2.5 check --formatter-enabled=false --assist-enabled=false biome.json renovate.json tests/browser-smoke.cjs` |
+| browser-smoke | `.github/workflows/quality.yml` | Playwright 1.56.1 Chromium으로 페이지를 열어 제목과 탭이 있는지 확인 | `node tests/browser-smoke.cjs`(Playwright 필요) |
+
+Renovate(`renovate.json`)는 주말마다 의존성 갱신 PR을 최대 2개 연다(메이저는 승인 후).
+
 ### 실행 파일 만들기
 
 ```bash
