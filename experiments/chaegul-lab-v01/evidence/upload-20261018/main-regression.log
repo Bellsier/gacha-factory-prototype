@@ -1489,7 +1489,7 @@ Not implemented: HTMLCanvasElement's getContext() method: without installing the
 
 <--- Last few GCs --->
 
-[1614:0xc9fa000]   284988 ms: Scavenge (interleaved) 2031.3 (2046.1) -> 2029.4 (2054.8) MB, pooled: 0 MB, 31.61 / 0.00 ms  (average mu = 0.357, current mu = 0.341) allocation failure; 
+[1614:0xc9fa000]   284988 ms: Scavenge (interleaved) 2031.3 (2046.1) -> 2029.4 (2054.8) MB, pooled: 0 MB, 31.61 / 0.00 ms  (average mu = 0.357, current mu = 0.341) allocation failure;
 [1614:0xc9fa000]   287813 ms: Mark-Compact (reduce) 2037.8 (2056.6) -> 2026.8 (2039.4) MB, pooled: 0 MB, 61.91 / 0.00 ms  (+ 2373.9 ms in 132 steps since start of marking, biggest step 263.7 ms, walltime since start of marking 2705 ms) (average mu = 0.312
 FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
 ----- Native stack trace -----
