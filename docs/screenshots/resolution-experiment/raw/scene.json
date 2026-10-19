@@ -1,0 +1,354 @@
+{
+ "pc_day": {
+  "r1": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3,
+   "viewport": "1280x800",
+   "dpr": 1,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 640,
+    "y": 314
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none",
+   "res": 1,
+   "devPxPerSpritePx": 3,
+   "runWidths": [
+    3,
+    18
+   ],
+   "sheetBuildMs": 30.5,
+   "playerHouseSpriteKB": 46,
+   "frameAvgMs": 16.67,
+   "frames": 151
+  },
+  "r15": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3,
+   "viewport": "1280x800",
+   "dpr": 1,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 640,
+    "y": 314
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none",
+   "res": 1.5,
+   "devPxPerSpritePx": 2,
+   "runWidths": [
+    2,
+    6
+   ],
+   "sheetBuildMs": 41.8,
+   "playerHouseSpriteKB": 104,
+   "frameAvgMs": 16.67,
+   "frames": 152
+  },
+  "r2": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3,
+   "viewport": "1280x800",
+   "dpr": 1,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 640,
+    "y": 314
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none",
+   "res": 2,
+   "devPxPerSpritePx": 1.5,
+   "runWidths": [
+    1,
+    2,
+    6
+   ],
+   "sheetBuildMs": 69.3,
+   "playerHouseSpriteKB": 184,
+   "frameAvgMs": 16.67,
+   "frames": 151
+  }
+ },
+ "mobile_day": {
+  "r1": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 2,
+   "cssPxPerArtPx": 2,
+   "viewport": "390x664",
+   "dpr": 3,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 195,
+    "y": 274
+   },
+   "playerScreen": {
+    "x": 195,
+    "y": 332
+   },
+   "inside": false,
+   "errors": "none",
+   "res": 1,
+   "devPxPerSpritePx": 6,
+   "runWidths": [
+    6,
+    36
+   ],
+   "sheetBuildMs": 30.1,
+   "playerHouseSpriteKB": 46,
+   "frameAvgMs": 23.19,
+   "frames": 114
+  },
+  "r15": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 2,
+   "cssPxPerArtPx": 2,
+   "viewport": "390x664",
+   "dpr": 3,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 195,
+    "y": 274
+   },
+   "playerScreen": {
+    "x": 195,
+    "y": 332
+   },
+   "inside": false,
+   "errors": "none",
+   "res": 1.5,
+   "devPxPerSpritePx": 4,
+   "runWidths": [
+    2,
+    4,
+    12
+   ],
+   "sheetBuildMs": 43.9,
+   "playerHouseSpriteKB": 104,
+   "frameAvgMs": 20.53,
+   "frames": 130
+  },
+  "r2": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 2,
+   "cssPxPerArtPx": 2,
+   "viewport": "390x664",
+   "dpr": 3,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 195,
+    "y": 274
+   },
+   "playerScreen": {
+    "x": 195,
+    "y": 332
+   },
+   "inside": false,
+   "errors": "none",
+   "res": 2,
+   "devPxPerSpritePx": 3,
+   "runWidths": [
+    3,
+    12
+   ],
+   "sheetBuildMs": 57.5,
+   "playerHouseSpriteKB": 184,
+   "frameAvgMs": 19.48,
+   "frames": 128
+  }
+ },
+ "laptop150_day": {
+  "r1": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3.333333333333333,
+   "viewport": "1280x800",
+   "dpr": 1.5,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 640,
+    "y": 304.44444444444446
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none",
+   "res": 1,
+   "devPxPerSpritePx": 5,
+   "runWidths": [
+    5,
+    30
+   ],
+   "sheetBuildMs": 22.5,
+   "playerHouseSpriteKB": 46,
+   "frameAvgMs": 26.24,
+   "frames": 103
+  },
+  "r15": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3.333333333333333,
+   "viewport": "1280x800",
+   "dpr": 1.5,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 640,
+    "y": 304.44444444444446
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none",
+   "res": 1.5,
+   "devPxPerSpritePx": 3.333,
+   "runWidths": [
+    3,
+    4,
+    10
+   ],
+   "sheetBuildMs": 66.8,
+   "playerHouseSpriteKB": 104,
+   "frameAvgMs": 19.45,
+   "frames": 117
+  },
+  "r2": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3.333333333333333,
+   "viewport": "1280x800",
+   "dpr": 1.5,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 640,
+    "y": 304.44444444444446
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none",
+   "res": 2,
+   "devPxPerSpritePx": 2.5,
+   "runWidths": [
+    2,
+    3,
+    10
+   ],
+   "sheetBuildMs": 64.8,
+   "playerHouseSpriteKB": 184,
+   "frameAvgMs": 25.42,
+   "frames": 120
+  }
+ }
+}

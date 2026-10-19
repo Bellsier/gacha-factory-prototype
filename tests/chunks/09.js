@@ -368,6 +368,33 @@ function styleSolid(r) {
   check('Style: nothing about the style is saved (saveVersion 1)', sv.saveVersion === 1 && !/style/i.test(JSON.stringify(Object.keys(sv.run))) && !('style' in sv));
 })();
 
+// Resolution experiment (?style=v2&res=1.5 / 2): the player and the house on a finer
+// grid, the same size on screen. Off unless asked for; only with the v2 style.
+(function test_resolution_experiment() {
+  const plain = newDom(makeMemoryStorage()).window;
+  check('Res: without ?res the resolution is 1 (and ?res alone, without v2, does nothing)', plain.tdResFactor() === 1 && tdDomAt('https://example.test/?res=2', makeMemoryStorage()).tdResFactor() === 1);
+  [1.5, 2].forEach((R) => {
+    const win = tdDomAt('https://example.test/?style=v2&res=' + R, makeMemoryStorage());
+    check('Res ' + R + ': the setting is read', win.tdResFactor() === R);
+    let sizes = true, feet = true, hair = true;
+    ['down', 'up', 'left', 'right'].forEach((d) => [0, 1, 2, 3].forEach((f) => {
+      const r = win.tdRaster(win.tdPlayerSpriteRes(d, f, R)), lo = win.tdRaster(win.tdPlayerSpriteV2(d, f)), a = styleSolid(r), b = styleSolid(lo);
+      if (r.w !== Math.round(16 * R) || r.h !== Math.round(22 * R)) sizes = false;
+      if (Math.abs((a.y1 + 1) / R - (b.y1 + 1)) > 0.5 || Math.abs(a.y0 / R - b.y0) > 1) feet = false; // the feet and the top in the same place on screen
+      if (r.px.filter((p) => p && p[3] >= 1 && p[2] - p[0] > 50).length < 25 * R * R) hair = false;
+    }));
+    check('Res ' + R + ': the player is drawn ' + R + ' times finer (' + Math.round(16 * R) + 'x' + Math.round(22 * R) + ') with its feet and head where they were on screen', sizes && feet);
+    check('Res ' + R + ': ...and keeps its cobalt hair', hair);
+    const h = win.tdRaster(win.tdHouseSpriteRes(R)), hb = styleSolid(h), lo = styleSolid(win.tdRaster(win.tdHouseSpriteV2()));
+    check('Res ' + R + ': the house is drawn ' + R + ' times finer with the same outline box (within an art pixel)', h.w === Math.round(84 * R) && h.h === Math.round(73 * R) &&
+      Math.abs(hb.x0 / R - lo.x0) <= 1 && Math.abs((hb.x1 + 1) / R - (lo.x1 + 1)) <= 1 && Math.abs((hb.y1 + 1) / R - (lo.y1 + 1)) <= 1);
+    // tdDrawSprite shows a finer sprite at zoom / R: the same size on screen
+    const drawn = []; const g = { drawImage: (img, x, y, w, hh) => drawn.push([w, hh]) };
+    win.tdDrawSprite(g, { width: Math.round(16 * R), height: Math.round(22 * R), artRes: R }, 100, 100, 3, 1);
+    check('Res ' + R + ': on screen the player is exactly as big as at resolution 1', Math.abs(drawn[0][0] - 48) < 1e-9 && Math.abs(drawn[0][1] - 66) < 1e-9);
+  });
+})();
+
 // -----------------------------------------------------------------------------
 // Task 120: the garden and its decorations
 // -----------------------------------------------------------------------------

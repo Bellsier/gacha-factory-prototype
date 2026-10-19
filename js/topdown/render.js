@@ -202,7 +202,7 @@ function tdResize(){
 
 function tdDrawSprite(g, img, sx, sy, zoom, anchorY){
   if(!img) return;
-  const w = img.width * zoom, h = img.height * zoom;
+  const s = zoom / (img.artRes || 1), w = img.width * s, h = img.height * s; // a finer-grid sprite (resolution experiment) keeps its size on screen
   g.drawImage(img, Math.round(sx - w / 2), Math.round(sy - h + (anchorY || 0) * zoom), w, h);
 }
 

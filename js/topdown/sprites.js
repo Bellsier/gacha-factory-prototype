@@ -492,11 +492,13 @@ function tdSpriteImage(sprite){
 function tdBuildSpriteSheet(){
   const sheet = { player: {}, ore: {}, workshop: {}, prop: {} };
   const v2 = typeof tdStyleV2 === 'function' && tdStyleV2(); // the style experiment (?style=v2)
-  ['down', 'up', 'left', 'right'].forEach(d => { sheet.player[d] = [0, 1, 2, 3].map(f => tdSpriteImage(v2 ? tdPlayerSpriteV2(d, f) : tdPlayerSprite(d, f))); });
+  const R = typeof tdResFactor === 'function' ? tdResFactor() : 1; // the resolution experiment (?res=1.5 / 2, with v2)
+  const atRes = (img) => { if(img) img.artRes = R; return img; };
+  ['down', 'up', 'left', 'right'].forEach(d => { sheet.player[d] = [0, 1, 2, 3].map(f => R > 1 ? atRes(tdSpriteImage(tdPlayerSpriteRes(d, f, R))) : tdSpriteImage(v2 ? tdPlayerSpriteV2(d, f) : tdPlayerSprite(d, f))); });
   Object.keys(TD_RES_COLORS).forEach(r => { sheet.ore[r] = { unsecured: tdSpriteImage(tdOreSprite(r, 'unsecured')), secured: tdSpriteImage(tdOreSprite(r, 'secured')) }; });
   sheet.ore.undiscovered = tdSpriteImage(tdOreSprite(null, 'undiscovered'));
   sheet.base = tdSpriteImage(tdBaseSprite());
-  sheet.house = tdSpriteImage(v2 ? tdHouseSpriteV2() : tdHouseSprite()); // Task 119
+  sheet.house = R > 1 ? atRes(tdSpriteImage(tdHouseSpriteRes(R))) : tdSpriteImage(v2 ? tdHouseSpriteV2() : tdHouseSprite()); // Task 119
   sheet.torch = [0, 1, 2].map(f => tdSpriteImage(tdTorchSprite(f)));
   [1, 2, 3].forEach(t => { sheet.workshop[t] = tdSpriteImage(tdWorkshopSprite(t)); });
   ['bigTree', 'sparseTree', 'grass', 'rock', 'clearing', 'exposedVein', 'undevelopedVein', 'rareVein', 'crystal', 'oldShaftEntrance', 'timberSupport', 'mineCart', 'diggingMarks', 'lamp', 'villageBoard']

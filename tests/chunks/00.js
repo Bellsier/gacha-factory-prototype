@@ -28,7 +28,7 @@ const html = fs.readFileSync(HTML_PATH, 'utf8');
 const JS_DIR = path.join(__dirname, '..', 'js');
 const MODULE_FILES = ['data.js', 'balance.js', 'terrain.js', 'worldgen.js', 'state.js', 'systems.js', 'factory.js', 'research.js', 'delivery.js', 'player.js', 'village.js', 'ui.js', 'main.js',
   // Task 104-106: the top-down world (loaded after main.js, as in index.html)
-  'topdown/view.js', 'topdown/tiles.js', 'topdown/sprites.js', 'topdown/style.js', 'topdown/interact.js', 'topdown/light.js', 'topdown/workers.js', 'topdown/render.js', 'topdown/app.js'];
+  'topdown/view.js', 'topdown/tiles.js', 'topdown/sprites.js', 'topdown/style.js', 'topdown/hires.js', 'topdown/interact.js', 'topdown/light.js', 'topdown/workers.js', 'topdown/render.js', 'topdown/app.js'];
 const moduleSource = MODULE_FILES.map((f) => fs.readFileSync(path.join(JS_DIR, f), 'utf8')).join('\n');
 
 let passCount = 0;
