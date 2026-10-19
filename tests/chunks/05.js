@@ -334,7 +334,9 @@ function t107Overlapping(win, x, y) {
 (function test_T107_obstacles() {
   const win = newDom(makeMemoryStorage()).window;
   const s = win.state, p = s.world.player, b = s.world.base;
-  const hut = win.addWorkshop({ x: b.x + 3, y: b.y + 2, level: 1 });
+  // the hut goes on the first open spot round the workshop (the village's house can stand on a fixed one)
+  const spot = [[3, 2], [3, -2], [-3, 2], [-3, -2], [2, 3], [-2, 3], [3.5, 0], [-3.5, 0]].map(([dx, dy]) => ({ x: b.x + dx, y: b.y + dy })).find((c) => win.playerCanStand(c.x, c.y));
+  const hut = win.addWorkshop({ x: spot.x, y: spot.y, level: 1 });
   const obs = win.worldObstacles();
   check('Task107: every vein, the workshop and every craft hut is an obstacle', obs.filter((o) => o.kind === 'mine').length === s.world.mines.length &&
     obs.filter((o) => o.kind === 'base').length === 1 && obs.filter((o) => o.kind === 'workshop').length === 1);
@@ -359,7 +361,12 @@ function t107Overlapping(win, x, y) {
   p.x = hut.x; p.y = hut.y; t107Hold(win, ['up'], 10);
   check('Task107: a craft hut stops the player at its wall', Math.abs(p.y - (hut.y + B.workshop.maxY + F.HALF_H)) < 1e-3);
   // veins: head-on the player glides round a small boulder; slightly off-centre it slips past
-  const vein = win.addMine({ id: 'mine_t107', x: b.x + 4, y: b.y - 4, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' });
+  // (on open ground with room either side: a village building can stand on a fixed spot)
+  const vs = [[4, -4], [-4, -4], [4, 4], [-4, 4], [5, 0], [-5, 0], [0, 5], [0, -5]].map(([dx, dy]) => ({ x: b.x + dx, y: b.y + dy })).find((c) => {
+    for (let x = c.x - 1.0; x <= c.x + 1.7; x += 0.05) for (let y = c.y - 0.35; y <= c.y + 0.35; y += 0.05) if (!win.playerCanStand(x, y)) return false;
+    return true;
+  });
+  const vein = win.addMine({ id: 'mine_t107', x: vs.x, y: vs.y, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' });
   p.x = vein.x + 1.5; p.y = vein.y; let touched = false;
   win.setPlayerHeld('left', true);
   for (let i = 0; i < 12; i++) { win.tickPlayer(); if (t107Overlapping(win, p.x, p.y).length) touched = true; }
@@ -371,8 +378,10 @@ function t107Overlapping(win, x, y) {
   p.x = b.x + 1.2; p.y = b.y - 0.27; t107Hold(win, ['left'], 10);
   check('Task107: the cabin is too wide to glide round — the player stops', Math.abs(p.x - flush) < 1e-3);
   // the mountain still stops the player (Task 66)
-  p.x = 0; p.y = -5; t107Hold(win, ['left'], 40);
-  check('Task107: the mountain face still stops the player flush', Math.abs(p.x - (win.terrainFaceX(-5) + win.WORLD_TERRAIN.PLAYER_MARGIN)) < 1e-3);
+  // (a clear lane next to the face: a vein or a village building can stand on a fixed one)
+  const laneY = [-5, -4.5, -5.5, -4, -6, -3.5, -6.5].find((y) => { const fx = win.terrainFaceX(y) + win.WORLD_TERRAIN.PLAYER_MARGIN; for (let x = fx + 0.02; x <= fx + 1.2; x += 0.05) if (!win.playerCanStand(x, y)) return false; return true; });
+  p.x = win.terrainFaceX(laneY) + win.WORLD_TERRAIN.PLAYER_MARGIN + 1.2; p.y = laneY; t107Hold(win, ['left'], 40);
+  check('Task107: the mountain face still stops the player flush', Math.abs(p.x - (win.terrainFaceX(laneY) + win.WORLD_TERRAIN.PLAYER_MARGIN)) < 1e-3);
   check('Task107: walking speed is unchanged (3 units a second)', win.BALANCE.world.PLAYER_SPEED === 3);
 })();
 
@@ -903,7 +912,8 @@ function t110Arrived(win) {
 (function test_T112_controls() {
   const win = newDom(makeMemoryStorage()).window;
   const s = win.state, p = s.world.player, b = s.world.base, doc = win.document;
-  p.x = b.x + 2.5; p.y = b.y + 2.5; p.facing = 'down';
+  // stand where a torch can go just ahead (the village's house can stand on a fixed spot)
+  [[2.5, 2.5], [-2.5, 2.5], [2.5, -2.5], [-2.5, -2.5], [3, 0], [-3, 0], [0, 3]].some(([dx, dy]) => { p.x = b.x + dx; p.y = b.y + dy; p.facing = 'down'; const a = win.torchSpotAhead(); return win.playerCanStand(p.x, p.y) && !win.torchPlaceProblem(a.x, a.y); });
   const btn = doc.getElementById('tdTorch');
   win.tdUpdateActionButton();
   check('Task112: a torch button is on the screen and says what it will do', !!btn && /횃불 놓기/.test(btn.textContent) && /0\/12/.test(btn.textContent));

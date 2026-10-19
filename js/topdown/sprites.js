@@ -288,25 +288,49 @@ function tdVillageSprite(key, stage, exhibits, specimens, hall){
   return P.done(false);
 }
 
-// --- Task 119: the player's house (outside), 48 x 44, door at the bottom centre.
+// --- Task 119: the player's house (outside), door at the bottom centre.
+// Sized to the player (H = 21 px, hair to boots): the door frame 25 px (~1.2H),
+// the walls 66 px wide (~3.1H; 76 with the eaves), the ridge 63 px above the
+// ground (3H; the chimney 67). Walls, roof and door are laid out on their own,
+// not one picture scaled up.
 function tdHouseSprite(){
-  const P = tdPainter(48, 44), groundY = 41;
-  P(3, 41, 42, 3, 'rgba(0,0,0,0.22)');
-  // walls: warm plaster over a stone footing, timber posts
-  P(6, 22, 36, 19, '#e8d6b0'); P(6, 37, 36, 4, '#9a9086'); P(6, 37, 36, 1, '#b4aaa0');
-  P(6, 22, 2, 15, '#8a6440'); P(40, 22, 2, 15, '#8a6440'); P(23, 22, 2, 4, '#8a6440');
-  // roof: green shingles
-  for(let k = 0; k < 15; k++){ const o = Math.floor(k * 6 / 14); P(9 - o, 6 + k, 30 + 2 * o, 1, k % 3 === 2 ? '#3f6b3a' : '#4f8246'); }
-  P(9, 6, 30, 1, 'rgba(255,255,255,0.22)'); P(2, 20, 44, 3, '#35592f');
-  P(33, 1, 6, 10, '#7a6a5e'); P(33, 1, 6, 2, '#958576'); // chimney
-  // door with a little step and a lantern
-  P(20, 27, 8, 14, '#5a3b28'); P(21, 28, 6, 13, '#8a5a36'); P(25, 34, 1, 2, '#e2b23c');
-  P(18, 40, 12, 1, '#b4aaa0');
-  P(29, 26, 2, 3, '#3a2a1e'); P(29, 27, 2, 2, '#ffd27a');
-  // windows with flower boxes
-  [[10, 26], [32, 26]].forEach(([x, y]) => {
-    P(x, y, 7, 7, '#5a3b28'); P(x + 1, y + 1, 5, 5, '#f3d27a'); P(x + 3, y + 1, 1, 5, '#5a3b28'); P(x + 1, y + 3, 5, 1, '#5a3b28');
-    P(x - 1, y + 7, 9, 2, '#8a6440'); P(x, y + 6, 2, 1, '#e06f8a'); P(x + 3, y + 6, 2, 1, '#f0d060'); P(x + 6, y + 6, 1, 1, '#e06f8a');
+  const P = tdPainter(84, 73), G = 70; // G: the ground row (the door step's foot)
+  P(5, G, 74, 3, 'rgba(0,0,0,0.22)');
+  // walls: warm boards over a stone footing, a timber frame
+  P(9, 36, 66, G - 36, '#e8d6b0');
+  for(let y = 40; y < G - 5; y += 4) P(9, y, 66, 1, '#dcc79e'); // board seams
+  P(9, G - 5, 66, 5, '#9a9086'); P(9, G - 5, 66, 1, '#b4aaa0');
+  for(let x = 13; x < 72; x += 9) P(x, G - 3, 1, 1, '#857b72'); // footing stones
+  P(9, 36, 3, G - 41, '#8a6440'); P(72, 36, 3, G - 41, '#8a6440'); // corner posts
+  P(9, 37, 66, 2, '#8a6440'); P(9, 39, 66, 1, '#6f5034');           // the beam under the eaves
+  P(31, 39, 2, G - 44, '#8a6440'); P(51, 39, 2, G - 44, '#8a6440'); // posts either side of the door
+  // roof: green shingle rows widening to the eaves, staggered tabs, a ridge cap
+  for(let y = 8; y <= 34; y++){
+    const o = Math.round((y - 8) * 16 / 26), x0 = 20 - o, w = 44 + 2 * o, band = Math.floor((y - 8) / 3);
+    P(x0, y, w, 1, band % 2 ? '#4a7c43' : '#4f8246');
+    if((y - 8) % 3 === 2){
+      P(x0, y, w, 1, '#3f6b3a');
+      for(let x = x0 + (band % 2 ? 3 : 6); x < x0 + w - 1; x += 6) P(x, y - 2, 1, 2, '#447540');
+    }
+  }
+  P(20, 7, 44, 1, '#6a9e5f'); P(22, 6, 40, 1, '#3f6b3a'); P(20, 8, 44, 1, 'rgba(255,255,255,0.18)');
+  P(3, 35, 78, 2, '#35592f'); P(4, 37, 76, 1, '#2c4a28');   // the eaves' edge
+  P(12, 39, 60, 1, 'rgba(60,40,20,0.18)');                   // shade under the eaves
+  P(58, 3, 8, 13, '#7a6a5e'); P(57, 2, 10, 2, '#958576'); P(60, 7, 3, 1, '#6a5b50'); P(59, 11, 4, 1, '#6a5b50'); // chimney
+  // door: a frame, two planks, a little window, a handle, the step
+  P(34, 43, 16, G - 45, '#5a3b28');
+  P(36, 45, 12, G - 47, '#8a5a36'); P(41, 45, 1, G - 47, '#74492c'); P(36, 56, 12, 1, '#74492c');
+  P(38, 48, 8, 4, '#3a2a1e'); P(39, 49, 6, 2, '#f3d27a');
+  P(45, 58, 2, 2, '#e2b23c');
+  P(31, G - 2, 22, 2, '#b4aaa0'); P(31, G - 2, 22, 1, '#cfc6bc');
+  // a lantern beside the door
+  P(55, 47, 4, 1, '#3a2a1e'); P(55, 48, 4, 4, '#3a2a1e'); P(56, 49, 2, 2, '#ffd27a');
+  // windows with flower boxes, one each side
+  [[15, 45], [59, 45]].forEach(([x, y]) => {
+    P(x, y, 11, 11, '#5a3b28'); P(x + 1, y + 1, 9, 9, '#f3d27a'); P(x + 1, y + 1, 9, 2, '#f7e2a0');
+    P(x + 5, y + 1, 1, 9, '#5a3b28'); P(x + 1, y + 5, 9, 1, '#5a3b28');
+    P(x - 1, y + 12, 13, 3, '#8a6440'); P(x - 1, y + 12, 13, 1, '#a07a50');
+    [[0, '#e06f8a'], [3, '#f0d060'], [6, '#e06f8a'], [9, '#f7c0cf']].forEach(([dx, c]) => { P(x + dx, y + 10, 2, 2, c); P(x + dx + 1, y + 11, 1, 1, '#4f8246'); });
   });
   return P.done(false);
 }

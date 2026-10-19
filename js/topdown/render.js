@@ -99,7 +99,7 @@ function tdPlazaLights(now){
 function tdHouseLights(now){
   const vd = typeof villageDistrict === 'function' ? villageDistrict() : null;
   if(!vd) return [];
-  return [{ kind: 'house', x: vd.house.x + 0.1, y: vd.house.y - 0.2, r: 0.75, rgb: [255, 206, 128], strength: 0.5 * tdFlicker(now, 61) }];
+  return [{ kind: 'house', x: vd.house.x + 0.23, y: vd.house.y - 0.31, r: 0.85, rgb: [255, 206, 128], strength: 0.5 * tdFlicker(now, 61) }];
 }
 
 // Task 120: stone lanterns in the garden glow at dusk.
@@ -217,7 +217,7 @@ function tdBubbleLift(target){
   if(target.type === 'base') return 64;
   if(target.type === 'village') return target.id === 'museum' ? 54 : 46;
   if(target.type === 'plaza') return 40;
-  if(target.type === 'house') return 50;
+  if(target.type === 'house') return 76;
   if(target.type === 'homeDoor') return 30;
   if(target.type === 'garden') return 32;
   return 34;

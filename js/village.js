@@ -404,7 +404,7 @@ VILLAGE.DISTRICT = {
     { house: { x: -1.25, y: -1.5 }, garden: { x: 1.45, y: -1.9 } },
     { house: { x: 1.25, y: -1.5 }, garden: { x: -1.45, y: -1.9 } },
   ],
-  HOUSE_BOX: { minX: -0.34, maxX: 0.34, minY: -0.44, maxY: -0.1 }, // the house walls, relative to its door
+  HOUSE_BOX: { minX: -0.5, maxX: 0.5, minY: -0.75, maxY: -0.1 }, // the house walls, relative to its door (the picture: 66 px wide walls)
   HOUSE_ROOM: 0.3,           // ground kept round the house walls
   GARDEN_HALF: { x: 1.25, y: 0.85 }, // the garden round its centre
   DIST: [3.5, 7.5],          // plaza centre from the workshop door (then wider, up to DIST_WIDE)

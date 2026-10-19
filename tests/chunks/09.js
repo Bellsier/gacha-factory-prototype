@@ -284,6 +284,45 @@ function t119Hold(win, dirs, ticks) {
   check('Task119: the 마을 panel has a card for the house', !!card && /내 집/.test(card.textContent));
 })();
 
+// The house outside, sized to the player (design review, 1st pass): measured on the
+// sprites' solid pixels. H = the player's height, hair to boots.
+function houseSolid(sp) {
+  const solid = sp.rects.filter((r) => !/^rgba/.test(r[4]));
+  return { top: Math.min(...solid.map((r) => r[1])), bottom: Math.max(...solid.map((r) => r[1] + r[3])) };
+}
+(function test_house_exterior() {
+  const win = newDom(makeMemoryStorage()).window;
+  const pl = win.tdPlayerSprite('down', 0), hs = win.tdHouseSprite(), H = houseSolid(pl).bottom - houseSolid(pl).top;
+  const walls = hs.rects.find((r) => r[4] === '#e8d6b0'), door = hs.rects.find((r) => r[4] === '#5a3b28' && r[0] + r[2] / 2 === hs.w / 2);
+  const ground = hs.h - 3, ridge = Math.min(...hs.rects.filter((r) => /^#(3f6b3a|4f8246|4a7c43|6a9e5f)$/.test(r[4])).map((r) => r[1]));
+  check('House: the player keeps its size (16 x 22, 21 px hair to boots)', pl.w === 16 && pl.h === 22 && H === 21);
+  check('House: the door is 1.15~1.3 H tall and stands at the bottom centre', !!door && door[3] / H >= 1.15 && door[3] / H <= 1.3 && door[1] + door[3] <= ground);
+  check('House: the walls are 3~4 H wide', !!walls && walls[2] / H >= 3 && walls[2] / H <= 4);
+  check('House: with the roof it is 2.7~3.3 H tall (to the ridge and to the chimney top)', (ground - ridge) / H >= 2.7 && (ground - ridge) / H <= 3.3 &&
+    (ground - houseSolid(hs).top) / H >= 2.7 && (ground - houseSolid(hs).top) / H <= 3.3);
+  const B = win.VILLAGE.DISTRICT.HOUSE_BOX, wallUnits = walls[2] / win.TD_UNIT_PX;
+  check('House: the walls block as wide as they are drawn (within 0.05), centred on the door', Math.abs((B.maxX - B.minX) - wallUnits) <= 0.05 && B.minX === -B.maxX && B.maxY === -0.1);
+  // a village placed before the house grew (with the old, smaller walls) still works with the new walls
+  const OLD = { minX: -0.34, maxX: 0.34, minY: -0.44, maxY: -0.1 }, NEW = Object.assign({}, B);
+  let worlds = 0, bad = [];
+  for (let k = 0; k < 6; k++) {
+    const w = newDom(makeMemoryStorage()).window, v = w.state.village, D = w.VILLAGE.DISTRICT;
+    D.HOUSE_BOX = OLD; v.district = null; w.eval('villageDistrictFailKey = null; villageRoadCache = null;');
+    if (!w.villageEnsureDistrict()) continue;
+    D.HOUSE_BOX = NEW; v.district = Object.assign({}, v.district); w.eval('villageRoadCache = null;');
+    worlds++;
+    const door2 = w.villageHouseDoor(), box = w.villageHouseBox(door2), others = w.worldObstacles().filter((o) => o.kind !== 'house');
+    const overlaps = others.some((o) => o.maxX > box.minX && o.minX < box.maxX && o.maxY > box.minY && o.minY < box.maxY);
+    const veinsClear = w.state.world.mines.every((m) => w.villageRectDist(box, m.x, m.y) > 0.3);
+    const r = t114Reach(w), roads = w.villageRoads();
+    const stepFree = w.playerCanStand(door2.x, door2.y + 0.15) && w.playerCanStand(door2.x, door2.y + 0.25);
+    const roadsClear = roads.every((rd) => rd.points.every((pt) => !(pt.x > box.minX && pt.x < box.maxX && pt.y > box.minY && pt.y < box.maxY)));
+    if (overlaps || !veinsClear || !r.doorsOk || !r.minesOk || r.pockets || !stepFree || !roadsClear || !roads.length) bad.push({ k, overlaps, veinsClear, r, stepFree, roadsClear });
+  }
+  check('House: a village placed with the old smaller house still fits the new one (no overlap, veins clear, roads round it, every door, vein and the door step reachable)', worlds >= 5 && bad.length === 0);
+  if (bad.length) console.log('  house compat:', JSON.stringify(bad));
+})();
+
 // -----------------------------------------------------------------------------
 // Task 120: the garden and its decorations
 // -----------------------------------------------------------------------------
