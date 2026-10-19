@@ -99,6 +99,7 @@ function tdPaintTileMap(map){
     data[o] = data[o] * (1 - al) + c[0] * al; data[o + 1] = data[o + 1] * (1 - al) + c[1] * al; data[o + 2] = data[o + 2] * (1 - al) + c[2] * al; data[o + 3] = 255;
   };
   const pick = (list, h) => list[Math.floor(h * list.length) % list.length];
+  const v2 = typeof tdStyleV2 === 'function' && tdStyleV2();
   for(let j = 0; j < map.rows; j++){
     for(let i = 0; i < map.cols; i++){
       const type = map.types[j * map.cols + i];
@@ -116,7 +117,9 @@ function tdPaintTileMap(map){
         }
       }
       const h1 = tdHash(i, j, 1), h2 = tdHash(i, j, 2), h3 = tdHash(i, j, 3);
-      if(type === TD_TILE.GRASS){
+      if(v2 && (type === TD_TILE.GRASS || type === TD_TILE.ROAD || type === TD_TILE.PLAZA)){
+        tdPaintGrassV2(put, x0, y0, i, j); // the style experiment's grass (roads and the plaza are grass underneath)
+      } else if(type === TD_TILE.GRASS){
         if(h1 < 0.22){ const tx = x0 + 3 + Math.floor(h2 * 9), ty = y0 + 4 + Math.floor(h3 * 8); put(tx, ty, TD_COLORS.tuft); put(tx + 2, ty, TD_COLORS.tuft); put(tx + 1, ty - 1, TD_COLORS.tuft); put(tx + 1, ty, TD_COLORS.tuft); }
         if(h1 > 0.955){ const fx = x0 + 4 + Math.floor(h2 * 8), fy = y0 + 4 + Math.floor(h3 * 8), fc = pick(TD_COLORS.flower, h3); put(fx, fy, fc); put(fx + 1, fy, fc); put(fx, fy + 1, fc); put(fx + 1, fy + 1, [244, 226, 120]); }
       } else if(type === TD_TILE.BEYOND){
@@ -206,6 +209,10 @@ function tdPaintVillageGround(map, put, W, H){
   const toPx = (x, y) => [(x - map.originX) * U, (y - map.originY) * U];
   const base = state && state.world ? state.world.base : null, yardR = 1.0 * U, [bx, by] = base ? toPx(base.x, base.y) : [-1e9, -1e9];
   const hw = V.roadHalf * U;
+  const v2 = typeof tdStyleV2 === 'function' && tdStyleV2();
+  // v2: is (x, y) inside any road (so the shadow ring of one segment never darkens another)?
+  const segs = []; V.roads.forEach(pts => { for(let k = 0; k < pts.length - 1; k++) segs.push([...toPx(pts[k].x, pts[k].y), ...toPx(pts[k + 1].x, pts[k + 1].y)]); });
+  const onRoad = (x, y) => segs.some(([ax, ay, cx, cy]) => tdSegDist(x + 0.5, y + 0.5, ax, ay, cx, cy) <= hw);
   V.roads.forEach(pts => {
     for(let k = 0; k < pts.length - 1; k++){
       const [ax, ay] = toPx(pts[k].x, pts[k].y), [cx, cy] = toPx(pts[k + 1].x, pts[k + 1].y);
@@ -214,6 +221,12 @@ function tdPaintVillageGround(map, put, W, H){
       for(let y = minY; y <= maxY; y++){
         for(let x = minX; x <= maxX; x++){
           const d = tdSegDist(x + 0.5, y + 0.5, ax, ay, cx, cy);
+          if(v2){ // the style experiment's cobbles, and a one-pixel shadow sinking them into the grass
+            if(Math.hypot(x + 0.5 - bx, y + 0.5 - by) < yardR || d > hw + 1) continue;
+            if(d > hw){ if(!onRoad(x, y)) put(x, y, TD_SHADE_RGB, 0.18); continue; }
+            const c = tdRoadPixelV2(x, y, d, hw); if(c) put(x, y, c); else if(!onRoad(x, y)) put(x, y, TD_SHADE_RGB, 0.18);
+            continue;
+          }
           if(d > hw || Math.hypot(x + 0.5 - bx, y + 0.5 - by) < yardR) continue;
           if(d > hw - 2 && tdHash(x, y, 41) < 0.45) continue; // a ragged edge into the grass
           const row = Math.floor(y / 5), col = Math.floor((x + (row % 2) * 3) / 7);

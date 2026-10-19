@@ -323,6 +323,51 @@ function houseSolid(sp) {
   if (bad.length) console.log('  house compat:', JSON.stringify(bad));
 })();
 
+// Style experiment v2 (opt-in with ?style=v2): the player, the house, the grass and
+// the cobbles drawn in a textured style. Off by default; sizes, anchors and every
+// system the same either way.
+function styleSolid(r) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1, n = 0;
+  r.px.forEach((p, k) => { if (!p || p[3] < 1) return; const x = k % r.w, y = (k - x) / r.w; n++; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
+  return { x0, y0, x1, y1, n };
+}
+(function test_style_experiment() {
+  const plain = newDom(makeMemoryStorage()).window;
+  check('Style: without ?style=v2 the classic style is used and the drawing scale is the device ratio', plain.tdStyleName() === 'classic' && !plain.tdStyleV2() && plain.tdStyleRenderScale(3, 1.5) === 1.5);
+  const win = tdDomAt('https://example.test/?style=v2', makeMemoryStorage());
+  check('Style: ?style=v2 turns the experiment on', win.tdStyleName() === 'v2' && win.tdStyleV2());
+  check('Style: in v2 one art pixel is a whole number of device pixels at any device ratio', [1, 1.25, 1.5, 1.75, 2, 2.625, 3].every((d) => [1, 2, 3, 4].every((z) => { const k = win.tdStyleRenderScale(z, d) * z; return Math.abs(k - Math.round(k)) < 1e-9 && k >= 1 && Math.abs(k - z * d) <= z / 2 + 0.5; })));
+  const eye = win.tdParseColor('#4a3326').slice(0, 3).join(); // the player's eye colour (TD_PLAYER_COLORS.eye)
+  let sameBox = true, eyesKept = true, blue = true, noBlack = true, shadowRows = true;
+  ['down', 'up', 'left', 'right'].forEach((d) => [0, 1, 2, 3].forEach((f) => {
+    const a = win.tdRaster(win.tdPlayerSprite(d, f)), b = win.tdRaster(win.tdPlayerSpriteV2(d, f)), sa = styleSolid(a), sb = styleSolid(b);
+    if (b.w !== 16 || b.h !== 22 || sb.y1 !== sa.y1 || sb.x0 < sa.x0 || sb.x1 > sa.x1 || sb.y0 < sa.y0) sameBox = false;
+    if (d !== 'up' && !b.px.some((p) => p && p.slice(0, 3).join() === eye)) eyesKept = false;
+    if (b.px.filter((p) => p && p[3] >= 1 && p[2] - p[0] > 50).length < 25) blue = false;
+    if (b.px.some((p) => p && p[0] + p[1] + p[2] < 40)) noBlack = false;
+    b.px.forEach((p, k) => { if (p && p[3] < 1 && Math.floor(k / 16) < 20) shadowRows = false; });
+  }));
+  check('Style: the v2 player keeps its 16 x 22 size, feet row and outline box in every direction and frame', sameBox);
+  check('Style: ...keeps its eyes clean, its cobalt hair, and is outlined in a warm dark tone (no black)', eyesKept && blue && noBlack);
+  check('Style: ...and its shadow is a stepped pixel shape under the feet only', shadowRows);
+  const hc = win.tdRaster(win.tdHouseSprite()), hv = win.tdRaster(win.tdHouseSpriteV2()), bc = styleSolid(hc), bv = styleSolid(hv), H = 21;
+  check('Style: the v2 house has the classic size, ground row and outline box (within a pixel)', hv.w === hc.w && hv.h === hc.h && Math.abs(bv.y1 - bc.y1) <= 1 && Math.abs(bv.x0 - bc.x0) <= 1 && Math.abs(bv.x1 - bc.x1) <= 1 && Math.abs(bv.y0 - bc.y0) <= 1);
+  const doorTop = (x) => { for (let y = 40; y < 70; y++) { const p = hv.px[y * hv.w + x]; if (p && p[0] < 110 && p[1] < 80 && p[2] < 60) return y; } return -1; };
+  check('Style: ...its door is arched (the frame starts lower at its corners) and 1.15~1.3 H tall', doorTop(34) > doorTop(42) && (68 - doorTop(42)) / H >= 1.15 && (68 - doorTop(42)) / H <= 1.3);
+  const tones = new Set(); hv.px.forEach((p) => { if (p && p[3] >= 1) tones.add(p.slice(0, 3).join()); });
+  check('Style: ...and its materials are textured (many more tones than the classic house)', tones.size > 2 * new Set(hc.px.filter((p) => p && p[3] >= 1).map((p) => p.slice(0, 3).join())).size);
+  // the ground paints in v2 and the systems do not change
+  const s2 = win.state, door = win.villageHouseDoor(), base = s2.world.base;
+  let painted = false; try { const m = win.tdBuildTileMap(win.terrainTunnelOpen(), base, win.villageGroundLayout()); const img = win.tdPaintTileMap(m); painted = img.width > 0 && img.data.length === img.width * img.height * 4; } catch (e) { painted = false; }
+  check('Style: in v2 the ground (grass, cobbles) paints without errors', painted);
+  check('Style: the house still blocks the same and its door step stays free in v2', !win.playerCanStand(door.x, door.y - 0.25) && win.playerCanStand(door.x, door.y + 0.15) &&
+    (() => { const b = win.villageHouseBox(door), B = plain.VILLAGE.DISTRICT.HOUSE_BOX, r = (v) => Math.round(v * 1e6); return r(b.minX - door.x) === r(B.minX) && r(b.maxX - door.x) === r(B.maxX) && r(b.minY - door.y) === r(B.minY) && r(b.maxY - door.y) === r(B.maxY); })());
+  const p = s2.world.player, pz = s2.village.district; p.x = pz.x; p.y = pz.y - 0.3; const y0 = p.y; win.setPlayerHeld('down', true); for (let i = 0; i < 5; i++) win.tickPlayer(); win.clearPlayerHeld();
+  check('Style: walking speed is the same in v2', Math.abs((p.y - y0) - 5 * plain.BALANCE.world.PLAYER_SPEED / plain.TICKS_PER_SECOND) < 1e-9);
+  const sv = (() => { win.saveGame(); return JSON.parse(win.localStorage.getItem('gachaFactorySave')); })();
+  check('Style: nothing about the style is saved (saveVersion 1)', sv.saveVersion === 1 && !/style/i.test(JSON.stringify(Object.keys(sv.run))) && !('style' in sv));
+})();
+
 // -----------------------------------------------------------------------------
 // Task 120: the garden and its decorations
 // -----------------------------------------------------------------------------

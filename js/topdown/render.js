@@ -195,7 +195,9 @@ function tdResize(){
   const w = Math.max(1, c.clientWidth || window.innerWidth), h = Math.max(1, c.clientHeight || window.innerHeight);
   const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
   if(c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)){ c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
-  TD.view = { w, h, zoom: topdownZoom(w, h), dpr };
+  const zoom = topdownZoom(w, h), k = typeof tdStyleRenderScale === 'function' ? tdStyleRenderScale(zoom, dpr) : dpr;
+  // the style experiment snaps the drawing scale so an art pixel is whole device pixels; the view is then measured in those units
+  TD.view = k === dpr ? { w, h, zoom, dpr } : { w: c.width / k, h: c.height / k, zoom, dpr: k };
 }
 
 function tdDrawSprite(g, img, sx, sy, zoom, anchorY){

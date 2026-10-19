@@ -1,0 +1,234 @@
+{
+ "pc_day": {
+  "A": {
+   "style": "classic",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3,
+   "viewport": "1280x800",
+   "dpr": 1,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 640,
+    "y": 314
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none"
+  },
+  "B": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3,
+   "viewport": "1280x800",
+   "dpr": 1,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 640,
+    "y": 314
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none"
+  }
+ },
+ "pc_evening": {
+  "A": {
+   "style": "classic",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3,
+   "viewport": "1280x800",
+   "dpr": 1,
+   "darkness": 0.45,
+   "houseScreen": {
+    "x": 640,
+    "y": 314
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none"
+  },
+  "B": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 3,
+   "cssPxPerArtPx": 3,
+   "viewport": "1280x800",
+   "dpr": 1,
+   "darkness": 0.45,
+   "houseScreen": {
+    "x": 640,
+    "y": 314
+   },
+   "playerScreen": {
+    "x": 640,
+    "y": 400
+   },
+   "inside": false,
+   "errors": "none"
+  }
+ },
+ "mobile_day": {
+  "A": {
+   "style": "classic",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 2,
+   "cssPxPerArtPx": 2,
+   "viewport": "390x664",
+   "dpr": 3,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 195,
+    "y": 274
+   },
+   "playerScreen": {
+    "x": 195,
+    "y": 332
+   },
+   "inside": false,
+   "errors": "none"
+  },
+  "B": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 2,
+   "cssPxPerArtPx": 2,
+   "viewport": "390x664",
+   "dpr": 3,
+   "darkness": 0,
+   "houseScreen": {
+    "x": 195,
+    "y": 274
+   },
+   "playerScreen": {
+    "x": 195,
+    "y": 332
+   },
+   "inside": false,
+   "errors": "none"
+  }
+ },
+ "mobile_evening": {
+  "A": {
+   "style": "classic",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 2,
+   "cssPxPerArtPx": 2,
+   "viewport": "390x664",
+   "dpr": 3,
+   "darkness": 0.45,
+   "houseScreen": {
+    "x": 195,
+    "y": 274
+   },
+   "playerScreen": {
+    "x": 195,
+    "y": 332
+   },
+   "inside": false,
+   "errors": "none"
+  },
+  "B": {
+   "style": "v2",
+   "player": {
+    "x": 4.75,
+    "y": -3.05,
+    "facing": "down",
+    "pose": "idle"
+   },
+   "cam": {
+    "x": 4.75,
+    "y": -3.05
+   },
+   "zoom": 2,
+   "cssPxPerArtPx": 2,
+   "viewport": "390x664",
+   "dpr": 3,
+   "darkness": 0.45,
+   "houseScreen": {
+    "x": 195,
+    "y": 274
+   },
+   "playerScreen": {
+    "x": 195,
+    "y": 332
+   },
+   "inside": false,
+   "errors": "none"
+  }
+ }
+}
