@@ -395,6 +395,105 @@ function styleSolid(r) {
   });
 })();
 
+// The 24 x 33 player (R = 1.5) with its head and legs drawn for that size, and ?res=auto.
+(function test_player_15() {
+  const win = tdDomAt('https://example.test/?style=v2&res=1.5', makeMemoryStorage());
+  const hex = (c) => win.tdParseColor(c).slice(0, 3).join(), eye = hex('#4a3326'), pants = hex('#6c7076'), pantsDark = hex('#55595e');
+  let size = true, feet = true, eyes = true, legs = true, spikes = true, blue = true;
+  ['down', 'up', 'left', 'right'].forEach((d) => [0, 1, 2, 3].forEach((f) => {
+    const r = win.tdRaster(win.tdPlayerSprite15(d, f)), a = styleSolid(r), lo = styleSolid(win.tdRaster(win.tdPlayerSpriteV2(d, f)));
+    if (r.w !== 24 || r.h !== 33) size = false;
+    if (Math.abs((a.y1 + 1) / 1.5 - (lo.y1 + 1)) > 0.5) feet = false;
+    const hasEye = r.px.some((p) => p && p.slice(0, 3).join() === eye);
+    if ((d === 'up') === hasEye) eyes = false;
+    // legs: every row of trousers has its colour in runs of at least two (no 1-px stripes)
+    for (let y = 24; y <= 26; y++) { let run = 0; for (let x = 0; x <= 24; x++) { const p = x < 24 ? r.px[y * 24 + x] : null, c = p && p.slice(0, 3).join(); if (c === pants) run++; else { if (run === 1) legs = false; run = 0; } } }
+    if (!r.px.some((p, k) => p && p[3] >= 1 && k < 24 * ((f === 1 || f === 3) ? 3 : 1))) spikes = false; // the crown's tufts reach the top row (two lower on a step)
+    if (r.px.filter((p) => p && p[3] >= 1 && p[2] - p[0] > 50).length < 60) blue = false;
+  }));
+  check('P15: the 24 x 33 player has its size and feet line in every direction and frame', size && feet);
+  check('P15: eyes from the front and the side, none from behind', eyes);
+  check('P15: solid trousers (no one-pixel stripes)', legs);
+  check('P15: the crown\'s tufts reach the top (with the step bob)', spikes);
+  check('P15: ...and plenty of cobalt hair', blue);
+  // ?res=auto: 1.5x only where a sprite pixel is whole device pixels (zoom x ratio a multiple of 3)
+  const auto = tdDomAt('https://example.test/?style=v2&res=auto', makeMemoryStorage());
+  const pick = (z, d) => auto.tdResAutoPick(z, d);
+  check('Auto: picks 1.5x for PC 1x zoom 3, Mac 2x zoom 3, phones 3x zoom 2; 1x for zoom 4, 1.5x laptops and 2x phones',
+    pick(3, 1) === 1.5 && pick(3, 2) === 1.5 && pick(2, 3) === 1.5 && pick(2, 2.75) === 1.5 && pick(4, 1) === 1 && pick(3, 1.5) === 1 && pick(2, 2) === 1 && pick(3, 1.25) === 1 && pick(2, 2.625) === 1);
+  check('Auto: every pick keeps sprite pixels whole', [1, 2, 3, 4].every((z) => [1, 1.25, 1.5, 2, 2.625, 2.75, 3].every((d) => { const dev = Math.max(1, Math.round(z * d)), r = pick(z, d); return Math.abs(dev / r - Math.round(dev / r)) < 1e-9; })));
+  const r0 = auto.tdResFactor();
+  check('Auto: a resize to another zoom switches the sprite set only when the pick changes', auto.tdResOnResize(3, 1) === (r0 !== 1.5) && auto.tdResFactor() === 1.5 && auto.tdResOnResize(3, 1) === false && auto.tdResOnResize(4, 1) === true && auto.tdResFactor() === 1);
+})();
+
+// Chunk rendering (WORLD_EXPANSION_2048.md step 1): the ground painted per 32 x 32-tile
+// chunk on a grid fixed to the world; pixels identical to the one-picture ground.
+(function test_chunk_rendering() {
+  const same = (a, b) => a.length === b.length && a.every((v, k) => v === b[k]);
+  let worlds = 0, identical = 0, chunkCounts = [];
+  [['https://example.test/', false], ['https://example.test/?style=v2', false], ['https://example.test/', true], ['https://example.test/?style=v2', true]].forEach(([url, open]) => {
+    for (let k = 0; k < 2; k++) {
+      const win = tdDomAt(url, makeMemoryStorage()), s = win.state;
+      if (open) { s.research.tunnelWork = true; win.unlockTunnel(); }
+      const map = win.tdBuildTileMap(win.terrainTunnelOpen(), s.world.base, win.villageGroundLayout()), whole = win.tdPaintTileMap(map), T = 16;
+      // put every chunk's pixels back into one picture and compare byte for byte
+      const back = new Uint8ClampedArray(whole.data.length), R = win.tdChunkRange({ minX: map.originX, minY: map.originY, maxX: map.originX + map.cols / 4 - 1e-9, maxY: map.originY + map.rows / 4 - 1e-9 });
+      let n = 0;
+      for (let cy = R.cy0; cy <= R.cy1; cy++) for (let cx = R.cx0; cx <= R.cx1; cx++) {
+        const a = win.tdChunkArea(map, cx, cy); if (!a) continue; n++;
+        const img = win.tdPaintTileMap(map, a);
+        for (let y = 0; y < img.height; y++) back.set(img.data.subarray(y * img.width * 4, (y + 1) * img.width * 4), (((a.j0 * T) + y) * whole.width + a.i0 * T) * 4);
+      }
+      worlds++; if (same(back, whole.data)) identical++; chunkCounts.push(n);
+    }
+  });
+  check('Chunks: painted chunk by chunk, the ground is byte-identical to the one-picture ground (classic and v2, tunnel closed and open, 8 worlds)', worlds === 8 && identical === 8);
+  const win = tdDomAt('https://example.test/', makeMemoryStorage()), TD = win.__td.TD(), plain = newDom(makeMemoryStorage()).window;
+  win.tdEnsureGround();
+  const map = TD.groundMap, R = win.tdChunkRange({ minX: map.originX, minY: map.originY, maxX: map.originX + map.cols / 4 - 1e-9, maxY: map.originY + map.rows / 4 - 1e-9 });
+  let tiles = 0, onGrid = true; const seen = new Uint8Array(map.cols * map.rows);
+  for (let cy = R.cy0; cy <= R.cy1; cy++) for (let cx = R.cx0; cx <= R.cx1; cx++) {
+    const a = win.tdChunkArea(map, cx, cy); if (!a) continue;
+    for (let j = a.j0; j < a.j1; j++) for (let i = a.i0; i < a.i1; i++) { seen[j * map.cols + i]++; tiles++; }
+    // inner chunk edges fall on world units that are multiples of 8 (32 tiles), the grid a 2048-tile world will use
+    [[a.i0, 0], [a.i1, map.cols]].forEach(([t, edge]) => { if (t !== edge && Math.abs(((map.originX + t / 4) % 8 + 8) % 8) > 1e-9) onGrid = false; });
+  }
+  check('Chunks: the chunks cover every tile of the map exactly once', tiles === map.cols * map.rows && seen.every((v) => v === 1) && chunkCounts.every((c) => c === 16));
+  check('Chunks: chunk edges are on a grid fixed to the world (every 8 units = 32 tiles), not to the map corner', onGrid && TD.groundMap === map && win.tdChunkRange({ minX: -0.1, minY: 0, maxX: 7.9, maxY: 7.9 }).cx0 === -1);
+  // the cache: walking the camera across the world keeps what is on screen and at most KEEP chunks
+  const fake = { drawImage() {}, strokeRect() {}, fillText() {} };
+  let maxKept = 0, missing = 0;
+  for (let step = 0; step <= 60; step++) {
+    const cam = { x: -11 + step * 0.37, y: -9 + step * 0.3 }, now = 1000 + step * 16;
+    win.tdDrawGroundChunks(fake, cam, 1280, 800, 3, now);
+    const vis = win.topdownVisibleRect(cam, 1280, 800, 3), V = win.tdChunkRange(vis);
+    for (let cy = V.cy0; cy <= V.cy1; cy++) for (let cx = V.cx0; cx <= V.cx1; cx++) if (!TD.chunks.has(cx + ',' + cy)) missing++;
+    maxKept = Math.max(maxKept, TD.chunks.size);
+  }
+  check('Chunks: every chunk on screen is there in every frame while the camera crosses the world', missing === 0);
+  check('Chunks: no more than KEEP (25) chunks are kept', maxKept <= 25 && TD.chunks.size <= 25);
+  check('Chunks: a new ground state (tunnel opened) drops the old chunks', (() => { TD.chunks.set('9,9', { canvas: null, used: 0 }); win.state.research.tunnelWork = true; win.unlockTunnel(); win.tdEnsureGround(); return !TD.chunks.has('9,9') && TD.groundMap.tunnelOpen; })());
+  // walking across chunk lines: the same steps as anywhere else (movement does not know about chunks)
+  const s = win.state, p = s.world.player, step = plain.BALANCE.world.PLAYER_SPEED / plain.TICKS_PER_SECOND;
+  let lineOk = 0, tried = 0;
+  [[0, 'x'], [-8, 'x'], [0, 'y'], [8, 'y']].forEach(([line, axis]) => {
+    for (let off = -3; off <= 3; off += 0.5) {
+      const x = axis === 'x' ? line - 0.45 : off, y = axis === 'y' ? line - 0.45 : off;
+      if (!win.playerCanStand(x, y) || !win.playerCanStand(axis === 'x' ? x + 0.9 : x, axis === 'y' ? y + 0.9 : y)) continue;
+      let clear = true; for (let t = 0; t <= 0.9; t += 0.05) if (!win.playerCanStand(axis === 'x' ? x + t : x, axis === 'y' ? y + t : y)) clear = false;
+      if (!clear) continue;
+      tried++; p.x = x; p.y = y; const pos = [];
+      win.setPlayerHeld(axis === 'x' ? 'right' : 'down', true);
+      for (let i = 0; i < 3; i++) { win.tickPlayer(); pos.push(axis === 'x' ? p.x : p.y); }
+      win.clearPlayerHeld(); win.tickPlayer();
+      const d = pos.map((v, i) => v - (i ? pos[i - 1] : (axis === 'x' ? x : y)));
+      if (d.every((v) => Math.abs(v - step) < 1e-9) && pos[2] > line) lineOk++;
+      break;
+    }
+  });
+  check('Chunks: walking across chunk lines (x = 0, x = -8, y = 0, y = 8) moves exactly one step a tick, straight over', tried >= 3 && lineOk === tried);
+})();
+
 // -----------------------------------------------------------------------------
 // Task 120: the garden and its decorations
 // -----------------------------------------------------------------------------

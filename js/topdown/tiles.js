@@ -90,18 +90,27 @@ const TD_WALKABLE_TYPES = [TD_TILE.GRASS, TD_TILE.BEYOND, TD_TILE.TUNNEL, TD_TIL
 
 // Paints the map into an RGBA buffer (TILE x TILE pixels per tile). Returns
 // { width, height, data } — the renderer puts it on a canvas once.
-function tdPaintTileMap(map){
-  const T = TOPDOWN.TILE, W = map.cols * T, H = map.rows * T;
+// `area` ({ i0, j0, i1, j1 }, tiles; default the whole map) paints only that
+// part — one chunk of the ground (chunk rendering). Pixels are addressed in
+// whole-map coordinates and every texture is hashed from them, so painting a
+// chunk gives exactly the pixels the whole-map painting has there: tiles one
+// tile round the area are painted too (in the same order), because a tile's
+// tufts, flowers and boulders reach a few pixels into its neighbours.
+function tdPaintTileMap(map, area){
+  const T = TOPDOWN.TILE, A = area || { i0: 0, j0: 0, i1: map.cols, j1: map.rows };
+  const W = (A.i1 - A.i0) * T, H = (A.j1 - A.j0) * T, ox = A.i0 * T, oy = A.j0 * T, MW = map.cols * T, MH = map.rows * T;
   const data = new Uint8ClampedArray(W * H * 4);
-  const put = (x, y, c, a) => {
-    if(x < 0 || y < 0 || x >= W || y >= H) return;
+  const put = (gx, gy, c, a) => {
+    const x = gx - ox, y = gy - oy;
+    if(x < 0 || y < 0 || x >= W || y >= H || gx >= MW || gy >= MH) return;
     const o = (y * W + x) * 4, al = a === undefined ? 1 : a;
     data[o] = data[o] * (1 - al) + c[0] * al; data[o + 1] = data[o + 1] * (1 - al) + c[1] * al; data[o + 2] = data[o + 2] * (1 - al) + c[2] * al; data[o + 3] = 255;
   };
   const pick = (list, h) => list[Math.floor(h * list.length) % list.length];
   const v2 = typeof tdStyleV2 === 'function' && tdStyleV2();
-  for(let j = 0; j < map.rows; j++){
-    for(let i = 0; i < map.cols; i++){
+  const ti0 = Math.max(0, A.i0 - 1), tj0 = Math.max(0, A.j0 - 1), ti1 = Math.min(map.cols, A.i1 + 1), tj1 = Math.min(map.rows, A.j1 + 1);
+  for(let j = tj0; j < tj1; j++){
+    for(let i = ti0; i < ti1; i++){
       const type = map.types[j * map.cols + i];
       const x0 = i * T, y0 = j * T;
       // base texture: small noise on 2x2 pixel blocks, so it reads as pixel art when zoomed
@@ -189,9 +198,9 @@ function tdPaintTileMap(map){
       }
     }
   }
-  if(map.village) tdPaintVillageGround(map, put, W, H);
+  if(map.village) tdPaintVillageGround(map, put, MW, MH);
   if(!map.tunnelOpen){
-    for(let j = 0; j < map.rows; j++) for(let i = 0; i < map.cols; i++){
+    for(let j = A.j0; j < A.j1; j++) for(let i = A.i0; i < A.i1; i++){
       if(map.types[j * map.cols + i] !== TD_TILE.BEYOND) continue;
       for(let y = 0; y < T; y++) for(let x = 0; x < T; x++) put(i * T + x, j * T + y, [14, 20, 18], 0.62);
     }

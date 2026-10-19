@@ -494,7 +494,7 @@ function tdBuildSpriteSheet(){
   const v2 = typeof tdStyleV2 === 'function' && tdStyleV2(); // the style experiment (?style=v2)
   const R = typeof tdResFactor === 'function' ? tdResFactor() : 1; // the resolution experiment (?res=1.5 / 2, with v2)
   const atRes = (img) => { if(img) img.artRes = R; return img; };
-  ['down', 'up', 'left', 'right'].forEach(d => { sheet.player[d] = [0, 1, 2, 3].map(f => R > 1 ? atRes(tdSpriteImage(tdPlayerSpriteRes(d, f, R))) : tdSpriteImage(v2 ? tdPlayerSpriteV2(d, f) : tdPlayerSprite(d, f))); });
+  ['down', 'up', 'left', 'right'].forEach(d => { sheet.player[d] = [0, 1, 2, 3].map(f => R > 1 ? atRes(tdSpriteImage(R === 1.5 ? tdPlayerSprite15(d, f) : tdPlayerSpriteRes(d, f, R))) : tdSpriteImage(v2 ? tdPlayerSpriteV2(d, f) : tdPlayerSprite(d, f))); });
   Object.keys(TD_RES_COLORS).forEach(r => { sheet.ore[r] = { unsecured: tdSpriteImage(tdOreSprite(r, 'unsecured')), secured: tdSpriteImage(tdOreSprite(r, 'secured')) }; });
   sheet.ore.undiscovered = tdSpriteImage(tdOreSprite(null, 'undiscovered'));
   sheet.base = tdSpriteImage(tdBaseSprite());

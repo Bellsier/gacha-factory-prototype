@@ -167,21 +167,15 @@ function tdEnsureGround(){
   const base = state.world.base;
   const village = typeof villageGroundLayout === 'function' ? villageGroundLayout() : null; // Task 118: the plaza and roads are ground too
   const key = (terrainTunnelOpen() ? 'open' : 'closed') + '|' + base.x + ',' + base.y + '|' + (village ? village.key + '|' + JSON.stringify(village.garden) : '');
-  if(TD.groundKey === key && TD.ground) return;
+  if(TD.groundKey === key && TD.groundMap) return;
   const map = tdBuildTileMap(terrainTunnelOpen(), base, village);
-  const img = tdPaintTileMap(map);
-  const c = document.createElement('canvas');
-  c.width = img.width; c.height = img.height;
-  const g = c.getContext('2d');
-  if(!g) return;
-  const id = g.createImageData(img.width, img.height);
-  id.data.set(img.data);
-  g.putImageData(id, 0, 0);
-  TD.ground = c; TD.groundKey = key; TD.groundMap = map;
+  // the picture is painted chunk by chunk as it comes into view (tdChunkCanvas); a new state drops the old chunks
+  TD.groundKey = key; TD.groundMap = map; TD.chunks = new Map();
   // minimap base: one pixel per tile, mountain / ground / beyond colours
   const mc = document.createElement('canvas');
   mc.width = map.cols; mc.height = map.rows;
   const mg = mc.getContext('2d');
+  if(!mg) return; // no canvas (tests): the map and the chunk cache are ready, the minimap is not drawn
   const mid = mg.createImageData(map.cols, map.rows);
   const col = { [TD_TILE.GRASS]: [86, 128, 76], [TD_TILE.BEYOND]: [60, 98, 64], [TD_TILE.ROCK]: [120, 114, 106], [TD_TILE.TUNNEL]: [150, 120, 80], [TD_TILE.EDGE]: [34, 58, 40], [TD_TILE.PATH]: [160, 132, 92],
     [TD_TILE.ROAD]: [176, 162, 138], [TD_TILE.PLAZA]: [206, 194, 170], [TD_TILE.GARDEN]: [112, 168, 92] };
@@ -189,6 +183,69 @@ function tdEnsureGround(){
   mg.putImageData(mid, 0, 0);
   TD.miniBase = mc;
 }
+
+// ---------------------------------------------------------------------------
+// Chunk rendering (WORLD_EXPANSION_2048.md step 1). The ground is cut into
+// 32 x 32-tile chunks on a grid fixed to the world (chunk (cx, cy) covers world
+// units [8cx, 8cx+8) x [8cy, 8cy+8)), so the same grid serves a 2048 x 2048
+// world later. A chunk is painted the first time it is needed — at once when it
+// is on screen, ahead of time (at most one a frame, within a time budget) when
+// it is next to the screen — and at most TD_CHUNK.KEEP painted chunks are kept
+// (the least recently drawn go first). Painting a chunk gives exactly the
+// pixels the old one-picture ground had there. Renderer state only; nothing saved.
+// ---------------------------------------------------------------------------
+const TD_CHUNK = { UNITS: 8, KEEP: 25, AHEAD: 1, BUDGET_MS: 6 }; // BUDGET_MS: a chunk is painted ahead only while the frame has used less than this
+
+// The chunks (cx, cy) covering a world rectangle.
+function tdChunkRange(r){
+  const U = TD_CHUNK.UNITS;
+  return { cx0: Math.floor(r.minX / U), cy0: Math.floor(r.minY / U), cx1: Math.floor(r.maxX / U), cy1: Math.floor(r.maxY / U) };
+}
+// The part of the tile map a chunk covers (tiles), or null when it lies outside the map.
+function tdChunkArea(map, cx, cy){
+  const n = TOPDOWN.TILES_PER_UNIT, U = TD_CHUNK.UNITS;
+  const i0 = Math.max(0, Math.round((cx * U - map.originX) * n)), j0 = Math.max(0, Math.round((cy * U - map.originY) * n));
+  const i1 = Math.min(map.cols, Math.round(((cx + 1) * U - map.originX) * n)), j1 = Math.min(map.rows, Math.round(((cy + 1) * U - map.originY) * n));
+  return i1 > i0 && j1 > j0 ? { i0, j0, i1, j1 } : null;
+}
+// A chunk's picture, painting it if it has none yet: { canvas, area, used } or null (outside the map).
+function tdChunkCanvas(cx, cy, now){
+  const map = TD.groundMap, key = cx + ',' + cy, have = TD.chunks.get(key);
+  if(have){ have.used = now; return have; }
+  const area = tdChunkArea(map, cx, cy);
+  if(!area){ TD.chunks.set(key, { canvas: null, area: null, used: now }); return TD.chunks.get(key); }
+  const t0 = performance.now(), img = tdPaintTileMap(map, area);
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d');
+  if(g){ const id = g.createImageData(img.width, img.height); id.data.set(img.data); g.putImageData(id, 0, 0); }
+  const ms = performance.now() - t0, st = TD.chunkStats || (TD.chunkStats = { painted: 0, paintMs: 0, maxMs: 0, dropped: 0 });
+  st.painted++; st.paintMs += ms; st.maxMs = Math.max(st.maxMs, ms);
+  const chunk = { canvas: g ? c : null, area, used: now };
+  TD.chunks.set(key, chunk);
+  return chunk;
+}
+function tdDrawGroundChunks(g, cam, w, h, zoom, now){
+  const map = TD.groundMap, T = TOPDOWN.TILE, vis = topdownVisibleRect(cam, w, h, zoom), R = tdChunkRange(vis);
+  // the map's corner on screen, once: every chunk is placed from it by whole pixels, so chunks meet without seams
+  const o = topdownToScreen(map.originX, map.originY, cam, w, h, zoom);
+  for(let cy = R.cy0; cy <= R.cy1; cy++) for(let cx = R.cx0; cx <= R.cx1; cx++){
+    const ch = tdChunkCanvas(cx, cy, now);
+    if(!ch.canvas) continue;
+    g.drawImage(ch.canvas, o.x + ch.area.i0 * T * zoom, o.y + ch.area.j0 * T * zoom, ch.canvas.width * zoom, ch.canvas.height * zoom);
+    if(TD_CHUNK_DEBUG){ g.strokeStyle = 'rgba(255,240,120,0.8)'; g.lineWidth = 1; g.strokeRect(o.x + ch.area.i0 * T * zoom + 0.5, o.y + ch.area.j0 * T * zoom + 0.5, ch.canvas.width * zoom - 1, ch.canvas.height * zoom - 1); g.fillStyle = 'rgba(255,240,120,0.9)'; g.font = '12px monospace'; g.fillText(cx + ',' + cy, o.x + ch.area.i0 * T * zoom + 6, o.y + ch.area.j0 * T * zoom + 16); }
+  }
+  // ahead of time: the ring round the screen, nearest the middle first, within the frame's budget
+  const mx = (R.cx0 + R.cx1) / 2, my = (R.cy0 + R.cy1) / 2, A = TD_CHUNK.AHEAD, todo = [];
+  for(let cy = R.cy0 - A; cy <= R.cy1 + A; cy++) for(let cx = R.cx0 - A; cx <= R.cx1 + A; cx++) if(!TD.chunks.has(cx + ',' + cy)) todo.push([cx, cy]);
+  todo.sort((a, b) => Math.hypot(a[0] - mx, a[1] - my) - Math.hypot(b[0] - mx, b[1] - my));
+  if(todo.length && performance.now() - now < TD_CHUNK.BUDGET_MS) tdChunkCanvas(todo[0][0], todo[0][1], now - 1); // only when this frame has time left
+  // keep at most KEEP painted chunks: drop the least recently drawn ones that are not on screen
+  if(TD.chunks.size > TD_CHUNK.KEEP){
+    const old = [...TD.chunks.entries()].filter(([, c]) => c.used < now - 1).sort((a, b) => a[1].used - b[1].used);
+    while(TD.chunks.size > TD_CHUNK.KEEP && old.length){ TD.chunks.delete(old.shift()[0]); TD.chunkStats.dropped++; }
+  }
+}
+const TD_CHUNK_DEBUG = (() => { try { return new URLSearchParams(window.location.search).get('chunks') === 'debug'; } catch(e){ return false; } })();
 
 function tdResize(){
   const c = TD.canvas;
@@ -198,6 +255,8 @@ function tdResize(){
   const zoom = topdownZoom(w, h), k = typeof tdStyleRenderScale === 'function' ? tdStyleRenderScale(zoom, dpr) : dpr;
   // the style experiment snaps the drawing scale so an art pixel is whole device pixels; the view is then measured in those units
   TD.view = k === dpr ? { w, h, zoom, dpr } : { w: c.width / k, h: c.height / k, zoom, dpr: k };
+  // the resolution experiment's auto mode: another zoom or device ratio may need the other sprite set
+  if(typeof tdResOnResize === 'function' && tdResOnResize(zoom, dpr) && TD.sheet) TD.sheet = tdBuildSpriteSheet();
 }
 
 function tdDrawSprite(g, img, sx, sy, zoom, anchorY){
@@ -262,15 +321,8 @@ function tdRender(now){
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.imageSmoothingEnabled = false;
   g.fillStyle = '#1d2f22'; g.fillRect(0, 0, w, h);
-  // ground: only the visible part of the cached image
-  const map = TD.groundMap, s = topdownScale(zoom), tilePx = TOPDOWN.TILE, unitPx = TD_UNIT_PX;
-  if(TD.ground && map){
-    const vis = topdownVisibleRect(cam, w, h, zoom);
-    const sx0 = Math.max(0, Math.floor((vis.minX - map.originX) * unitPx) - tilePx), sy0 = Math.max(0, Math.floor((vis.minY - map.originY) * unitPx) - tilePx);
-    const sx1 = Math.min(TD.ground.width, Math.ceil((vis.maxX - map.originX) * unitPx) + tilePx), sy1 = Math.min(TD.ground.height, Math.ceil((vis.maxY - map.originY) * unitPx) + tilePx);
-    const o = topdownToScreen(map.originX + sx0 / unitPx, map.originY + sy0 / unitPx, cam, w, h, zoom);
-    if(sx1 > sx0 && sy1 > sy0) g.drawImage(TD.ground, sx0, sy0, sx1 - sx0, sy1 - sy0, o.x, o.y, (sx1 - sx0) * zoom, (sy1 - sy0) * zoom);
-  }
+  // ground: the visible chunks (painted on first sight; neighbours painted ahead within a small budget)
+  if(TD.groundMap) tdDrawGroundChunks(g, cam, w, h, zoom, now);
   // Task 110: the workers walk on (renderer state only)
   if(typeof tdWorkerSimStep === 'function'){ const ws = TD.workerSim; tdWorkerSimStep(ws && ws.last !== null ? now - ws.last : 0, now); }
   // objects, back to front
