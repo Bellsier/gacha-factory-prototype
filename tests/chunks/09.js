@@ -494,6 +494,97 @@ function styleSolid(r) {
   check('Chunks: walking across chunk lines (x = 0, x = -8, y = 0, y = 8) moves exactly one step a tick, straight over', tried >= 3 && lineOk === tried);
 })();
 
+// Chunk cache: the cap, empty chunks, the same frame, strips; and step 2 — the chunk spatial index.
+(function test_chunk_cache_and_index() {
+  const win = tdDomAt('https://example.test/', makeMemoryStorage()), TD = win.__td.TD();
+  win.tdEnsureGround();
+  const fake = { drawImage() {}, strokeRect() {}, fillText() {} };
+  // walk the camera over and past the map's edges (empty chunks are wanted there too) at zoom 3 and zoom 2
+  let over = 0, emptySeen = 0, missing = 0, frames = 0;
+  [[1280, 800, 3], [390, 664, 2]].forEach(([w, h, z]) => {
+    for (let step = 0; step <= 80; step++) {
+      const cam = { x: -16 + step * 0.42, y: 13 - step * 0.33 }, now = 5000 + frames++ * 16;
+      win.tdDrawGroundChunks(fake, cam, w, h, z, now);
+      if (TD.chunks.size > 25) over++;
+      emptySeen += [...TD.chunks.values()].filter((c) => c.empty).length > 0 ? 1 : 0;
+      const V = win.tdChunkRange(win.topdownVisibleRect(cam, w, h, z));
+      for (let cy = V.cy0; cy <= V.cy1; cy++) for (let cx = V.cx0; cx <= V.cx1; cx++) { const c = TD.chunks.get(cx + ',' + cy); if (!c || c.job) missing++; }
+    }
+  });
+  check('Chunk cache: never more than 25 chunks kept, empty (off-map) chunks counted, while the camera crosses the map and its edges', over === 0 && emptySeen > 0);
+  check('Chunk cache: every chunk on screen is finished in every frame', missing === 0);
+  // the same frame, asked twice: one entry, painted once
+  const st = TD.chunkStats, painted = st.painted, size = TD.chunks.size, now = 99999;
+  win.tdChunkCanvas(0, 0, now); win.tdChunkCanvas(0, 0, now); win.tdDrawGroundChunks(fake, { x: 4, y: 4 }, 1280, 800, 3, now); win.tdDrawGroundChunks(fake, { x: 4, y: 4 }, 1280, 800, 3, now);
+  const p2 = st.painted;
+  win.tdDrawGroundChunks(fake, { x: 4, y: 4 }, 1280, 800, 3, now);
+  check('Chunk cache: asking for the same chunk again in the same frame paints nothing more', st.painted === p2 && TD.chunks.size <= 25 && size <= 25);
+  // more on screen than KEEP (a huge screen at zoom 1): all of them kept, nothing else
+  win.tdDrawGroundChunks(fake, { x: 0, y: 0 }, 3840, 2160, 1, 200000);
+  const V = win.tdChunkRange(win.topdownVisibleRect({ x: 0, y: 0 }, 3840, 2160, 1)), onScreen = (V.cx1 - V.cx0 + 1) * (V.cy1 - V.cy0 + 1);
+  check('Chunk cache: when more than 25 chunks are on screen they are all kept, and nothing else', onScreen > 25 && TD.chunks.size === onScreen);
+  // strips: painting a chunk in 4-row strips gives the same bytes as all at once
+  const map = TD.groundMap, area = win.tdChunkArea(map, 0, 0), whole = win.tdPaintTileMap(map, area), back = new Uint8ClampedArray(whole.data.length);
+  for (let j = area.j0; j < area.j1; j += 4) { const img = win.tdPaintTileMap(map, { i0: area.i0, i1: area.i1, j0: j, j1: Math.min(area.j1, j + 4) }); back.set(img.data, (j - area.j0) * 16 * whole.width * 4); }
+  check('Chunk cache: a chunk painted in strips is byte-identical to the chunk painted at once', back.every((v, k) => v === whole.data[k]));
+  check('Tile map: types come chunk by chunk, and the whole-map array is still the same', (() => { const m = win.tdBuildTileMap(false, win.state.world.base, win.villageGroundLayout()); const a = m.typeAt(10, 10); return m.chunkTypes.size === 1 && m.types.length === 96 * 96 && m.types[10 * 96 + 10] === a; })());
+
+  // --- step 2: the index answers exactly as the full scans ---
+  const plain = newDom(makeMemoryStorage()).window;
+  let worlds = 0, sameObs = 0, sameMines = 0, sameTarget = 0, sameDraw = 0, queries = 0;
+  [false, true].forEach((open) => {
+    for (let k = 0; k < 2; k++) {
+      const w2 = tdDomAt('https://example.test/', makeMemoryStorage()), s = w2.state, b = s.world.base;
+      if (open) { s.research.tunnelWork = true; w2.unlockTunnel(); }
+      w2.addWorkshop({ x: b.x + 3, y: b.y + 2.5, level: 1 }); w2.addMine({ id: 'mine_idx', x: b.x - 2, y: b.y + 4, resource: 'iron', grade: 1, miningPower: 1, developmentState: 'unsecured' });
+      worlds++;
+      let okObs = true, okMines = true, okT = true;
+      for (let y = -11.5; y <= 11.5; y += 0.61) for (let x = -11.5; x <= 11.5; x += 0.73) {
+        [1, 1.3, 2.5].forEach((r) => { queries++; if (JSON.stringify(w2.worldObstacles(x, y, r)) !== JSON.stringify(w2.worldObstaclesScan(x, y, r))) okObs = false; });
+        const near = w2.worldMinesNear(x, y, 1.15).map((m) => m.id).join(), scan = s.world.mines.filter((m) => m && Math.hypot(m.x - x, m.y - y) <= 1.15).map((m) => m.id).join();
+        if (near !== scan) okMines = false;
+      }
+      // the interaction target and the draw list: with the index, and with it switched off (the old scans)
+      const keep = { near: w2.worldMinesNear, rect: w2.worldMinesInRect, sc: w2.worldSceneryInRect }, p = s.world.player, targets = [];
+      for (let y = -9; y <= 9; y += 0.9) for (let x = -9; x <= 9; x += 0.9) targets.push(JSON.stringify(w2.tdInteractTarget(x, y)));
+      const view = { minX: -6, maxX: 7, minY: -5, maxY: 6 }, inView = (it) => it.x >= view.minX && it.x <= view.maxX && it.y >= view.minY && it.y <= view.maxY;
+      const drawIdx = JSON.stringify(w2.tdDrawList(null, view).filter((it) => it.kind === 'ore' || it.kind === 'prop'));
+      const drawAll = JSON.stringify(w2.tdDrawList(null).filter((it) => (it.kind === 'ore' || it.kind === 'prop') && inView(it)));
+      w2.worldMinesNear = undefined;
+      const targets0 = []; for (let y = -9; y <= 9; y += 0.9) for (let x = -9; x <= 9; x += 0.9) targets0.push(JSON.stringify(w2.tdInteractTarget(x, y)));
+      w2.worldMinesNear = keep.near;
+      if (JSON.stringify(targets) !== JSON.stringify(targets0)) okT = false;
+      if (okObs) sameObs++; if (okMines) sameMines++; if (okT) sameTarget++; if (drawIdx === drawAll && JSON.parse(drawIdx).length > 0) sameDraw++;
+    }
+  });
+  check('Index: obstacles near a point are the same boxes in the same order as the full scan (' + queries + ' queries, tunnel closed and open, extra vein and hut)', worlds === 4 && sameObs === 4);
+  check('Index: the veins in reach are the same, in the same order', sameMines === 4);
+  check('Index: the interaction target is the same everywhere with and without the index', sameTarget === 4);
+  check('Index: the draw list for the screen has the same veins and props, in the same order', sameDraw === 4);
+  // the same collision and the same walk with and without the index
+  const st2 = makeMemoryStorage(); const w3 = tdDomAt('https://example.test/', st2); w3.saveGame();
+  const raw = st2.getItem('gachaFactorySave'), sA = makeMemoryStorage(), sB = makeMemoryStorage(); sA.setItem('gachaFactorySave', raw); sB.setItem('gachaFactorySave', raw);
+  const A = tdDomAt('https://example.test/', sA), B = tdDomAt('https://example.test/', sB); B.worldObstaclesNear = undefined; // B: the old full scan
+  let standSame = true;
+  for (let y = -10; y <= 10; y += 0.17) for (let x = -10; x <= 10; x += 0.19) if (A.playerCanStand(x, y) !== B.playerCanStand(x, y)) standSame = false;
+  const dirs = ['right', 'down', 'left', 'up', 'right', 'up', 'left', 'down'], posA = [], posB = [];
+  [A, B].forEach((W, wi) => { const p = W.state.world.player, out = wi ? posB : posA; dirs.forEach((d, k) => { W.setPlayerHeld(d, true); if (k % 2) W.setPlayerHeld(dirs[(k + 1) % dirs.length], true); for (let i = 0; i < 40; i++) { W.tickPlayer(); out.push(p.x.toFixed(6) + ',' + p.y.toFixed(6)); } W.clearPlayerHeld(); }); });
+  check('Index: where the player can stand is the same everywhere (about 13 000 points) with and without the index', standSame);
+  check('Index: a 320-tick walk (straight and diagonal, into walls) takes exactly the same steps with and without the index', posA.join('|') === posB.join('|') && new Set(posA).size > 100);
+  // kept current: a new vein, a new hut and the opened tunnel are in the next answer; nothing is saved
+  const s3 = A.state, b3 = s3.world.base, n0 = A.worldObstacles(b3.x + 5, b3.y - 5, 1).length;
+  A.addMine({ id: 'mine_new', x: b3.x + 5, y: b3.y - 5, resource: 'coal', grade: 1, miningPower: 1, developmentState: 'unsecured' });
+  const withMine = A.worldObstacles(b3.x + 5, b3.y - 5, 1).some((o) => o.id === 'mine_new') && A.worldMinesNear(b3.x + 5, b3.y - 5, 0.5).some((m) => m.id === 'mine_new');
+  A.addWorkshop({ x: b3.x - 4, y: b3.y + 3, level: 1 });
+  const withHut = A.worldObstacles(b3.x - 4, b3.y + 3, 1).some((o) => o.kind === 'workshop');
+  s3.research.tunnelWork = true; A.unlockTunnel();
+  const sc = A.worldScenery().solid[0], withScenery = !!sc && A.worldObstacles(sc.x, sc.y, 1).some((o) => o.kind === 'scenery');
+  check('Index: a new vein, a new hut and the scenery of the opened tunnel are in the next answer', n0 >= 0 && withMine && withHut && withScenery);
+  A.saveGame(); const sv = JSON.parse(sA.getItem('gachaFactorySave'));
+  check('Index: nothing of the index or the chunks is saved (saveVersion 1, the same run fields)', sv.saveVersion === 1 && !/chunk|index/i.test(Object.keys(sv.run).join() + Object.keys(sv.run.world).join()));
+  void plain;
+})();
+
 // -----------------------------------------------------------------------------
 // Task 120: the garden and its decorations
 // -----------------------------------------------------------------------------

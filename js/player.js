@@ -139,8 +139,14 @@ function worldScenery(){
   return worldSceneryCache;
 }
 
-// Obstacle boxes in world coordinates, optionally only those near (x, y).
+// Obstacle boxes in world coordinates, optionally only those near (x, y). Near a point the chunk
+// index answers (worldindex.js, same boxes in the same order); the whole world is the full scan.
 function worldObstacles(nearX, nearY, radius){
+  if(radius !== undefined && typeof worldObstaclesNear === 'function') return worldObstaclesNear(nearX, nearY, radius);
+  return worldObstaclesScan(nearX, nearY, radius);
+}
+// The full scan over every list (the reference the index is tested against).
+function worldObstaclesScan(nearX, nearY, radius){
   const out = [];
   const add = (kind, id, px, py) => {
     if(radius !== undefined && Math.hypot(px - nearX, py - nearY) > radius + 1) return; // boxes are under 1 unit across

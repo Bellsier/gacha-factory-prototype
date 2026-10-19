@@ -1,0 +1,458 @@
+{
+ "pc_classic": {
+  "before": {
+   "frames": 1141,
+   "avg": 16.78,
+   "p95": 16.7,
+   "p99": 16.8,
+   "max": 33.3,
+   "over33": 0,
+   "path": [
+    [
+     -3.2,
+     2.5,
+     true
+    ],
+    [
+     -3.2,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     -2.9,
+     true
+    ],
+    [
+     0.43,
+     -2.86,
+     true
+    ],
+    [
+     0.43,
+     2.84,
+     true
+    ]
+   ],
+   "chunksVisited": 6,
+   "allStandable": true,
+   "walkSyncPaints": 0,
+   "walkSyncMs": 0,
+   "walkPainted": 4,
+   "maxSliceMs": null,
+   "maxChunkMs": 41.4,
+   "kept": 25,
+   "errors": "none"
+  },
+  "after": {
+   "frames": 1128,
+   "avg": 16.96,
+   "p95": 16.8,
+   "p99": 33.3,
+   "max": 100.1,
+   "over33": 3,
+   "path": [
+    [
+     -3.2,
+     2.5,
+     true
+    ],
+    [
+     -3.2,
+     10,
+     true
+    ],
+    [
+     9.4,
+     10,
+     true
+    ],
+    [
+     9.4,
+     -2.6,
+     true
+    ],
+    [
+     0.4,
+     -2.6,
+     true
+    ],
+    [
+     0.4,
+     3.4,
+     true
+    ]
+   ],
+   "chunksVisited": 6,
+   "allStandable": true,
+   "walkSyncPaints": 0,
+   "walkSyncMs": 0,
+   "walkPainted": 4,
+   "maxSliceMs": 21.2,
+   "maxChunkMs": 80.1,
+   "kept": 25,
+   "errors": "none",
+   "bench": {
+    "tunnelClosed": {
+     "indexMs": 28.4,
+     "scanMs": 22.7,
+     "sameAnswers": true
+    },
+    "tunnelOpen": {
+     "indexMs": 39.3,
+     "scanMs": 87.1,
+     "sameAnswers": true
+    },
+    "scenerySolid": 38,
+    "mines": 22
+   }
+  }
+ },
+ "pc_v2": {
+  "before": {
+   "frames": 1137,
+   "avg": 16.84,
+   "p95": 16.8,
+   "p99": 16.8,
+   "max": 33.4,
+   "over33": 0,
+   "path": [
+    [
+     -3.2,
+     2.5,
+     true
+    ],
+    [
+     -3.2,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     -2.9,
+     true
+    ],
+    [
+     0.73,
+     -2.86,
+     true
+    ],
+    [
+     0.73,
+     3.14,
+     true
+    ]
+   ],
+   "chunksVisited": 6,
+   "allStandable": true,
+   "walkSyncPaints": 0,
+   "walkSyncMs": 0,
+   "walkPainted": 4,
+   "maxSliceMs": null,
+   "maxChunkMs": 69.3,
+   "kept": 25,
+   "errors": "none"
+  },
+  "after": {
+   "frames": 1136,
+   "avg": 16.9,
+   "p95": 16.8,
+   "p99": 33.3,
+   "max": 49.9,
+   "over33": 4,
+   "path": [
+    [
+     -3.2,
+     2.5,
+     true
+    ],
+    [
+     -3.2,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     -2.9,
+     true
+    ],
+    [
+     0.73,
+     -2.86,
+     true
+    ],
+    [
+     0.73,
+     3.14,
+     true
+    ]
+   ],
+   "chunksVisited": 6,
+   "allStandable": true,
+   "walkSyncPaints": 0,
+   "walkSyncMs": 0,
+   "walkPainted": 4,
+   "maxSliceMs": 20.3,
+   "maxChunkMs": 93.7,
+   "kept": 25,
+   "errors": "none",
+   "bench": {
+    "tunnelClosed": {
+     "indexMs": 27.6,
+     "scanMs": 24.8,
+     "sameAnswers": true
+    },
+    "tunnelOpen": {
+     "indexMs": 49.8,
+     "scanMs": 118.9,
+     "sameAnswers": true
+    },
+    "scenerySolid": 40,
+    "mines": 22
+   }
+  }
+ },
+ "mobile_classic": {
+  "before": {
+   "frames": 817,
+   "avg": 23.76,
+   "p95": 33.4,
+   "p99": 50,
+   "max": 50.1,
+   "over33": 69,
+   "path": [
+    [
+     -3.2,
+     2.5,
+     true
+    ],
+    [
+     -3.2,
+     9.7,
+     true
+    ],
+    [
+     9.7,
+     9.7,
+     true
+    ],
+    [
+     9.7,
+     -2.9,
+     true
+    ],
+    [
+     1.03,
+     -2.86,
+     true
+    ],
+    [
+     1.03,
+     3.04,
+     true
+    ]
+   ],
+   "chunksVisited": 6,
+   "allStandable": true,
+   "walkSyncPaints": 0,
+   "walkSyncMs": 0,
+   "walkPainted": 0,
+   "maxSliceMs": null,
+   "maxChunkMs": 46.2,
+   "kept": 25,
+   "errors": "none"
+  },
+  "after": {
+   "frames": 782,
+   "avg": 24.79,
+   "p95": 33.4,
+   "p99": 50,
+   "max": 50.1,
+   "over33": 70,
+   "path": [
+    [
+     -3.2,
+     2.5,
+     true
+    ],
+    [
+     -3.2,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     -2.9,
+     true
+    ],
+    [
+     0.73,
+     -2.86,
+     true
+    ],
+    [
+     0.73,
+     3.14,
+     true
+    ]
+   ],
+   "chunksVisited": 6,
+   "allStandable": true,
+   "walkSyncPaints": 0,
+   "walkSyncMs": 0,
+   "walkPainted": 0,
+   "maxSliceMs": 16.4,
+   "maxChunkMs": 75.1,
+   "kept": 25,
+   "errors": "none",
+   "bench": {
+    "tunnelClosed": {
+     "indexMs": 25.6,
+     "scanMs": 20.6,
+     "sameAnswers": true
+    },
+    "tunnelOpen": {
+     "indexMs": 27.6,
+     "scanMs": 68.6,
+     "sameAnswers": true
+    },
+    "scenerySolid": 39,
+    "mines": 22
+   }
+  }
+ },
+ "mobile_v2": {
+  "before": {
+   "frames": 801,
+   "avg": 24.16,
+   "p95": 33.4,
+   "p99": 49.9,
+   "max": 433.2,
+   "over33": 49,
+   "path": [
+    [
+     -3.2,
+     2.5,
+     true
+    ],
+    [
+     -3.2,
+     10,
+     true
+    ],
+    [
+     9.4,
+     10,
+     true
+    ],
+    [
+     9.4,
+     -2.6,
+     true
+    ],
+    [
+     0.4,
+     -2.6,
+     true
+    ],
+    [
+     0.4,
+     3.4,
+     true
+    ]
+   ],
+   "chunksVisited": 6,
+   "allStandable": true,
+   "walkSyncPaints": 0,
+   "walkSyncMs": 0,
+   "walkPainted": 0,
+   "maxSliceMs": null,
+   "maxChunkMs": 87.2,
+   "kept": 25,
+   "errors": "none"
+  },
+  "after": {
+   "frames": 819,
+   "avg": 23.71,
+   "p95": 33.4,
+   "p99": 50,
+   "max": 50.1,
+   "over33": 64,
+   "path": [
+    [
+     -3.2,
+     2.5,
+     true
+    ],
+    [
+     -3.2,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     9.7,
+     true
+    ],
+    [
+     9.4,
+     -2.9,
+     true
+    ],
+    [
+     0.73,
+     -2.86,
+     true
+    ],
+    [
+     0.73,
+     3.44,
+     true
+    ]
+   ],
+   "chunksVisited": 6,
+   "allStandable": true,
+   "walkSyncPaints": 0,
+   "walkSyncMs": 0,
+   "walkPainted": 0,
+   "maxSliceMs": 33,
+   "maxChunkMs": 146.2,
+   "kept": 25,
+   "errors": "none",
+   "bench": {
+    "tunnelClosed": {
+     "indexMs": 18.8,
+     "scanMs": 15.3,
+     "sameAnswers": true
+    },
+    "tunnelOpen": {
+     "indexMs": 26,
+     "scanMs": 67.5,
+     "sameAnswers": true
+    },
+    "scenerySolid": 36,
+    "mines": 22
+   }
+  }
+ }
+}

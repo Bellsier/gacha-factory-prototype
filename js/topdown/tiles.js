@@ -54,21 +54,45 @@ function tdPolyDist(points, x, y){
 }
 
 // The whole map: one entry per tile over the drawn world (bounds + forest edge).
+// The tile map: its size and corner, and the tile types — worked out chunk by
+// chunk when first asked for (typeAt), from tdTileAt alone. Nothing walks the
+// whole world any more; a 2048-tile world swaps tdTileAt for a per-chunk
+// generator (seed, chunk) without touching the painter. `types` (the whole
+// map as one array) is still there for the minimap, built on first use.
+const TD_TILE_CHUNK = 32; // tiles a side, the ground chunk (8 world units)
 function tdBuildTileMap(tunnelOpen, base, village){
   const r = topdownWorldRect(), n = TOPDOWN.TILES_PER_UNIT;
   const cols = Math.round((r.maxX - r.minX) * n), rows = Math.round((r.maxY - r.minY) * n);
-  const types = new Uint8Array(cols * rows);
-  for(let j = 0; j < rows; j++){
-    for(let i = 0; i < cols; i++){
-      types[j * cols + i] = tdTileAt(r.minX + (i + 0.5) / n, r.minY + (j + 0.5) / n, tunnelOpen, base, village);
+  const gi0 = Math.round(r.minX * n), gj0 = Math.round(r.minY * n); // the map's first tile on the world tile grid
+  const chunks = new Map(), C = TD_TILE_CHUNK;
+  const map = { cols, rows, originX: r.minX, originY: r.minY, tunnelOpen: tunnelOpen === true, village: village || null, chunkTypes: chunks };
+  // the types of world chunk (cx, cy) — one tdTileAt call per tile, once
+  map.chunk = (cx, cy) => {
+    const key = cx * 65536 + cy;
+    let t = chunks.get(key);
+    if(t) return t;
+    t = new Uint8Array(C * C);
+    for(let y = 0; y < C; y++) for(let x = 0; x < C; x++){
+      const gi = cx * C + x, gj = cy * C + y;
+      t[y * C + x] = tdTileAt((gi + 0.5) / n, (gj + 0.5) / n, tunnelOpen, base, village);
     }
-  }
-  return { cols, rows, originX: r.minX, originY: r.minY, types, tunnelOpen: tunnelOpen === true, village: village || null };
+    chunks.set(key, t);
+    return t;
+  };
+  map.typeAt = (i, j) => { const gi = i + gi0, gj = j + gj0, cx = Math.floor(gi / C), cy = Math.floor(gj / C); return map.chunk(cx, cy)[(gj - cy * C) * C + (gi - cx * C)]; };
+  let all = null;
+  Object.defineProperty(map, 'types', { enumerable: true, get(){
+    if(all) return all;
+    all = new Uint8Array(cols * rows);
+    for(let j = 0; j < rows; j++) for(let i = 0; i < cols; i++) all[j * cols + i] = map.typeAt(i, j);
+    return all;
+  } });
+  return map;
 }
 
 function tdTileType(map, i, j){
   if(i < 0 || j < 0 || i >= map.cols || j >= map.rows) return TD_TILE.EDGE;
-  return map.types[j * map.cols + i];
+  return map.typeAt ? map.typeAt(i, j) : map.types[j * map.cols + i];
 }
 
 // Palette (r, g, b). Soft, slightly muted colours for a calm mood.
@@ -111,7 +135,7 @@ function tdPaintTileMap(map, area){
   const ti0 = Math.max(0, A.i0 - 1), tj0 = Math.max(0, A.j0 - 1), ti1 = Math.min(map.cols, A.i1 + 1), tj1 = Math.min(map.rows, A.j1 + 1);
   for(let j = tj0; j < tj1; j++){
     for(let i = ti0; i < ti1; i++){
-      const type = map.types[j * map.cols + i];
+      const type = tdTileType(map, i, j);
       const x0 = i * T, y0 = j * T;
       // base texture: small noise on 2x2 pixel blocks, so it reads as pixel art when zoomed
       // Task 118: road and plaza tiles are grass underneath; their exact shapes are painted over them below
@@ -198,10 +222,10 @@ function tdPaintTileMap(map, area){
       }
     }
   }
-  if(map.village) tdPaintVillageGround(map, put, MW, MH);
+  if(map.village) tdPaintVillageGround(map, put, MW, MH, { x0: ox, y0: oy, x1: Math.min(MW, ox + W) - 1, y1: Math.min(MH, oy + H) - 1 });
   if(!map.tunnelOpen){
     for(let j = A.j0; j < A.j1; j++) for(let i = A.i0; i < A.i1; i++){
-      if(map.types[j * map.cols + i] !== TD_TILE.BEYOND) continue;
+      if(tdTileType(map, i, j) !== TD_TILE.BEYOND) continue;
       for(let y = 0; y < T; y++) for(let x = 0; x < T; x++) put(i * T + x, j * T + y, [14, 20, 18], 0.62);
     }
   }
@@ -213,7 +237,10 @@ function tdPaintTileMap(map, area){
 // Roads first (cobbles in staggered rows, a ragged edge), then the plaza
 // (slabs, a darker rim and a ring round its centre). The workshop yard keeps
 // its dirt. Pure: pixels only, from the same plain data as the tile types.
-function tdPaintVillageGround(map, put, W, H){
+// `clip` ({ x0, y0, x1, y1 }, whole-map pixels, optional): only those pixels are wanted (a chunk or a strip of one),
+// so the loops stay inside it — what `put` keeps is the same, the work is only for the area.
+function tdPaintVillageGround(map, put, W, H, clip){
+  const C = clip || { x0: 0, y0: 0, x1: W - 1, y1: H - 1 };
   const V = map.village, U = TOPDOWN.TILE * TOPDOWN.TILES_PER_UNIT;
   const toPx = (x, y) => [(x - map.originX) * U, (y - map.originY) * U];
   const base = state && state.world ? state.world.base : null, yardR = 1.0 * U, [bx, by] = base ? toPx(base.x, base.y) : [-1e9, -1e9];
@@ -225,8 +252,8 @@ function tdPaintVillageGround(map, put, W, H){
   V.roads.forEach(pts => {
     for(let k = 0; k < pts.length - 1; k++){
       const [ax, ay] = toPx(pts[k].x, pts[k].y), [cx, cy] = toPx(pts[k + 1].x, pts[k + 1].y);
-      const minX = Math.max(0, Math.floor(Math.min(ax, cx) - hw - 2)), maxX = Math.min(W - 1, Math.ceil(Math.max(ax, cx) + hw + 2));
-      const minY = Math.max(0, Math.floor(Math.min(ay, cy) - hw - 2)), maxY = Math.min(H - 1, Math.ceil(Math.max(ay, cy) + hw + 2));
+      const minX = Math.max(C.x0, Math.floor(Math.min(ax, cx) - hw - 2)), maxX = Math.min(C.x1, W - 1, Math.ceil(Math.max(ax, cx) + hw + 2));
+      const minY = Math.max(C.y0, Math.floor(Math.min(ay, cy) - hw - 2)), maxY = Math.min(C.y1, H - 1, Math.ceil(Math.max(ay, cy) + hw + 2));
       for(let y = minY; y <= maxY; y++){
         for(let x = minX; x <= maxX; x++){
           const d = tdSegDist(x + 0.5, y + 0.5, ax, ay, cx, cy);
@@ -247,8 +274,8 @@ function tdPaintVillageGround(map, put, W, H){
     }
   });
   const pz = V.plaza, [cx, cy] = toPx(pz.x, pz.y), r = pz.r * U;
-  for(let y = Math.max(0, Math.floor(cy - r - 1)); y <= Math.min(H - 1, Math.ceil(cy + r + 1)); y++){
-    for(let x = Math.max(0, Math.floor(cx - r - 1)); x <= Math.min(W - 1, Math.ceil(cx + r + 1)); x++){
+  for(let y = Math.max(C.y0, Math.floor(cy - r - 1)); y <= Math.min(C.y1, H - 1, Math.ceil(cy + r + 1)); y++){
+    for(let x = Math.max(C.x0, Math.floor(cx - r - 1)); x <= Math.min(C.x1, W - 1, Math.ceil(cx + r + 1)); x++){
       const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
       if(d > r) continue;
       const rx = x - Math.floor(cx), ry = y - Math.floor(cy);

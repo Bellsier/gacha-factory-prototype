@@ -14,7 +14,7 @@ function tdInteractTarget(px, py){
   const range = TOPDOWN.INTERACT_RANGE;
   let best = null, bestD = Infinity;
   const consider = (t, d) => { if(d <= range && d < bestD){ best = t; bestD = d; } };
-  state.world.mines.forEach(m => {
+  (typeof worldMinesNear === 'function' ? worldMinesNear(px, py, range) : state.world.mines).forEach(m => { // the veins in reach (chunk index)
     if(!m || !isMineDiscovered(m)) return; // hidden mines are found by walking near them, not used
     const d = Math.hypot(m.x - px, m.y - py);
     if(d > range) return;

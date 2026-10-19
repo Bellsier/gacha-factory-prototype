@@ -16,7 +16,9 @@ const TD = {
 
 // Everything that stands in the world this frame, sorted back to front (by y).
 // Plain data, so it can be checked without a canvas.
-function tdDrawList(player){
+// `view` (a world rectangle, optional): only veins and scenery props inside it are listed (by the chunk
+// index) — the renderer passes the screen plus a margin wider than its own culling, so what is drawn is the same.
+function tdDrawList(player, view){
   const list = [];
   const base = state.world.base;
   // Task 107: buildings sort by the front edge of their footprint, so the player
@@ -53,7 +55,7 @@ function tdDrawList(player){
       else if(d.cell !== carry) list.push({ kind: 'gardenDecor', key: d.kind, x: c.x, y: c.y, sortY: c.y });
     });
   }
-  state.world.mines.forEach(m => {
+  (view ? worldMinesInRect(view) : state.world.mines).forEach(m => {
     if(!m) return;
     const look = !isMineDiscovered(m) ? 'undiscovered' : m.developmentState === 'secured' ? 'secured' : 'unsecured';
     list.push({ kind: 'ore', id: m.id, resource: m.resource, look, x: m.x, y: m.y, sortY: m.y });
@@ -61,7 +63,7 @@ function tdDrawList(player){
   tdOpenLandTufts().forEach(t => list.push({ kind: 'decor', prop: 'grass', x: t.x, y: t.y, sortY: t.y - 0.2 }));
   if(terrainTunnelOpen()){
     // Task 111: the same pieces that block (worldScenery leaves out those on a mine or walling something in)
-    worldScenery().props.forEach(pr => {
+    (view ? worldSceneryInRect(view) : worldScenery().props).forEach(pr => {
       list.push({ kind: 'prop', prop: pr.kind, x: pr.x, y: pr.y, sortY: pr.kind === 'clearing' ? pr.y - 5 : pr.y });
     });
   } else {
@@ -194,7 +196,14 @@ function tdEnsureGround(){
 // (the least recently drawn go first). Painting a chunk gives exactly the
 // pixels the old one-picture ground had there. Renderer state only; nothing saved.
 // ---------------------------------------------------------------------------
-const TD_CHUNK = { UNITS: 8, KEEP: 25, AHEAD: 1, BUDGET_MS: 6 }; // BUDGET_MS: a chunk is painted ahead only while the frame has used less than this
+const TD_DRAW_MARGIN = 5; // world units round the screen whose veins and props the draw list takes
+const TD_CHUNK = {
+  UNITS: 8,        // a chunk's side in world units (32 tiles)
+  KEEP: 25,        // painted (or known empty) chunks kept at most — unless more than that are on screen at once
+  AHEAD: 1,        // rings of chunks round the screen painted ahead
+  SLICE_ROWS: 4,   // a chunk is painted ahead in strips of this many tile rows, spread over frames
+  FRAME_MS: 9,     // more strips in a frame only while the frame has used less than this
+};
 
 // The chunks (cx, cy) covering a world rectangle.
 function tdChunkRange(r){
@@ -208,41 +217,86 @@ function tdChunkArea(map, cx, cy){
   const i1 = Math.min(map.cols, Math.round(((cx + 1) * U - map.originX) * n)), j1 = Math.min(map.rows, Math.round(((cy + 1) * U - map.originY) * n));
   return i1 > i0 && j1 > j0 ? { i0, j0, i1, j1 } : null;
 }
-// A chunk's picture, painting it if it has none yet: { canvas, area, used } or null (outside the map).
-function tdChunkCanvas(cx, cy, now){
-  const map = TD.groundMap, key = cx + ',' + cy, have = TD.chunks.get(key);
-  if(have){ have.used = now; return have; }
-  const area = tdChunkArea(map, cx, cy);
-  if(!area){ TD.chunks.set(key, { canvas: null, area: null, used: now }); return TD.chunks.get(key); }
-  const t0 = performance.now(), img = tdPaintTileMap(map, area);
-  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+function tdChunkStats(){ return TD.chunkStats || (TD.chunkStats = { painted: 0, paintMs: 0, maxMs: 0, sync: 0, syncMs: 0, slices: 0, maxSliceMs: 0, dropped: 0 }); }
+
+// Starts (or continues) painting a chunk; `rows` tile rows more, or all when rows is Infinity.
+// Returns the chunk's entry once it is finished, else null. Strips are painted with the same
+// area painter, so the finished picture is exactly the whole chunk painted at once.
+function tdChunkWork(cx, cy, rows, now){
+  const map = TD.groundMap, key = cx + ',' + cy, st = tdChunkStats();
+  let have = TD.chunks.get(key);
+  if(have && !have.job) return have;
+  if(!have){
+    const area = tdChunkArea(map, cx, cy);
+    if(!area){ have = { canvas: null, area: null, used: now, empty: true }; TD.chunks.set(key, have); return have; }
+    const T = TOPDOWN.TILE, W = (area.i1 - area.i0) * T, H = (area.j1 - area.j0) * T;
+    have = { canvas: null, area, used: now, job: { next: area.j0, data: new Uint8ClampedArray(W * H * 4), W, H, ms: 0 } };
+    TD.chunks.set(key, have);
+  }
+  const job = have.job, area = have.area, T = TOPDOWN.TILE;
+  const stop = rows === Infinity ? area.j1 : Math.min(area.j1, job.next + rows);
+  while(job.next < stop){
+    const j1 = Math.min(stop, job.next + TD_CHUNK.SLICE_ROWS), t0 = performance.now();
+    const img = tdPaintTileMap(map, { i0: area.i0, i1: area.i1, j0: job.next, j1 });
+    job.data.set(img.data, (job.next - area.j0) * T * job.W * 4);
+    const ms = performance.now() - t0; job.ms += ms; st.slices++; st.maxSliceMs = Math.max(st.maxSliceMs, ms);
+    job.next = j1;
+  }
+  if(job.next < area.j1) return null;
+  const c = document.createElement('canvas'); c.width = job.W; c.height = job.H;
   const g = c.getContext('2d');
-  if(g){ const id = g.createImageData(img.width, img.height); id.data.set(img.data); g.putImageData(id, 0, 0); }
-  const ms = performance.now() - t0, st = TD.chunkStats || (TD.chunkStats = { painted: 0, paintMs: 0, maxMs: 0, dropped: 0 });
-  st.painted++; st.paintMs += ms; st.maxMs = Math.max(st.maxMs, ms);
-  const chunk = { canvas: g ? c : null, area, used: now };
-  TD.chunks.set(key, chunk);
-  return chunk;
+  if(g){ const id = g.createImageData(job.W, job.H); id.data.set(job.data); g.putImageData(id, 0, 0); }
+  st.painted++; st.paintMs += job.ms; st.maxMs = Math.max(st.maxMs, job.ms);
+  have.canvas = g ? c : null; delete have.job;
+  return have;
+}
+// A chunk's finished picture, painting whatever is left of it now (it is on screen): { canvas, area, used } .
+function tdChunkCanvas(cx, cy, now){
+  const key = cx + ',' + cy, before = TD.chunks.get(key), st = tdChunkStats();
+  if(before && !before.job){ before.used = now; return before; }
+  const t0 = performance.now(), ch = tdChunkWork(cx, cy, Infinity, now);
+  if(!ch.empty){ st.sync++; st.syncMs += performance.now() - t0; }
+  ch.used = now;
+  return ch;
+}
+// The chunks wanted this frame: those on screen, then the ring(s) round them nearest first, at most KEEP
+// (all on-screen chunks are always in, even if they alone are more than KEEP).
+function tdChunkWanted(R){
+  const on = [], ring = [], A = TD_CHUNK.AHEAD, mx = (R.cx0 + R.cx1) / 2, my = (R.cy0 + R.cy1) / 2;
+  for(let cy = R.cy0 - A; cy <= R.cy1 + A; cy++) for(let cx = R.cx0 - A; cx <= R.cx1 + A; cx++){
+    (cx >= R.cx0 && cx <= R.cx1 && cy >= R.cy0 && cy <= R.cy1 ? on : ring).push([cx, cy]);
+  }
+  ring.sort((a, b) => Math.hypot(a[0] - mx, a[1] - my) - Math.hypot(b[0] - mx, b[1] - my));
+  return { on, ahead: ring.slice(0, Math.max(0, TD_CHUNK.KEEP - on.length)) };
 }
 function tdDrawGroundChunks(g, cam, w, h, zoom, now){
-  const map = TD.groundMap, T = TOPDOWN.TILE, vis = topdownVisibleRect(cam, w, h, zoom), R = tdChunkRange(vis);
+  const map = TD.groundMap, T = TOPDOWN.TILE, vis = topdownVisibleRect(cam, w, h, zoom), R = tdChunkRange(vis), want = tdChunkWanted(R);
   // the map's corner on screen, once: every chunk is placed from it by whole pixels, so chunks meet without seams
   const o = topdownToScreen(map.originX, map.originY, cam, w, h, zoom);
-  for(let cy = R.cy0; cy <= R.cy1; cy++) for(let cx = R.cx0; cx <= R.cx1; cx++){
+  want.on.forEach(([cx, cy]) => {
     const ch = tdChunkCanvas(cx, cy, now);
-    if(!ch.canvas) continue;
-    g.drawImage(ch.canvas, o.x + ch.area.i0 * T * zoom, o.y + ch.area.j0 * T * zoom, ch.canvas.width * zoom, ch.canvas.height * zoom);
-    if(TD_CHUNK_DEBUG){ g.strokeStyle = 'rgba(255,240,120,0.8)'; g.lineWidth = 1; g.strokeRect(o.x + ch.area.i0 * T * zoom + 0.5, o.y + ch.area.j0 * T * zoom + 0.5, ch.canvas.width * zoom - 1, ch.canvas.height * zoom - 1); g.fillStyle = 'rgba(255,240,120,0.9)'; g.font = '12px monospace'; g.fillText(cx + ',' + cy, o.x + ch.area.i0 * T * zoom + 6, o.y + ch.area.j0 * T * zoom + 16); }
+    if(!ch.canvas) return;
+    const x = o.x + ch.area.i0 * T * zoom, y = o.y + ch.area.j0 * T * zoom;
+    g.drawImage(ch.canvas, x, y, ch.canvas.width * zoom, ch.canvas.height * zoom);
+    if(TD_CHUNK_DEBUG){ g.strokeStyle = 'rgba(255,240,120,0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, ch.canvas.width * zoom - 1, ch.canvas.height * zoom - 1); g.fillStyle = 'rgba(255,240,120,0.9)'; g.font = '12px monospace'; g.fillText(cx + ',' + cy, x + 6, y + 16); }
+  });
+  // ahead of time, in strips: at least one strip a frame, more while the frame still has time
+  const keep = new Set(want.on.concat(want.ahead).map(([cx, cy]) => cx + ',' + cy));
+  for(const [cx, cy] of want.ahead){
+    const ch = TD.chunks.get(cx + ',' + cy);
+    if(ch && !ch.job){ ch.used = Math.max(ch.used, now - 1); continue; }
+    let first = true;
+    while(first || performance.now() - now < TD_CHUNK.FRAME_MS){
+      first = false;
+      const done = tdChunkWork(cx, cy, TD_CHUNK.SLICE_ROWS, now - 1);
+      if(done) break;
+    }
+    if(performance.now() - now >= TD_CHUNK.FRAME_MS) break;
   }
-  // ahead of time: the ring round the screen, nearest the middle first, within the frame's budget
-  const mx = (R.cx0 + R.cx1) / 2, my = (R.cy0 + R.cy1) / 2, A = TD_CHUNK.AHEAD, todo = [];
-  for(let cy = R.cy0 - A; cy <= R.cy1 + A; cy++) for(let cx = R.cx0 - A; cx <= R.cx1 + A; cx++) if(!TD.chunks.has(cx + ',' + cy)) todo.push([cx, cy]);
-  todo.sort((a, b) => Math.hypot(a[0] - mx, a[1] - my) - Math.hypot(b[0] - mx, b[1] - my));
-  if(todo.length && performance.now() - now < TD_CHUNK.BUDGET_MS) tdChunkCanvas(todo[0][0], todo[0][1], now - 1); // only when this frame has time left
-  // keep at most KEEP painted chunks: drop the least recently drawn ones that are not on screen
-  if(TD.chunks.size > TD_CHUNK.KEEP){
-    const old = [...TD.chunks.entries()].filter(([, c]) => c.used < now - 1).sort((a, b) => a[1].used - b[1].used);
-    while(TD.chunks.size > TD_CHUNK.KEEP && old.length){ TD.chunks.delete(old.shift()[0]); TD.chunkStats.dropped++; }
+  // keep at most KEEP: drop what this frame does not want, least recently used first (empty markers too)
+  if(TD.chunks.size > Math.max(TD_CHUNK.KEEP, want.on.length)){
+    const drop = [...TD.chunks.entries()].filter(([k]) => !keep.has(k)).sort((a, b) => a[1].used - b[1].used);
+    while(TD.chunks.size > Math.max(TD_CHUNK.KEEP, want.on.length) && drop.length){ TD.chunks.delete(drop.shift()[0]); tdChunkStats().dropped++; }
   }
 }
 const TD_CHUNK_DEBUG = (() => { try { return new URLSearchParams(window.location.search).get('chunks') === 'debug'; } catch(e){ return false; } })();
@@ -327,7 +381,8 @@ function tdRender(now){
   if(typeof tdWorkerSimStep === 'function'){ const ws = TD.workerSim; tdWorkerSimStep(ws && ws.last !== null ? now - ws.last : 0, now); }
   // objects, back to front
   const frame = topdownWalkFrame(pos.walked, p.pose);
-  const items = tdDrawList({ dir: p.facing, frame, x: pos.x, y: pos.y });
+  const vr = topdownVisibleRect(cam, w, h, zoom), M = TD_DRAW_MARGIN; // the culling below reaches at most 260 px (4.1 units at zoom 1) past the screen
+  const items = tdDrawList({ dir: p.facing, frame, x: pos.x, y: pos.y }, { minX: vr.minX - M, maxX: vr.maxX + M, minY: vr.minY - M, maxY: vr.maxY + M });
   const sheet = TD.sheet;
   items.forEach(it => {
     const sp = topdownToScreen(it.x, it.y, cam, w, h, zoom);
